@@ -1,0 +1,95 @@
+name: test_athkar_app
+description: "تطبيق أذكار إسلامية للتجربة."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.6.1 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+    
+  # 🌐 خطوط وأيقونات
+  google_fonts: ^4.0.4                # لاستخدام خطوط Google
+  cupertino_icons: ^1.0.8              # أيقونات نظام iOS
+
+  # 🎬 حركات وانتقالات
+  animations: ^2.0.11                  # حزمة لإنشاء حركات جميلة
+  flutter_staggered_animations: ^1.1.1 # حركات مرتبة للعناصر داخل List/Grid
+
+  # 🕰️ التعامل مع الوقت والتاريخ
+  intl: ^0.19.0                        # التعامل مع تنسيقات التاريخ والوقت
+  hijri: ^3.0.0                        # دعم التقويم الهجري
+  hijri_calendar: ^1.0.7+7             # تقويم هجري محسّن
+
+  # 🗂️ إدارة الحالة والتخزين
+  provider: ^6.1.5                     # إدارة الحالة بطريقة بسيطة
+  shared_preferences: ^2.1.0           # حفظ البيانات محليًا (كالتفضيلات)
+
+  # 🚀 الشاشات الأولية والانطلاق
+  flutter_onboarding_slider: ^1.0.11   # شرائح المقدمة (Onboarding)
+  another_flutter_splash_screen: ^1.2.1 # شاشة البداية (Splash Screen)
+  flutter_native_splash: ^2.4.6        # توليد شاشة بداية أصلية تلقائيًا
+
+
+  # 📄 مؤشرات الصفحات
+  smooth_page_indicator: ^1.2.1        # إنشاء مؤشرات للصفحات المتنقلة (PageView)
+  auto_size_text: ^3.0.0
+  flutter_screenutil: ^5.9.3
+
+  flutter_localization: ^0.3.2
+  share_plus: ^11.0.0
+
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0                # قواعد تحسين الكود والتنبيه للأخطاء
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/data/daily_quotes.json
+
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Regular.ttf
+        - asset: assets/fonts/Cairo-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Cairo-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Cairo-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Cairo-Light.ttf
+          weight: 300
+
+
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Amiri-Bold.ttf
+          weight: 700
+
+# إعدادات شاشة العرض الأولية (Splash Screen)
+flutter_native_splash:
+  color: "#e7e8e3"
+  image: "assets/images/Logo22.png"
+  android: true
+  ios: true
+  web: false
+
+# إعدادات أيقونة التطبيق (Launcher Icon)
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo1.png"
+  adaptive_icon_background: "#e7e8e3"
+  adaptive_icon_foreground: "assets/images/logo1.png"
