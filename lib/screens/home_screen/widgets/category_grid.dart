@@ -3,10 +3,10 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/favorites_screen/favorites_screen.dart';
+import 'package:test_athkar_app/screens/AthkarScreen/tasbih_screen.dart';
 import '../../hijri_date_time_header/hijri_date_time_header.dart'
-
-
     show kPrimary; // للحصول على لون الـ SnackBar
+import 'package:test_athkar_app/screens/athkarscreen/athkar_screen.dart';
 
 class CategoryGrid extends StatefulWidget {
   const CategoryGrid({Key? key}) : super(key: key);
@@ -28,28 +28,49 @@ class _CategoryGridState extends State<CategoryGrid> {
 
   // قائمة الفئات المسبقة
   final List<Category> _categories = const [
-    Category(title: r'التسبيح', icon: Icons.cyclone, color: Color(0xFFFFB300)),
     Category(
-        title: r'الحديث',
-        icon: Icons.format_quote_rounded,
-        color: Color(0xFF4CAF50)),
-    Category(title: r'الدعاء', icon: Icons.favorite_rounded, color: Color(0xFF9C27B0)),
+      title: r'الأذكار',
+      icon: Icons.menu_book_rounded,
+      color: Color(0xFF009688),
+      screen: AthkarScreen(), // ربط مباشر بصفحة الأذكار
+    ),
     Category(
-        title: r'القرآن',
-        icon: Icons.menu_book_rounded,
-        color: Color(0xFF009688)),
+      title: r'المسبحة',
+      icon: Icons.cyclone,
+      color: Color(0xFFFFB300),
+      screen: TasbihScreen(), // ربط بالصفحة الجديدة للمسبحة
+    ),
     Category(
-        title: r'خلفيات', icon: Icons.wallpaper_rounded, color: Color(0xFF2196F3)),
+      title: r'الحديث',
+      icon: Icons.format_quote_rounded,
+      color: Color(0xFF4CAF50)
+    ),
     Category(
-        title: r'تبرع',
-        icon: Icons.card_giftcard_rounded,
-        color: Color(0xFFFF9800)),
-  Category(
-    title: r'المفضلة',
-    icon: Icons.favorite_rounded,
-    color: Color(0xFFE91E63),
-    screen: FavoritesScreen(), // صفحة المفضلة
-  ),
+      title: r'الدعاء',
+      icon: Icons.favorite_rounded,
+      color: Color(0xFF9C27B0)
+    ),
+    Category(
+      title: r'القرآن',
+      icon: Icons.menu_book_rounded,
+      color: Color(0xFF2196F3)
+    ),
+    Category(
+      title: r'خلفيات',
+      icon: Icons.wallpaper_rounded,
+      color: Color(0xFF03A9F4)
+    ),
+    Category(
+      title: r'المفضلة',
+      icon: Icons.favorite_rounded,
+      color: Color(0xFFE91E63),
+      screen: FavoritesScreen(), // صفحة المفضلة
+    ),
+    Category(
+      title: r'تبرع',
+      icon: Icons.card_giftcard_rounded,
+      color: Color(0xFFFF9800)
+    ),
   ];
 
   void _onCategoryTap(BuildContext context, Category cat) {
