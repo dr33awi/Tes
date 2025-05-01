@@ -58,4 +58,18 @@ class HighlightItem {
   final IconData headerIcon;
   final String quote;
   final String source;
+  
+  Map<String, dynamic> toJson() => {
+    'headerTitle': headerTitle,
+    'headerIcon': headerIcon.codePoint,
+    'quote': quote,
+    'source': source,
+  };
+ 
+  factory HighlightItem.fromJson(Map<String, dynamic> json) => HighlightItem(
+    headerTitle: json['headerTitle'],
+    headerIcon: IconData(json['headerIcon'], fontFamily: 'MaterialIcons'),
+    quote: json['quote'],
+    source: json['source'],
+  );
 }

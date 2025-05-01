@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/models/daily_quote_model.dart';
+import 'dart:convert';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key, this.newFavoriteQuote});
@@ -17,11 +19,44 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   void initState() {
     super.initState();
+    _loadFavoriteQuotes();
     if (widget.newFavoriteQuote != null) {
+      _addToFavorites(widget.newFavoriteQuote!);
+    }
+  }
+
+  // تحميل الاقتباسات المفضلة من SharedPreferences
+  void _loadFavoriteQuotes() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? jsonList = prefs.getStringList('favoriteQuotes');
+    if (jsonList != null) {
       setState(() {
-        favoriteQuotes.add(widget.newFavoriteQuote!);
+        favoriteQuotes = jsonList.map((json) => HighlightItem.fromJson(jsonDecode(json))).toList();
       });
     }
+  }
+
+  // حفظ الاقتباسات المفضلة في SharedPreferences
+  void _saveFavoriteQuotes() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> jsonList = favoriteQuotes.map((quote) => jsonEncode(quote.toJson())).toList();
+    await prefs.setStringList('favoriteQuotes', jsonList);
+  }
+
+  // إضافة اقتباس إلى المفضلة
+  void _addToFavorites(HighlightItem quote) {
+    setState(() {
+      favoriteQuotes.add(quote);
+    });
+    _saveFavoriteQuotes();
+  }
+
+  // إزالة اقتباس من المفضلة
+  void _removeFromFavorites(HighlightItem quote) {
+    setState(() {
+      favoriteQuotes.remove(quote);
+    });
+    _saveFavoriteQuotes();
   }
 
   @override
@@ -61,12 +96,5 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ),
       ),
     );
-  }
-
-  // إزالة اقتباس من المفضلة
-  void _removeFromFavorites(HighlightItem quote) {
-    setState(() {
-      favoriteQuotes.remove(quote);
-    });
   }
 }
