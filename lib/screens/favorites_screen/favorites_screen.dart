@@ -1,3 +1,4 @@
+// lib/screens/favorites_screen/favorites_screen.dart بعد التعديل
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -461,40 +462,38 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     ? _buildCategoriesGrid()
                     : _buildCategoryContent(),
               
-              // زر الرجوع
+              // زر الرجوع - تم تعديله هنا ليطابق نمط quote_details_screen
               Positioned(
                 top: 16,
                 right: 16,
-                child: InkWell(
-                  onTap: () {
-                    // إذا كنا نعرض المحتوى، نعود إلى قائمة الفئات
-                    if (!_showCategories && !_areAllCategoriesEmpty()) {
-                      setState(() {
-                        _showCategories = true;
-                      });
-                    } else {
-                      // وإلا نخرج من الصفحة
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(30),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: kPrimary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                child: AnimationConfiguration.synchronized(
+                  duration: const Duration(milliseconds: 300),
+                  child: FadeInAnimation(
+                    child: Material(
+                      color: kPrimary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: () {
+                          // إذا كنا نعرض المحتوى، نعود إلى قائمة الفئات
+                          if (!_showCategories && !_areAllCategoriesEmpty()) {
+                            setState(() {
+                              _showCategories = true;
+                            });
+                          } else {
+                            // وإلا نخرج من الصفحة
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10.0),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: kPrimary,
+                            size: 24,
+                          ),
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                      size: 20,
+                      ),
                     ),
                   ),
                 ),

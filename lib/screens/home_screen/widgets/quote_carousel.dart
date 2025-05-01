@@ -1,3 +1,4 @@
+// lib/screens/home_screen/widgets/quote_carousel.dart - تبسيط بإزالة ظل المؤشر والزخرفة الخلفية
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:test_athkar_app/models/daily_quote_model.dart';
@@ -25,46 +26,47 @@ class QuoteCarousel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Container(
-      decoration: BoxDecoration(
+    return Card(
+      elevation: 8,
+      shadowColor: kPrimary.withOpacity(0.4),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [kPrimary, kPrimaryLight],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(.12),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 180,
-            child: PageView.builder(
-              controller: pageController,
-              itemCount: highlights.length,
-              onPageChanged: (i) => pageIndex.value = i,
-              itemBuilder: (_, i) => Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                child: QuoteCard(
-                  text: highlights[i].quote,
-                  onTap: onQuoteTap != null
-                    ? () => onQuoteTap!(highlights[i])
-                    : null,
-                  quoteItem: highlights[i],
-                  index: i,  // إضافة فهرس العنصر هنا
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            colors: [kPrimary, kPrimaryLight],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            stops: [0.3, 1.0],
+          ),
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 180,
+              child: PageView.builder(
+                controller: pageController,
+                itemCount: highlights.length,
+                onPageChanged: (i) => pageIndex.value = i,
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                  child: QuoteCard(
+                    text: highlights[i].quote,
+                    onTap: onQuoteTap != null
+                      ? () => onQuoteTap!(highlights[i])
+                      : null,
+                    quoteItem: highlights[i],
+                    index: i,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          _buildCarouselFooter(theme),
-        ],
+            const SizedBox(height: 8),
+            _buildCarouselFooter(theme),
+          ],
+        ),
       ),
     );
   }
@@ -81,48 +83,63 @@ class QuoteCarousel extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(item.headerIcon, size: 18, color: kSourceTextColor),
-                      const SizedBox(width: 6),
-                      Text(
-                        item.headerTitle,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: kSourceTextColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                  // تصميم العنوان
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 0, 0, 0).withOpacity(.18),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(item.headerIcon, size: 18, color: kSourceTextColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          item.headerTitle,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: kSourceTextColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // تصميم المصدر
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       item.source,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-            SmoothPageIndicator(
-              controller: pageController,
-              count: highlights.length,
-              effect: const ExpandingDotsEffect(
-                expansionFactor: 3,
-                dotHeight: 6,
-                dotWidth: 6,
-                dotColor: Color.fromARGB(136, 255, 255, 255),
-                activeDotColor: Colors.white,
+            const SizedBox(height: 12),
+            
+            // مؤشر الصفحات البسيط (بدون حاوية)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: SmoothPageIndicator(
+                controller: pageController,
+                count: highlights.length,
+                effect: ExpandingDotsEffect(
+                  expansionFactor: 3,
+                  dotHeight: 6,
+                  dotWidth: 6,
+                  dotColor: Colors.white.withOpacity(0.3),
+                  activeDotColor: Colors.white,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
           ],
         );
       },

@@ -1,8 +1,13 @@
+// lib/screens/athkarscreen/tasbih_screen.dart - النسخة المحسنة
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
+import 'package:circular_seek_bar/circular_seek_bar.dart';
+import 'package:animated_flip_counter/animated_flip_counter.dart';
+import 'package:flutter/services.dart';
+import 'package:test_athkar_app/screens/home_screen/widgets/common/app_loading_indicator.dart';
 
 class TasbihScreen extends StatefulWidget {
   const TasbihScreen({Key? key}) : super(key: key);
@@ -26,18 +31,24 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
   
   // قائمة بعبارات التسبيح
   final List<Map<String, dynamic>> _tasbihList = [
-    {'text': 'سبحان الله', 'count': 33},
-    {'text': 'الحمد لله', 'count': 33},
-    {'text': 'الله أكبر', 'count': 33},
-    {'text': 'لا إله إلا الله', 'count': 100},
-    {'text': 'لا حول ولا قوة إلا بالله', 'count': 100},
-    {'text': 'أستغفر الله', 'count': 100},
-    {'text': 'اللهم صل على محمد', 'count': 100},
+    {'text': 'سبحان الله', 'count': 33, 'color': const Color(0xFF66BB6A)},
+    {'text': 'الحمد لله', 'count': 33, 'color': const Color(0xFF42A5F5)},
+    {'text': 'الله أكبر', 'count': 33, 'color': const Color(0xFFFFB74D)},
+    {'text': 'لا إله إلا الله', 'count': 100, 'color': const Color(0xFFAB47BC)},
+    {'text': 'لا حول ولا قوة إلا بالله', 'count': 100, 'color': const Color(0xFF5C6BC0)},
+    {'text': 'أستغفر الله', 'count': 100, 'color': const Color(0xFFE57373)},
+    {'text': 'اللهم صل على محمد', 'count': 100, 'color': const Color(0xFF4DB6AC)},
   ];
 
   // الفهرس الحالي لعبارة التسبيح
   int _currentTasbihIndex = 0;
 
+  // متحكم المؤشر الدائري
+  final _seekBarKey = GlobalKey<CircularSeekBarState>();
+  
+  // حالة التحميل
+  bool _isLoading = true;
+  
   // متحكم الحركة للزر
   late AnimationController _animationController;
   late Animation<double> _animation;
@@ -56,6 +67,15 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
     _animation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+    
+    // محاكاة التحميل
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
   }
 
   @override
@@ -91,15 +111,33 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       _counter++;
       _totalCount++;
       
+      // تحديث المؤشر الدائري
+      _seekBarKey.currentState?.setValue(_counter.toDouble());
+      
       // انتقل إلى التسبيح التالي إذا وصلنا للحد الأقصى
       if (_counter >= _maxCount) {
         _counter = 0;
         _currentTasbihIndex = (_currentTasbihIndex + 1) % _tasbihList.length;
         _currentTasbih = _tasbihList[_currentTasbihIndex]['text'];
         _maxCount = _tasbihList[_currentTasbihIndex]['count'];
+        
+        // تحديث المؤشر بالقيم الجديدة
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            _seekBarKey.currentState?.setMax(_maxCount.toDouble());
+            _seekBarKey.currentState?.setValue(0);
+          }
+        });
       }
     });
     _saveTasbihState();
+    
+    // تأثير اهتزاز للتغذية الراجعة
+    if (_counter >= _maxCount) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.lightImpact();
+    }
   }
 
   // إعادة ضبط العداد
@@ -118,9 +156,14 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
             onPressed: () {
               setState(() {
                 _counter = 0;
+                // تحديث المؤشر الدائري
+                _seekBarKey.currentState?.setValue(0);
               });
               _saveTasbihState();
               Navigator.pop(context);
+              
+              // تأثير اهتزاز للتغذية الراجعة
+              HapticFeedback.mediumImpact();
             },
             child: const Text('موافق'),
           ),
@@ -136,68 +179,124 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       _currentTasbih = _tasbihList[_currentTasbihIndex]['text'];
       _maxCount = _tasbihList[_currentTasbihIndex]['count'];
       _counter = 0;
+      
+      // تحديث المؤشر الدائري بالقيم الجديدة
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _seekBarKey.currentState?.setMax(_maxCount.toDouble());
+          _seekBarKey.currentState?.setValue(0);
+        }
+      });
     });
     _saveTasbihState();
+    
+    // تأثير اهتزاز للتغذية الراجعة
+    HapticFeedback.mediumImpact();
   }
 
   @override
   Widget build(BuildContext context) {
+    // الحصول على حجم الشاشة
+    final size = MediaQuery.of(context).size;
+    final double seekBarSize = size.width * 0.75;
+    
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: kSurface,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(
+            'المسبحة الإلكترونية',
+            style: TextStyle(
+              color: kPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
+          ),
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back,
+              color: kPrimary,
+            ),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: AppLoadingIndicator(
+          message: 'جاري تحضير المسبحة...',
+          loadingType: LoadingType.bouncingBall,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: kSurface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'المسبحة الإلكترونية',
+          style: TextStyle(
+            color: kPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: kPrimary,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
           child: Column(
             children: [
-              // شريط العنوان
-              Padding(
-                padding: const EdgeInsets.only(top: 8, right: 8, left: 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: kPrimary,
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const Expanded(
-                      child: Center(
-                        child: Text(
-                          'المسبحة الإلكترونية',
-                          style: TextStyle(
-                            color: kPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-              ),
-              
               // إجمالي العدد
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: kPrimary.withOpacity(0.1),
+                    gradient: LinearGradient(
+                      colors: [kPrimary, kPrimaryLight],
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                    ),
                     borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: kPrimary.withOpacity(0.3)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.equalizer, color: kPrimary),
+                      const Icon(Icons.equalizer, color: Colors.white),
                       const SizedBox(width: 8),
                       Text(
-                        'الإجمالي: $_totalCount',
+                        'الإجمالي: ',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: kPrimary,
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                      ),
+                      AnimatedFlipCounter(
+                        duration: const Duration(milliseconds: 500),
+                        value: _totalCount,
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 18,
                         ),
                       ),
                     ],
@@ -207,95 +306,157 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
               
               // عبارة التسبيح الحالية
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: AnimationConfiguration.synchronized(
                   duration: const Duration(milliseconds: 500),
-                  child: FadeInAnimation(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [kPrimary, kPrimaryLight],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
+                  child: SlideAnimation(
+                    verticalOffset: 20,
+                    child: FadeInAnimation(
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            _currentTasbih,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                _tasbihList[_currentTasbihIndex]['color'],
+                                Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.3) ?? _tasbihList[_currentTasbihIndex]['color'],
+                              ],
+                              begin: Alignment.topRight,
+                              end: Alignment.bottomLeft,
                             ),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            '$_counter / $_maxCount',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
+                          child: Column(
+                            children: [
+                              Text(
+                                _currentTasbih,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'العدد: ',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  AnimatedFlipCounter(
+                                    duration: const Duration(milliseconds: 500),
+                                    value: _counter,
+                                    textStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const Text(
+                                    ' / ',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$_maxCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
               
-              // زر العداد
+              // المؤشر الدائري
               Expanded(
                 child: Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      _animationController.forward().then((_) {
-                        _animationController.reverse();
-                      });
-                      _incrementCounter();
+                  child: CircularSeekBar(
+                    key: _seekBarKey,
+                    width: seekBarSize,
+                    height: seekBarSize,
+                    progress: _counter.toDouble(),
+                    maxProgress: _maxCount.toDouble(),
+                    barWidth: 16.0,
+                    startAngle: 0,
+                    sweepAngle: 360,
+                    strokeCap: StrokeCap.round,
+                    progressGradientColors: [
+                      _tasbihList[_currentTasbihIndex]['color'],
+                      Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.3) ?? _tasbihList[_currentTasbihIndex]['color'],
+                    ],
+                    innerThumbRadius: 5.0,
+                    innerThumbStrokeWidth: 3.0,
+                    innerThumbColor: Colors.white,
+                    outerThumbRadius: 18.0,
+                    outerThumbStrokeWidth: 3.0,
+                    outerThumbColor: _tasbihList[_currentTasbihIndex]['color'],
+                    dashWidth: 0.0,
+                    dashGap: 0.0,
+                    animation: true,
+                    animDurationMillis: 300,
+                    curves: Curves.easeInOut,
+                    trackColor: Colors.grey.shade300,
+                    valueNotifier: (double value) {
+                      // يمكنك استخدام هذا للحصول على قيمة المؤشر
                     },
-                    child: ScaleTransition(
-                      scale: _animation,
-                      child: Container(
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [kPrimary, kPrimaryLight],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: kPrimary.withOpacity(0.3),
-                              spreadRadius: 2,
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$_counter',
-                            style: const TextStyle(
-                              fontSize: 60,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: _incrementCounter,
+                        child: AnimatedBuilder(
+                          animation: _animation,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _animation.value,
+                              child: Container(
+                                width: seekBarSize * 0.7,
+                                height: seekBarSize * 0.7,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      _tasbihList[_currentTasbihIndex]['color'],
+                                      Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.2) ?? _tasbihList[_currentTasbihIndex]['color'],
+                                    ],
+                                    center: Alignment(0.2, 0.2),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _tasbihList[_currentTasbihIndex]['color'].withOpacity(0.4),
+                                      blurRadius: 25,
+                                      offset: Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: AnimatedFlipCounter(
+                                    duration: const Duration(milliseconds: 300),
+                                    value: _counter,
+                                    textStyle: const TextStyle(
+                                      fontSize: 60,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -309,15 +470,17 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton(
+                    _buildToolbarButton(
                       onPressed: _resetCounter,
-                      icon: const Icon(Icons.refresh, color: kPrimary),
-                      tooltip: 'إعادة ضبط',
+                      icon: Icons.refresh,
+                      label: 'إعادة ضبط',
+                      color: Colors.blue,
                     ),
-                    IconButton(
+                    _buildToolbarButton(
                       onPressed: () => _showTasbihList(context),
-                      icon: const Icon(Icons.list, color: kPrimary),
-                      tooltip: 'قائمة التسبيحات',
+                      icon: Icons.list,
+                      label: 'قائمة التسبيحات',
+                      color: kPrimary,
                     ),
                   ],
                 ),
@@ -325,6 +488,29 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
             ],
           ),
         ),
+      ),
+    );
+  }
+  
+  // بناء زر في شريط الأدوات
+  Widget _buildToolbarButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, color: Colors.white),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 4,
       ),
     );
   }
@@ -341,7 +527,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withOpacity(0.2),
               spreadRadius: 1,
               blurRadius: 10,
             ),
@@ -353,6 +539,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // مقبض السحب
             Container(
               width: 50,
               height: 5,
@@ -362,17 +549,20 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                 borderRadius: BorderRadius.circular(2.5),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'اختر التسبيح',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: kPrimary,
-                ),
+            
+            // عنوان
+            Text(
+              'اختر التسبيح',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: kPrimary,
               ),
             ),
+            
+            const SizedBox(height: 12),
+            
+            // قائمة التسبيحات
             Flexible(
               child: AnimationLimiter(
                 child: ListView.builder(
@@ -380,6 +570,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                   itemCount: _tasbihList.length,
                   itemBuilder: (context, index) {
                     final bool isSelected = index == _currentTasbihIndex;
+                    final tasbih = _tasbihList[index];
                     
                     return AnimationConfiguration.staggeredList(
                       position: index,
@@ -387,37 +578,37 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                       child: SlideAnimation(
                         verticalOffset: 50.0,
                         child: FadeInAnimation(
-                          child: ListTile(
-                            title: Text(
-                              _tasbihList[index]['text'],
-                              style: TextStyle(
-                                color: isSelected ? kPrimary : Colors.black87,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
+                          child: Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            elevation: isSelected ? 4 : 1,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            subtitle: Text(
-                              'العدد: ${_tasbihList[index]['count']}',
-                              style: TextStyle(
-                                color: isSelected ? kPrimary.withOpacity(0.7) : Colors.black54,
+                            child: ListTile(
+                              leading: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: tasbih['color'],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: isSelected 
+                                    ? Icon(Icons.check, color: Colors.white, size: 20)
+                                    : null,
                               ),
+                              title: Text(
+                                tasbih['text'],
+                                style: TextStyle(
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              subtitle: Text('العدد: ${tasbih['count']}'),
+                              selected: isSelected,
+                              onTap: () {
+                                _changeTasbih(index);
+                                Navigator.pop(context);
+                              },
                             ),
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: isSelected ? kPrimary : kPrimary.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.check,
-                                color: isSelected ? Colors.white : Colors.transparent,
-                                size: 20,
-                              ),
-                            ),
-                            onTap: () {
-                              _changeTasbih(index);
-                              Navigator.pop(context);
-                            },
                           ),
                         ),
                       ),

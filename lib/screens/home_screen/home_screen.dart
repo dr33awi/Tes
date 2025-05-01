@@ -1,41 +1,22 @@
-// lib/screens/home_screen/home_screen.dart
+// lib/screens/home_screen/home_screen.dart - تغيير شكل أيقونة التحميل عند التحديث
 import 'dart:async';
-
 
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart'; // إضافة المكتبة
 
 import 'package:test_athkar_app/models/daily_quote_model.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart';
-import 'package:test_athkar_app/screens/home_screen/widgets/category_grid.dart';   // ← الاستدعاء الوحيد للقائمة
+import 'package:test_athkar_app/screens/home_screen/widgets/category_grid.dart';
 import 'package:test_athkar_app/screens/home_screen/widgets/quote_carousel.dart';
 import 'package:test_athkar_app/screens/quote_details_screen/quote_details_screen.dart';
 import 'package:test_athkar_app/services/daily_quote_service.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 
-// Palette & constants
+// استيراد الألوان الرئيسية
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
-
-const Color kQuoteTextColor = Color(0xFF2F5943);
-const Color kSourceTextColor = Colors.white;
-
-class HijriDateText extends StatelessWidget {
-  const HijriDateText({super.key, required this.currentTime});
-
-  final ValueListenable<DateTime> currentTime;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<DateTime>(
-      valueListenable: currentTime,
-      builder: (_, now, __) {
-        return HijriDateTimeHeader(currentTime: currentTime);
-      },
-    );
-  }
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -46,18 +27,21 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with AutomaticKeepAliveClientMixin {
-  // Controllers
+  // متحكمات العرض
   final PageController _pageController = PageController();
   final ValueNotifier<int> _pageIndex = ValueNotifier<int>(0);
 
-  // Live clock notifier
+  // ساعة حية
   late final ValueNotifier<DateTime> _currentTime;
   Timer? _clockTimer;
 
-  // Quote service
+  // خدمة الاقتباسات
   final DailyQuoteService _quoteService = DailyQuoteService();
   List<HighlightItem> _highlights = [];
   bool _highlightsLoaded = false;
+  
+  // للتحكم في حالة السحب للتحديث
+  bool _isRefreshing = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -66,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
 
-    // clock
+    // إعداد الساعة
     _currentTime = ValueNotifier<DateTime>(DateTime.now());
     _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _currentTime.value = DateTime.now();
@@ -76,6 +60,12 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _initQuoteService() async {
+    if (mounted) {
+      setState(() {
+        _highlightsLoaded = false; // نجعل حالة التحميل نشطة عند بدء التحميل
+      });
+    }
+    
     try {
       await _quoteService.initialize();
       final dailyHighlights = await _quoteService.getDailyHighlights();
@@ -83,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() {
           _highlights = dailyHighlights;
           _highlightsLoaded = true;
+          _isRefreshing = false;
         });
       }
     } catch (e) {
@@ -106,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ];
           _highlightsLoaded = true;
+          _isRefreshing = false;
         });
       }
     }
@@ -123,6 +115,8 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    
+    // إعداد سمة متناسقة مع التطبيق
     final ThemeData theme = ThemeData(
       fontFamily: GoogleFonts.cairo().fontFamily,
       colorScheme: ColorScheme.fromSeed(seedColor: kPrimary, surface: kSurface),
@@ -133,42 +127,90 @@ class _HomeScreenState extends State<HomeScreen>
       data: theme,
       child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            'تطبيق الأذكار',
+            style: TextStyle(
+              color: kPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
+          ),
+          centerTitle: true,
+          actions: [
+            // زر الإعدادات
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: IconButton(
+                icon: Icon(
+                  Icons.settings,
+                  color: kPrimary,
+                  size: 26,
+                ),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('إعدادات التطبيق قيد التطوير'),
+                      backgroundColor: kPrimary,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                },
+                tooltip: 'الإعدادات',
+              ),
+            ),
+          ],
+        ),
         body: Directionality(
           textDirection: TextDirection.rtl,
-          child: SafeArea(
+          child: RefreshIndicator(
+            color: kPrimary,
+            backgroundColor: Colors.white,
+            onRefresh: () async {
+              setState(() {
+                _isRefreshing = true;
+                _highlightsLoaded = false; // نجعل حالة التحميل نشطة عند السحب للتحديث
+              });
+              await _initQuoteService();
+            },
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
               slivers: [
-                // Date text
+                // التاريخ الهجري
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: AnimationConfiguration.synchronized(
                       duration: const Duration(milliseconds: 500),
                       child: SlideAnimation(
                         verticalOffset: 20,
                         child: FadeInAnimation(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: HijriDateText(currentTime: _currentTime),
-                          ),
+                          child: HijriDateTimeHeader(currentTime: _currentTime),
                         ),
                       ),
                     ),
                   ),
                 ),
 
-                // Quote carousel
+                // عرض الاقتباسات أو مؤشر التحميل
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     child: AnimationConfiguration.synchronized(
                       duration: const Duration(milliseconds: 600),
                       child: SlideAnimation(
                         verticalOffset: 50,
                         child: FadeInAnimation(
-                          child: _highlightsLoaded
-                              ? QuoteCarousel(
+                          child: !_highlightsLoaded
+                              ? _buildLoadingHighlightsCard(theme)
+                              : QuoteCarousel(
                                   highlights: _highlights,
                                   pageController: _pageController,
                                   pageIndex: _pageIndex,
@@ -179,15 +221,47 @@ class _HomeScreenState extends State<HomeScreen>
                                           QuoteDetailsScreen(quoteItem: quoteItem),
                                     ),
                                   ),
-                                )
-                              : _buildLoadingHighlightsCard(theme),
+                                ),
                         ),
                       ),
                     ),
                   ),
                 ),
 
-                // *** القائمة (Grid) أصبحت مجرد استدعاء واحد ***
+                // عنوان قسم الفئات
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: AnimationConfiguration.synchronized(
+                      duration: const Duration(milliseconds: 700),
+                      child: SlideAnimation(
+                        verticalOffset: 30,
+                        child: FadeInAnimation(
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.category_rounded,
+                                color: kPrimary,
+                                size: 24,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'الأقسام',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: kPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // شبكة الفئات
                 const CategoryGrid(),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -199,34 +273,50 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // Loading placeholder
+  // مؤشر التحميل باستخدام المكتبة - يتغير حسب حالة التحديث
   Widget _buildLoadingHighlightsCard(ThemeData theme) {
-    return Container(
-      height: 240,
-      decoration: BoxDecoration(
+    return Card(
+      elevation: 6,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [kPrimary, kPrimaryLight],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(.12),
-              blurRadius: 14,
-              offset: const Offset(0, 6)),
-        ],
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(color: Colors.white),
-            const SizedBox(height: 16),
-            Text('جاري تحميل المقتبسات...',
+      child: Container(
+        height: 240,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            colors: [kPrimary, kPrimaryLight],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            stops: [0.3, 1.0],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // استخدام أيقونة تحميل مختلفة عند التحديث
+              _isRefreshing 
+                ? LoadingAnimationWidget.fourRotatingDots(
+                    color: Colors.white,
+                    size: 50,
+                  )
+                : LoadingAnimationWidget.staggeredDotsWave(
+                    color: Colors.white,
+                    size: 50,
+                  ),
+              const SizedBox(height: 16),
+              Text(
+                _isRefreshing 
+                    ? 'جاري تحديث المقتبسات...' 
+                    : 'جاري تحميل المقتبسات...',
                 style: theme.textTheme.bodyLarge!.copyWith(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
-          ],
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+// lib/screens/hijri_date_time_header/hijri_date_time_header.dart - تحسين وتبسيط
 import 'package:flutter/material.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -8,9 +9,6 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 const Color kPrimary = Color(0xFF0B8457);
 const Color kPrimaryLight = Color(0xFF27B376);
 const Color kSurface = Color(0xFFE7E8E3);
-
-
-const _kDialogRadius = 20.0;
 
 // أسماء الأشهر الهجرية
 const List<String> _hijriMonths = <String>[
@@ -27,9 +25,6 @@ const List<String> _hijriMonths = <String>[
   'ذو القعدة',
   'ذو الحجة',
 ];
-
-// حروف أيام الأسبوع (الأحد = "أ")
-const List<String> _weekDays = <String>['أ', 'إ', 'ث', 'ر', 'خ', 'ج', 'س'];
 
 // أسماء الأشهر الميلادية بالعربية
 const List<String> _gregorianMonths = <String>[
@@ -67,29 +62,95 @@ class HijriDateTimeHeader extends StatelessWidget {
         final String gregorianDate =
             '${now.day} ${_gregorianMonths[now.month - 1]} ${now.year} م';
 
-        return Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: <Widget>[
-              const _CalendarAvatar(iconSize: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: InkWell(
-                    onTap: () => _showCalendar(context, hijri),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: _DateTexts(
-                        hijri: hijri,
-                        gregorianDate: gregorianDate,
-                        textSize: 14,
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [kPrimary, kPrimaryLight],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                stops: [0.3, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _showCalendar(context, hijri),
+              child: Row(
+                children: <Widget>[
+                  // أيقونة التقويم المحسنة
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.calendar_today_rounded,
+                        size: 22,
+                        color: Colors.white,
                       ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  
+                  // تفاصيل التاريخ
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          // التاريخ الهجري
+                          Text(
+                            '${hijri.hDay} ${_hijriMonths[hijri.hMonth - 1]} ${hijri.hYear} هـ',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          
+                          // التاريخ الميلادي
+                          Text(
+                            gregorianDate,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // أيقونة العرض
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
@@ -100,67 +161,6 @@ class HijriDateTimeHeader extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (_) => _CalendarDialog(initial: hijri),
-    );
-  }
-}
-
-// Small reusable widgets to keep build methods tidy --------------------------
-class _CalendarAvatar extends StatelessWidget {
-  const _CalendarAvatar({required this.iconSize});
-
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: iconSize,
-      height: iconSize,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: <Color>[kPrimary, kPrimaryLight],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(Icons.calendar_today_rounded, size: iconSize * 0.6, color: Colors.white),
-    );
-  }
-}
-
-class _DateTexts extends StatelessWidget {
-  const _DateTexts({
-    required this.hijri,
-    required this.gregorianDate,
-    required this.textSize,
-  });
-
-  final HijriCalendar hijri;
-  final String gregorianDate;
-  final double textSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          '${hijri.hDay} ${_hijriMonths[hijri.hMonth - 1]} ${hijri.hYear} هـ',
-          style: TextStyle(
-            fontSize: textSize,
-            fontWeight: FontWeight.bold,
-            color: kPrimary,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          gregorianDate,
-          style: TextStyle(
-            fontSize: textSize * 0.8,
-            color: Colors.grey.shade600,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -195,12 +195,12 @@ class _CalendarDialogState extends State<_CalendarDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_kDialogRadius)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       elevation: 8,
       shadowColor: Colors.black38,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(_kDialogRadius),
+          borderRadius: BorderRadius.circular(20),
           color: Colors.white,
           boxShadow: <BoxShadow>[
             BoxShadow(
@@ -260,7 +260,7 @@ class _CalendarDialogState extends State<_CalendarDialog> {
     );
   }
 
-  // Navigation helpers --------------------------------------------------------
+  // Navigation helpers
   void _prevMonth() => setState(() {
         if (_visibleMonth.hMonth == 1) {
           if (_visibleMonth.hYear > 1356) {
@@ -495,6 +495,8 @@ class _WeekDaysRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final List<String> _weekDays = <String>['أ', 'إ', 'ث', 'ر', 'خ', 'ج', 'س'];
+    
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
