@@ -6,6 +6,8 @@ import 'package:test_athkar_app/models/daily_quote_model.dart';
 import 'package:test_athkar_app/screens/favorites_screen/favorites_screen.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class QuoteDetailsScreen extends StatefulWidget {
   const QuoteDetailsScreen({super.key, required this.quoteItem});
@@ -50,6 +52,82 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
     
     // تشغيل التحريك مباشرة
     _animationController.forward();
+    
+    // التحقق مما إذا كان الاقتباس موجودًا بالفعل في المفضلة
+    _checkIfFavorite();
+  }
+  
+  // دالة للتحقق مما إذا كان الاقتباس موجودًا في المفضلة
+  Future<void> _checkIfFavorite() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      
+      // قراءة قوائم المفضلة المختلفة
+      List<String>? jsonQuranVerses = prefs.getStringList('favoriteQuranVerses');
+      List<String>? jsonHadiths = prefs.getStringList('favoriteHadiths');
+      List<String>? jsonPrayers = prefs.getStringList('favoritePrayers');
+      List<String>? jsonAthkar = prefs.getStringList('favoriteAthkar');
+      List<String>? jsonLegacy = prefs.getStringList('favoriteQuotes');
+      
+      // تحويل جميع قوائم المفضلة إلى كائنات HighlightItem
+      List<HighlightItem> allFavorites = [];
+      
+      // إضافة جميع المفضلات من كل الفئات
+      if (jsonQuranVerses != null && jsonQuranVerses.isNotEmpty) {
+        allFavorites.addAll(jsonQuranVerses
+            .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+            .toList());
+      }
+      
+      if (jsonHadiths != null && jsonHadiths.isNotEmpty) {
+        allFavorites.addAll(jsonHadiths
+            .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+            .toList());
+      }
+      
+      if (jsonPrayers != null && jsonPrayers.isNotEmpty) {
+        allFavorites.addAll(jsonPrayers
+            .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+            .toList());
+      }
+      
+      if (jsonAthkar != null && jsonAthkar.isNotEmpty) {
+        allFavorites.addAll(jsonAthkar
+            .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+            .toList());
+      }
+      
+      // التوافق مع القائمة القديمة
+      if (jsonLegacy != null && jsonLegacy.isNotEmpty) {
+        allFavorites.addAll(jsonLegacy
+            .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+            .toList());
+      }
+      
+      // التحقق مما إذا كان الاقتباس الحالي موجودًا في المفضلة
+      bool isFound = false;
+      for (var favorite in allFavorites) {
+        if (favorite.quote == widget.quoteItem.quote) {
+          isFound = true;
+          break;
+        }
+      }
+      
+      // تحديث حالة المفضلة إذا كان الاقتباس موجودًا
+      if (mounted && isFound) {
+        setState(() {
+          _isFavorite = true;
+        });
+        
+        // نقوم بتشغيل تأثير النبض للزر إذا كان مفضلاً
+        if (_isFavorite) {
+          _animationController.reset();
+          _animationController.forward();
+        }
+      }
+    } catch (e) {
+      debugPrint('خطأ في التحقق من المفضلة: $e');
+    }
   }
 
   @override
@@ -120,17 +198,15 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
     HapticFeedback.mediumImpact();
     
     if (_isFavorite) {
+      // تشغيل تأثير النبض للزر
       _animationController.reset();
       _animationController.forward();
       
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => FavoritesScreen(
-            newFavoriteQuote: widget.quoteItem,
-          ),
-        ),
-      );
+      // إضافة الاقتباس للمفضلة بدون الانتقال إلى صفحة المفضلة
+      await _addToFavorites();
+    } else {
+      // إزالة العنصر من المفضلة مباشرةً
+      await _removeFromFavorites();
     }
     
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -139,11 +215,135 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
       }
     });
   }
+  
+  // إضافة الاقتباس إلى المفضلة
+  Future<void> _addToFavorites() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      
+      // تحديد نوع الاقتباس لإضافته إلى القائمة المناسبة
+      String listKey;
+      if (_isQuranVerse(widget.quoteItem)) {
+        listKey = 'favoriteQuranVerses';
+      } else if (_isHadith(widget.quoteItem)) {
+        listKey = 'favoriteHadiths';
+      } else if (_isPrayer(widget.quoteItem)) {
+        listKey = 'favoritePrayers';
+      } else {
+        listKey = 'favoriteAthkar';
+      }
+      
+      // قراءة القائمة الحالية
+      List<String> currentList = prefs.getStringList(listKey) ?? [];
+      
+      // التحقق من عدم وجود العنصر مسبقًا في القائمة
+      bool alreadyExists = false;
+      for (var jsonItem in currentList) {
+        HighlightItem item = HighlightItem.fromJson(jsonDecode(jsonItem));
+        if (item.quote == widget.quoteItem.quote) {
+          alreadyExists = true;
+          break;
+        }
+      }
+      
+      // إضافة العنصر فقط إذا لم يكن موجودًا
+      if (!alreadyExists) {
+        currentList.add(jsonEncode(widget.quoteItem.toJson()));
+        await prefs.setStringList(listKey, currentList);
+      }
+      
+    } catch (e) {
+      debugPrint('خطأ في إضافة العنصر إلى المفضلة: $e');
+    }
+  }
+
+  // إزالة الاقتباس من المفضلة مباشرة
+  Future<void> _removeFromFavorites() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      
+      // قراءة جميع قوائم المفضلة
+      List<String> jsonQuranVerses = prefs.getStringList('favoriteQuranVerses') ?? [];
+      List<String> jsonHadiths = prefs.getStringList('favoriteHadiths') ?? [];
+      List<String> jsonPrayers = prefs.getStringList('favoritePrayers') ?? [];
+      List<String> jsonAthkar = prefs.getStringList('favoriteAthkar') ?? [];
+      
+      // تحويل كل قائمة إلى كائنات HighlightItem
+      List<HighlightItem> quranVerses = jsonQuranVerses
+          .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+          .toList();
+      
+      List<HighlightItem> hadiths = jsonHadiths
+          .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+          .toList();
+      
+      List<HighlightItem> prayers = jsonPrayers
+          .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+          .toList();
+      
+      List<HighlightItem> athkar = jsonAthkar
+          .map((json) => HighlightItem.fromJson(jsonDecode(json)))
+          .toList();
+      
+      // إزالة الاقتباس من القائمة المناسبة
+      quranVerses.removeWhere((item) => item.quote == widget.quoteItem.quote);
+      hadiths.removeWhere((item) => item.quote == widget.quoteItem.quote);
+      prayers.removeWhere((item) => item.quote == widget.quoteItem.quote);
+      athkar.removeWhere((item) => item.quote == widget.quoteItem.quote);
+      
+      // تحويل القوائم مرة أخرى إلى JSON وحفظها
+      List<String> updatedQuranVerses = quranVerses
+          .map((item) => jsonEncode(item.toJson()))
+          .toList();
+      
+      List<String> updatedHadiths = hadiths
+          .map((item) => jsonEncode(item.toJson()))
+          .toList();
+      
+      List<String> updatedPrayers = prayers
+          .map((item) => jsonEncode(item.toJson()))
+          .toList();
+      
+      List<String> updatedAthkar = athkar
+          .map((item) => jsonEncode(item.toJson()))
+          .toList();
+      
+      // حفظ القوائم المحدثة
+      await prefs.setStringList('favoriteQuranVerses', updatedQuranVerses);
+      await prefs.setStringList('favoriteHadiths', updatedHadiths);
+      await prefs.setStringList('favoritePrayers', updatedPrayers);
+      await prefs.setStringList('favoriteAthkar', updatedAthkar);
+      
+      // إزالة القائمة القديمة للتوافق
+      await prefs.remove('favoriteQuotes');
+      
+    } catch (e) {
+      debugPrint('خطأ في إزالة العنصر من المفضلة: $e');
+    }
+  }
+  
+  // دوال مساعدة لتحديد نوع الاقتباس
+  bool _isQuranVerse(HighlightItem item) {
+    return item.headerTitle.contains('آية') || 
+           item.quote.contains('﴿') || 
+           item.source.contains('سورة');
+  }
+  
+  bool _isHadith(HighlightItem item) {
+    return item.headerTitle.contains('حديث') || 
+           item.quote.contains('قال رسول الله') || 
+           item.source.contains('صحيح') || 
+           item.source.contains('مسلم') || 
+           item.source.contains('البخاري');
+  }
+  
+  bool _isPrayer(HighlightItem item) {
+    return item.quote.contains('اللهم') || 
+           item.headerTitle.contains('دعاء');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final Size screenSize = MediaQuery.of(context).size;
-    
     return Scaffold(
       backgroundColor: kSurface,
       body: Directionality(
@@ -306,7 +506,7 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                                                     Text(
                                                       _removeNonWords(widget.quoteItem.quote),
                                                       textAlign: TextAlign.center,
-                                                      style: TextStyle(
+                                                      style: const TextStyle(
                                                         height: 2.0,
                                                         fontSize: 22,
                                                         fontWeight: FontWeight.bold,
@@ -389,7 +589,7 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                                 _buildMatchingStyleButton(
                                   context: context,
                                   icon: _isFavorite ? Icons.favorite : Icons.favorite_border,
-                                  title: 'المفضلة',
+                                  title: _isFavorite ? 'تمت الإضافة' : 'المفضلة',
                                   color: Colors.red,
                                   isActive: _isFavorite,
                                   onPressed: () => _toggleFavorite(context),
