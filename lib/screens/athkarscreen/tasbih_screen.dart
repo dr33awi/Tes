@@ -1,4 +1,4 @@
-// lib/screens/athkarscreen/tasbih_screen.dart - النسخة المحسنة
+// lib/screens/athkarscreen/tasbih_screen.dart - النسخة المصححة
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
@@ -44,7 +44,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
   int _currentTasbihIndex = 0;
 
   // متحكم المؤشر الدائري
-  final _seekBarKey = GlobalKey<CircularSeekBarState>();
+  final GlobalKey _seekBarKey = GlobalKey();
   
   // حالة التحميل
   bool _isLoading = true;
@@ -111,23 +111,12 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       _counter++;
       _totalCount++;
       
-      // تحديث المؤشر الدائري
-      _seekBarKey.currentState?.setValue(_counter.toDouble());
-      
       // انتقل إلى التسبيح التالي إذا وصلنا للحد الأقصى
       if (_counter >= _maxCount) {
         _counter = 0;
         _currentTasbihIndex = (_currentTasbihIndex + 1) % _tasbihList.length;
         _currentTasbih = _tasbihList[_currentTasbihIndex]['text'];
         _maxCount = _tasbihList[_currentTasbihIndex]['count'];
-        
-        // تحديث المؤشر بالقيم الجديدة
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) {
-            _seekBarKey.currentState?.setMax(_maxCount.toDouble());
-            _seekBarKey.currentState?.setValue(0);
-          }
-        });
       }
     });
     _saveTasbihState();
@@ -156,8 +145,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
             onPressed: () {
               setState(() {
                 _counter = 0;
-                // تحديث المؤشر الدائري
-                _seekBarKey.currentState?.setValue(0);
+                // المؤشر سيتحدث تلقائياً عند إعادة البناء
               });
               _saveTasbihState();
               Navigator.pop(context);
@@ -180,13 +168,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       _maxCount = _tasbihList[_currentTasbihIndex]['count'];
       _counter = 0;
       
-      // تحديث المؤشر الدائري بالقيم الجديدة
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          _seekBarKey.currentState?.setMax(_maxCount.toDouble());
-          _seekBarKey.currentState?.setValue(0);
-        }
-      });
+      // تحديث المؤشر الدائري بالقيم الجديدة سيحدث تلقائياً عند إعادة بناء الصفحة
     });
     _saveTasbihState();
     
@@ -412,9 +394,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                     animDurationMillis: 300,
                     curves: Curves.easeInOut,
                     trackColor: Colors.grey.shade300,
-                    valueNotifier: (double value) {
-                      // يمكنك استخدام هذا للحصول على قيمة المؤشر
-                    },
                     child: Center(
                       child: GestureDetector(
                         onTap: _incrementCounter,
@@ -460,6 +439,8 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                         ),
                       ),
                     ),
+                    // تمرير null للمعلمة
+                    valueNotifier: null,
                   ),
                 ),
               ),
