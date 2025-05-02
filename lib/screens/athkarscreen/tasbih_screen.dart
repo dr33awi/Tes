@@ -1,4 +1,4 @@
-// lib/screens/athkarscreen/tasbih_screen.dart - النسخة النهائية
+// lib/screens/athkarscreen/tasbih_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -124,6 +124,17 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
   
   // للتحكم في الاهتزاز
   bool _vibrationEnabled = true;
+  
+  // إحصائيات إضافية
+  Map<int, int> _tasbihUsageCount = {};
+  DateTime? _sessionStartTime;
+  int _sessionCount = 0;
+  int _streakDays = 0;
+  DateTime? _lastUseDate;
+
+  // ألوان جديدة للأزرار
+  final Color _buttonColor1 = const Color(0xFF5C6BC0); // أزرق داكن
+  final Color _buttonColor2 = const Color(0xFF7986CB); // أزرق فاتح
 
   @override
   void initState() {
@@ -139,6 +150,9 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
     _animation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+    
+    // تعيين وقت بدء الجلسة
+    _sessionStartTime = DateTime.now();
     
     // محاكاة التحميل
     Future.delayed(const Duration(milliseconds: 800), () {
@@ -159,6 +173,8 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
   // تحميل حالة التسبيح من التخزين المحلي
   Future<void> _loadTasbihState() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+    // تحميل البيانات الأساسية
     setState(() {
       _counter = prefs.getInt('tasbih_counter') ?? 0;
       _currentTasbihIndex = prefs.getInt('tasbih_index') ?? 0;
@@ -167,18 +183,63 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       
       _currentTasbih = _tasbihList[_currentTasbihIndex]['text'];
       _maxCount = _tasbihList[_currentTasbihIndex]['count'];
+      
+      // تحميل إحصائيات إضافية
+      _streakDays = prefs.getInt('tasbih_streak_days') ?? 0;
+      _sessionCount = 0;
+      
+      // تحميل بيانات آخر استخدام وتحديث التتابع
+      String? lastUseDateStr = prefs.getString('tasbih_last_use_date');
+      if (lastUseDateStr != null) {
+        _lastUseDate = DateTime.parse(lastUseDateStr);
+        _updateStreak();
+      }
+      
+      // تحميل إحصائيات استخدام كل تسبيح
+      for (int i = 0; i < _tasbihList.length; i++) {
+        int count = prefs.getInt('tasbih_usage_$i') ?? 0;
+        _tasbihUsageCount[i] = count;
+      }
     });
+  }
+
+  // تحديث تتابع الأيام
+  void _updateStreak() {
+    if (_lastUseDate == null) return;
+    
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final lastUseDay = DateTime(_lastUseDate!.year, _lastUseDate!.month, _lastUseDate!.day);
+    
+    if (lastUseDay.isAtSameMomentAs(yesterday)) {
+      // الاستخدام كان بالأمس، زيادة التتابع
+      _streakDays++;
+    } else if (!lastUseDay.isAtSameMomentAs(today) && !lastUseDay.isAfter(yesterday)) {
+      // انقطع التتابع، إعادة للصفر
+      _streakDays = 1;
+    }
+    // لا تغيير إذا كان آخر استخدام اليوم
   }
 
   // حفظ حالة التسبيح في التخزين المحلي
   Future<void> _saveTasbihState() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+    // حفظ البيانات الأساسية
     await prefs.setInt('tasbih_counter', _counter);
     await prefs.setInt('tasbih_index', _currentTasbihIndex);
     await prefs.setInt('tasbih_total', _totalCount);
-    
-    // حفظ إعداد الاهتزاز
     await prefs.setBool('tasbih_vibration', _vibrationEnabled);
+    
+    // حفظ إحصائيات إضافية
+    final now = DateTime.now();
+    await prefs.setString('tasbih_last_use_date', now.toIso8601String());
+    await prefs.setInt('tasbih_streak_days', _streakDays);
+    
+    // حفظ إحصائيات استخدام كل تسبيح
+    await prefs.setInt('tasbih_usage_$_currentTasbihIndex', 
+      _tasbihUsageCount[_currentTasbihIndex] ?? 0);
   }
 
   // زيادة العداد
@@ -188,6 +249,11 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
     setState(() {
       _counter++;
       _totalCount++;
+      _sessionCount++;
+      
+      // زيادة عداد استخدام التسبيح الحالي
+      _tasbihUsageCount[_currentTasbihIndex] = 
+        (_tasbihUsageCount[_currentTasbihIndex] ?? 0) + 1;
       
       // انتقل إلى التسبيح التالي إذا وصلنا للحد الأقصى
       if (_counter >= _maxCount) {
@@ -224,7 +290,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: kPrimary,
+        backgroundColor: _buttonColor1,
         duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -282,7 +348,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'حسنا',
-                style: TextStyle(color: kPrimary),
+                style: TextStyle(color: _buttonColor1),
               ),
             ),
           ],
@@ -316,7 +382,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.refresh, color: Colors.orange),
+            Icon(Icons.refresh, color: Colors.red),
             SizedBox(width: 8),
             Text('إعادة ضبط العداد'),
           ],
@@ -346,14 +412,14 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                 SnackBar(
                   content: const Text('تم إعادة ضبط العداد'),
                   behavior: SnackBarBehavior.floating,
-                  backgroundColor: kPrimary,
+                  backgroundColor: _buttonColor1,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   margin: const EdgeInsets.all(16),
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
+              backgroundColor: _buttonColor1,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -403,90 +469,397 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       SnackBar(
         content: Text(_vibrationEnabled ? 'تم تفعيل الاهتزاز' : 'تم إيقاف الاهتزاز'),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: kPrimary,
+        backgroundColor: _buttonColor1,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
   }
   
-  // عرض الإحصائيات
-  void _showStatistics() {
-    final mostUsedTasbih = _findMostUsedTasbih();
+  // حساب الوقت المستغرق في الجلسة الحالية
+  String _getSessionDuration() {
+    if (_sessionStartTime == null) return "0 دقيقة";
     
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.insights, color: kPrimary),
-            SizedBox(width: 8),
-            Text('إحصائيات المسبحة'),
-          ],
-        ),
-        content: Container(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // إجمالي التسبيحات
-              _buildStatItem(
-                icon: Icons.format_list_numbered,
-                title: 'إجمالي التسبيحات',
-                value: '$_totalCount',
-                color: kPrimary,
-              ),
-              
-              const Divider(height: 30),
-              
-              // الذكر الحالي
-              _buildStatItem(
-                icon: _tasbihList[_currentTasbihIndex]['icon'],
-                title: 'الذكر الحالي',
-                subtitle: _currentTasbih,
-                value: '$_counter / $_maxCount',
-                color: _tasbihList[_currentTasbihIndex]['color'],
-              ),
-              
-              if (mostUsedTasbih != null) ...[
-                const Divider(height: 30),
-                
-                // الذكر الأكثر استخداماً
-                _buildStatItem(
-                  icon: mostUsedTasbih['icon'],
-                  title: 'الذكر الأكثر استخداماً',
-                  subtitle: mostUsedTasbih['text'],
-                  value: '',
-                  color: mostUsedTasbih['color'],
-                ),
-              ],
-            ],
-          ),
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        actions: [
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: Icon(Icons.check),
-            label: Text('حسناً'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-      ),
-    );
+    final now = DateTime.now();
+    final difference = now.difference(_sessionStartTime!);
+    
+    if (difference.inHours > 0) {
+      return "${difference.inHours} ساعة ${difference.inMinutes % 60} دقيقة";
+    } else {
+      return "${difference.inMinutes} دقيقة";
+    }
   }
   
   // إيجاد الذكر الأكثر استخداماً
   Map<String, dynamic>? _findMostUsedTasbih() {
-    // يمكن تنفيذ منطق أكثر تعقيداً لتتبع الذكر الأكثر استخداماً
-    // لكن للتبسيط سنعيد الذكر الحالي
-    return _tasbihList[_currentTasbihIndex];
+    if (_tasbihUsageCount.isEmpty) return null;
+    
+    int mostUsedIndex = 0;
+    int maxCount = 0;
+    
+    _tasbihUsageCount.forEach((index, count) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostUsedIndex = index;
+      }
+    });
+    
+    if (maxCount > 0) {
+      return _tasbihList[mostUsedIndex];
+    }
+    
+    return null;
+  }
+  
+  // عرض الإحصائيات - نسخة مبسطة ومحسنة
+  void _showStatistics() {
+    final mostUsedTasbih = _findMostUsedTasbih();
+    
+    // حساب متوسط سرعة التسبيح
+    double averageSpeed = 0;
+    if (_sessionStartTime != null && _sessionCount > 0) {
+      final duration = DateTime.now().difference(_sessionStartTime!).inSeconds;
+      if (duration > 0) {
+        averageSpeed = _sessionCount / (duration / 60); // تسبيحات في الدقيقة
+      }
+    }
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // مقبض السحب
+              Container(
+                width: 50,
+                height: 5,
+                margin: const EdgeInsets.only(top: 12, bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+              
+              // عنوان
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Container(
+                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [_buttonColor1, _buttonColor2],
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.insights, color: Colors.white, size: 24),
+                          SizedBox(width: 8),
+                          Text(
+                            'إحصائيات المسبحة',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_streakDays > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Icon(Icons.local_fire_department, color: Colors.amber, size: 20),
+                              SizedBox(width: 4),
+                              Text(
+                                'تتابع التسبيح: $_streakDays يوم',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // محتوى الإحصائيات
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // إحصائيات عامة
+                        Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.analytics_outlined, color: _buttonColor1, size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'إحصائيات عامة',
+                                      style: TextStyle(
+                                        color: _buttonColor1,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Divider(height: 24),
+                                
+                                // إجمالي التسبيحات
+                                _buildStatItem(
+                                  icon: Icons.format_list_numbered,
+                                  title: 'إجمالي التسبيحات',
+                                  value: '$_totalCount',
+                                  color: _buttonColor1,
+                                ),
+                                
+                                SizedBox(height: 12),
+                                
+                                // تسبيحات الجلسة
+                                _buildStatItem(
+                                  icon: Icons.hourglass_top,
+                                  title: 'تسبيحات الجلسة الحالية',
+                                  value: '$_sessionCount',
+                                  color: Colors.orangeAccent,
+                                ),
+                                
+                                SizedBox(height: 12),
+                                
+                                // وقت الجلسة
+                                _buildStatItem(
+                                  icon: Icons.timer,
+                                  title: 'وقت الجلسة',
+                                  value: _getSessionDuration(),
+                                  color: Colors.green,
+                                ),
+                                
+                                if (averageSpeed > 0) ... [
+                                  SizedBox(height: 12),
+                                  
+                                  // سرعة التسبيح
+                                  _buildStatItem(
+                                    icon: Icons.speed,
+                                    title: 'متوسط السرعة',
+                                    value: '${averageSpeed.toStringAsFixed(1)} / دقيقة',
+                                    color: Colors.blue,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        SizedBox(height: 16),
+                        
+                        // الذكر الحالي
+                        Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                          color: _tasbihList[_currentTasbihIndex]['color'].withOpacity(0.1),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _tasbihList[_currentTasbihIndex]['icon'],
+                                      color: _tasbihList[_currentTasbihIndex]['color'],
+                                      size: 24,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'الذكر الحالي',
+                                        style: TextStyle(
+                                          color: _tasbihList[_currentTasbihIndex]['color'],
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _tasbihList[_currentTasbihIndex]['color'].withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                      child: Text(
+                                        '$_counter / $_maxCount',
+                                        style: TextStyle(
+                                          color: _tasbihList[_currentTasbihIndex]['color'],
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  padding: EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _tasbihList[_currentTasbihIndex]['color'].withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _currentTasbih,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: _tasbihList[_currentTasbihIndex]['color'],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        if (mostUsedTasbih != null) ...[
+                          SizedBox(height: 16),
+                          
+                          // الذكر الأكثر استخداماً
+                          Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 4,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.emoji_events, color: mostUsedTasbih['color'], size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'الذكر الأكثر استخداماً',
+                                        style: TextStyle(
+                                          color: mostUsedTasbih['color'],
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(height: 24),
+                                  
+                                  // محتوى الذكر الأكثر استخداماً
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 50,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          color: mostUsedTasbih['color'].withOpacity(0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          mostUsedTasbih['icon'],
+                                          color: mostUsedTasbih['color'],
+                                          size: 24,
+                                        ),
+                                      ),
+                                      SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              mostUsedTasbih['text'],
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              'المرات: ${_tasbihUsageCount[_tasbihList.indexOf(mostUsedTasbih)] ?? 0}',
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              // زر الإغلاق
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.check),
+                    label: Text('إغلاق'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _buttonColor1,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
   
   // بناء عنصر إحصائية
@@ -500,8 +873,8 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
     return Row(
       children: [
         Container(
-          width: 50,
-          height: 50,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
             shape: BoxShape.circle,
@@ -509,7 +882,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
           child: Icon(
             icon,
             color: color,
-            size: 24,
+            size: 22,
           ),
         ),
         SizedBox(width: 16),
@@ -521,7 +894,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 14,
                 ),
               ),
               if (subtitle != null)
@@ -529,7 +902,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                   subtitle,
                   style: TextStyle(
                     color: Colors.grey[600],
-                    fontSize: 14,
+                    fontSize: 12,
                   ),
                 ),
             ],
@@ -540,11 +913,82 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
             value,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 18,
+              fontSize: 16,
               color: color,
             ),
           ),
       ],
+    );
+  }
+  
+  // بناء زر متناسق مع quote_details_screen
+  Widget _buildMatchingStyleButton({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Card(
+      elevation: 8,
+      shadowColor: color.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 95,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                color,
+                color.withOpacity(0.7),
+              ],
+              stops: const [0.3, 1.0],
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // أيقونة دائرية
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.25),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // عنوان الزر
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
   
@@ -593,7 +1037,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
         title: Text(
           'المسبحة الإلكترونية',
           style: TextStyle(
-            color: kPrimary,
+            color: _buttonColor1,
             fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
@@ -601,7 +1045,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
-            color: kPrimary,
+            color: _buttonColor1,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -609,7 +1053,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
           IconButton(
             icon: Icon(
               _vibrationEnabled ? Icons.vibration : Icons.do_not_disturb,
-              color: kPrimary,
+              color: _buttonColor1,
             ),
             onPressed: _toggleVibration,
             tooltip: _vibrationEnabled ? 'إيقاف الاهتزاز' : 'تفعيل الاهتزاز',
@@ -617,7 +1061,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
           IconButton(
             icon: Icon(
               Icons.info_outline,
-              color: kPrimary,
+              color: _buttonColor1,
             ),
             onPressed: () => _showFadlDialog(),
             tooltip: 'فضل الذكر',
@@ -647,14 +1091,14 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [kPrimary, kPrimaryLight],
+                          colors: [_buttonColor1, _buttonColor2],
                           begin: Alignment.topRight,
                           end: Alignment.bottomLeft,
                         ),
                         borderRadius: BorderRadius.circular(15),
                         boxShadow: [
                           BoxShadow(
-                            color: kPrimary.withOpacity(0.3),
+                            color: _buttonColor1.withOpacity(0.3),
                             blurRadius: 8,
                             offset: Offset(0, 3),
                           ),
@@ -704,7 +1148,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                         gradient: LinearGradient(
                           colors: [
                             _tasbihList[_currentTasbihIndex]['color'],
-                            Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.3) ?? _tasbihList[_currentTasbihIndex]['color'],
+                            Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.3)!,
                           ],
                           begin: Alignment.topRight,
                           end: Alignment.bottomLeft,
@@ -817,7 +1261,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                       strokeCap: StrokeCap.round,
                       progressGradientColors: [
                         _tasbihList[_currentTasbihIndex]['color'],
-                        Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.3) ?? _tasbihList[_currentTasbihIndex]['color'],
+                        Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.3)!,
                       ],
                       innerThumbRadius: 5.0,
                       innerThumbStrokeWidth: 3.0,
@@ -848,7 +1292,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                     gradient: RadialGradient(
                                       colors: [
                                         _tasbihList[_currentTasbihIndex]['color'],
-                                        Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.2) ?? _tasbihList[_currentTasbihIndex]['color'],
+                                        Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.2)!,
                                       ],
                                       center: Alignment(0.2, 0.2),
                                     ),
@@ -902,33 +1346,31 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                   ),
                 ),
                 
-                // الأزرار السفلية (مباشرة بدون كارد)
+                // الأزرار بالألوان الجديدة وبتصميم متناسق
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.all(16.0),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Expanded(
-                        child: TextButton.icon(
-                          onPressed: _resetCounter,
-                          icon: Icon(Icons.refresh),
-                          label: Text('إعادة ضبط'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: kPrimary,
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
+                      _buildMatchingStyleButton(
+                        icon: Icons.refresh,
+                        title: 'إعادة ضبط',
+                        color: Colors.red,
+                        onPressed: _resetCounter,
                       ),
-                      Expanded(
-                        child: TextButton.icon(
-                          onPressed: () => _showTasbihList(context),
-                          icon: Icon(Icons.list),
-                          label: Text('قائمة الأذكار'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: kPrimary,
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
+                      const SizedBox(width: 16),
+                      _buildMatchingStyleButton(
+                        icon: Icons.insights,
+                        title: 'إحصائيات',
+                        color: _buttonColor1,
+                        onPressed: _showStatistics,
+                      ),
+                      const SizedBox(width: 16),
+                      _buildMatchingStyleButton(
+                        icon: Icons.list,
+                        title: 'قائمة الأذكار',
+                        color: Colors.purple,
+                        onPressed: () => _showTasbihList(context),
                       ),
                     ],
                   ),
@@ -941,7 +1383,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
     );
   }
   
-  // عرض قائمة التسبيحات
+  // عرض قائمة التسبيحات بتصميم محسن
   void _showTasbihList(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -976,21 +1418,43 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
               ),
             ),
             
-            // عنوان
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.format_list_bulleted, color: kPrimary),
-                SizedBox(width: 8),
-                Text(
-                  'اختر الذكر',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: kPrimary,
-                  ),
+            // العنوان
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.purple, // لون بنفسجي متناسق مع زر قائمة الأذكار
+                    Colors.purpleAccent,
+                  ],
+                  begin: Alignment.centerRight,
+                  end: Alignment.centerLeft,
                 ),
-              ],
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purple.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.format_list_bulleted, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'اختر الذكر',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ),
             
             const SizedBox(height: 12),
@@ -1021,40 +1485,113 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                   ? BorderSide(color: tasbih['color'], width: 2)
                                   : BorderSide.none,
                             ),
-                            child: ListTile(
-                              leading: Container(
-                                width: 45,
-                                height: 45,
-                                decoration: BoxDecoration(
-                                  color: tasbih['color'],
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: isSelected 
-                                      ? Icon(Icons.check, color: Colors.white, size: 22)
-                                      : Icon(tasbih['icon'], color: Colors.white, size: 22),
-                                ),
-                              ),
-                              title: Text(
-                                tasbih['text'],
-                                style: TextStyle(
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'العدد: ${tasbih['count']}',
-                                style: TextStyle(
-                                  color: isSelected ? tasbih['color'] : Colors.grey,
-                                ),
-                              ),
-                              selected: isSelected,
-                              trailing: isSelected
-                                  ? Icon(Icons.radio_button_checked, color: tasbih['color'])
-                                  : Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                            child: InkWell(
                               onTap: () {
                                 _changeTasbih(index);
                                 Navigator.pop(context);
                               },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 45,
+                                      height: 45,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            tasbih['color'],
+                                            Color.lerp(tasbih['color'], Colors.white, 0.3)!,
+                                          ],
+                                          begin: Alignment.topRight,
+                                          end: Alignment.bottomLeft,
+                                        ),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: tasbih['color'].withOpacity(0.3),
+                                            blurRadius: 6,
+                                            offset: Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Center(
+                                        child: isSelected 
+                                            ? Icon(Icons.check, color: Colors.white, size: 22)
+                                            : Icon(tasbih['icon'], color: Colors.white, size: 22),
+                                      ),
+                                    ),
+                                    SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            tasbih['text'],
+                                            style: TextStyle(
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              color: isSelected ? tasbih['color'] : Colors.black87,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: isSelected ? tasbih['color'].withOpacity(0.1) : Colors.grey.shade100,
+                                                  borderRadius: BorderRadius.circular(30),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.repeat,
+                                                      size: 14,
+                                                      color: isSelected ? tasbih['color'] : Colors.grey,
+                                                    ),
+                                                    SizedBox(width: 4),
+                                                    Text(
+                                                      '${tasbih['count']} مرة',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: isSelected ? tasbih['color'] : Colors.grey,
+                                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // سهم الانتقال
+                                    Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: isSelected 
+                                            ? tasbih['color'].withOpacity(0.1) 
+                                            : Colors.grey.shade100,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          isSelected 
+                                              ? Icons.radio_button_checked 
+                                              : Icons.arrow_forward_ios,
+                                          color: isSelected ? tasbih['color'] : Colors.grey,
+                                          size: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),

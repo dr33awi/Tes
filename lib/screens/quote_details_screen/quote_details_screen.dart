@@ -502,9 +502,9 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                                                 
                                                 Column(
                                                   children: [
-                                                    // نص الاقتباس
+                                                    // نص الاقتباس - تمت إزالة دالة _removeNonWords للحفاظ على التشكيل
                                                     Text(
-                                                      _removeNonWords(widget.quoteItem.quote),
+                                                      widget.quoteItem.quote,
                                                       textAlign: TextAlign.center,
                                                       style: const TextStyle(
                                                         height: 2.0,
@@ -760,14 +760,5 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
         ),
       ),
     );
-  }
-  
-  // دالة لإزالة علامات التشكيل وأي رموز غير الكلمات
-  String _removeNonWords(String text) {
-    // إزالة علامات التشكيل: الفتحة والكسرة والضمة والسكون والشدة وغيرها
-    text = text.replaceAll(RegExp(r'[\u064B-\u0652]'), '');
-    // إزالة علامات الترقيم معينة مثل الفواصل المزدوجة
-    text = text.replaceAll('،،', '');
-    return text;
   }
 }
