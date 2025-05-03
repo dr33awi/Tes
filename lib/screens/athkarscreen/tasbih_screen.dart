@@ -9,6 +9,7 @@ import 'package:circular_seek_bar/circular_seek_bar.dart';
 import 'package:animated_flip_counter/animated_flip_counter.dart';
 import 'package:flutter/services.dart';
 import 'package:test_athkar_app/screens/home_screen/widgets/common/app_loading_indicator.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class TasbihScreen extends StatefulWidget {
   const TasbihScreen({Key? key}) : super(key: key);
@@ -938,7 +939,8 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
         onTap: onPressed,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          width: 95,
+          // تعديل للتوافق مع جميع الشاشات - تقليل العرض
+          width: MediaQuery.of(context).size.width * 0.25,
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -996,7 +998,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     // الحصول على حجم الشاشة
     final size = MediaQuery.of(context).size;
-    final double seekBarSize = size.width * 0.75;
+    final double seekBarSize = size.width * 0.7; // تقليل الحجم قليلاً
     
     if (_isLoading) {
       return Scaffold(
@@ -1109,9 +1111,9 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                         children: [
                           const Icon(Icons.equalizer, color: Colors.white),
                           const SizedBox(width: 8),
-                          Text(
+                          const Text(
                             'الإجمالي: ',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                               fontSize: 16,
@@ -1180,20 +1182,23 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                           ),
                           const SizedBox(height: 12),
                           // نص التسبيح
-                          Text(
-                            _currentTasbih,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(
-                                  offset: Offset(0, 1),
-                                  blurRadius: 3.0,
-                                  color: Color.fromARGB(100, 0, 0, 0),
-                                ),
-                              ],
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _currentTasbih,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                shadows: [
+                                  Shadow(
+                                    offset: Offset(0, 1),
+                                    blurRadius: 3.0,
+                                    color: Color.fromARGB(100, 0, 0, 0),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -1212,6 +1217,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 14,
                                   ),
                                 ),
                                 AnimatedFlipCounter(
@@ -1228,6 +1234,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 14,
                                   ),
                                 ),
                                 Text(
@@ -1235,6 +1242,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 14,
                                   ),
                                 ),
                               ],
@@ -1312,7 +1320,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                           duration: const Duration(milliseconds: 300),
                                           value: _counter,
                                           textStyle: const TextStyle(
-                                            fontSize: 60,
+                                            fontSize: 50, // تعديل حجم الخط
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
                                             shadows: [
@@ -1346,33 +1354,38 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                   ),
                 ),
                 
-                // الأزرار بالألوان الجديدة وبتصميم متناسق
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildMatchingStyleButton(
-                        icon: Icons.refresh,
-                        title: 'إعادة ضبط',
-                        color: Colors.red,
-                        onPressed: _resetCounter,
+                // الأزرار
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildMatchingStyleButton(
+                            icon: Icons.refresh,
+                            title: 'إعادة ضبط',
+                            color: Colors.red,
+                            onPressed: _resetCounter,
+                          ),
+                          const SizedBox(width: 12),
+                          _buildMatchingStyleButton(
+                            icon: Icons.insights,
+                            title: 'إحصائيات',
+                            color: _buttonColor1,
+                            onPressed: _showStatistics,
+                          ),
+                          const SizedBox(width: 12),
+                          _buildMatchingStyleButton(
+                            icon: Icons.list,
+                            title: 'قائمة الأذكار',
+                            color: Colors.purple,
+                            onPressed: () => _showTasbihList(context),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      _buildMatchingStyleButton(
-                        icon: Icons.insights,
-                        title: 'إحصائيات',
-                        color: _buttonColor1,
-                        onPressed: _showStatistics,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildMatchingStyleButton(
-                        icon: Icons.list,
-                        title: 'قائمة الأذكار',
-                        color: Colors.purple,
-                        onPressed: () => _showTasbihList(context),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -1539,7 +1552,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                           Row(
                                             children: [
                                               Container(
-                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                                 decoration: BoxDecoration(
                                                   color: isSelected ? tasbih['color'].withOpacity(0.1) : Colors.grey.shade100,
                                                   borderRadius: BorderRadius.circular(30),
