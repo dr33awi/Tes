@@ -37,7 +37,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'سبحان الله', 
       'count': 33, 
       'color': const Color(0xFF66BB6A), 
-      'icon': Icons.auto_awesome,
       'fadl': 'عن أبي هريرة رضي الله عنه أن رسول الله ﷺ قال: "كلمتان خفيفتان على اللسان، ثقيلتان في الميزان، حبيبتان إلى الرحمن: سبحان الله وبحمده، سبحان الله العظيم"',
       'source': 'متفق عليه'
     },
@@ -45,7 +44,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'الحمد لله', 
       'count': 33, 
       'color': const Color(0xFF42A5F5), 
-      'icon': Icons.favorite,
       'fadl': 'عن أبي مالك الأشعري رضي الله عنه قال: قال رسول الله ﷺ: "الحمد لله تملأ الميزان"',
       'source': 'رواه مسلم'
     },
@@ -53,7 +51,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'الله أكبر', 
       'count': 33, 
       'color': const Color(0xFFFFB74D), 
-      'icon': Icons.star,
       'fadl': 'عن أبي هريرة رضي الله عنه: "من قال سبحان الله وبحمده في يوم مائة مرة، حطت خطاياه وإن كانت مثل زبد البحر"',
       'source': 'متفق عليه'
     },
@@ -61,7 +58,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'لا إله إلا الله', 
       'count': 100, 
       'color': const Color(0xFFAB47BC), 
-      'icon': Icons.air,
       'fadl': 'عن أبي هريرة رضي الله عنه أن النبي ﷺ قال: "من قال: لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير، في يوم مائة مرة، كانت له عدل عشر رقاب، وكتبت له مائة حسنة، ومحيت عنه مائة سيئة"',
       'source': 'متفق عليه'
     },
@@ -69,7 +65,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'لا حول ولا قوة إلا بالله', 
       'count': 100, 
       'color': const Color(0xFF5C6BC0), 
-      'icon': Icons.shield,
       'fadl': 'قال النبي ﷺ: "ألا أدلك على كنز من كنوز الجنة؟ لا حول ولا قوة إلا بالله"',
       'source': 'متفق عليه'
     },
@@ -77,7 +72,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'أستغفر الله', 
       'count': 100, 
       'color': const Color(0xFFE57373), 
-      'icon': Icons.water_drop,
       'fadl': 'قال رسول الله ﷺ: "والله إني لأستغفر الله وأتوب إليه في اليوم أكثر من سبعين مرة"',
       'source': 'رواه البخاري'
     },
@@ -85,7 +79,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'اللهم صل على محمد', 
       'count': 100, 
       'color': const Color(0xFF4DB6AC), 
-      'icon': Icons.mosque,
       'fadl': 'قال رسول الله ﷺ: "من صلى علي صلاة واحدة صلى الله عليه بها عشراً"',
       'source': 'رواه مسلم'
     },
@@ -93,7 +86,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'سبحان الله وبحمده', 
       'count': 100, 
       'color': const Color(0xFF26A69A), 
-      'icon': Icons.flare,
       'fadl': 'قال النبي ﷺ: "من قال سبحان الله وبحمده مائة مرة في يوم غُفرت له ذنوبه وإن كانت مثل زبد البحر"',
       'source': 'متفق عليه'
     },
@@ -101,7 +93,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       'text': 'سبحان الله والحمد لله ولا إله إلا الله والله أكبر', 
       'count': 25, 
       'color': const Color(0xFFF06292), 
-      'icon': Icons.shower,
       'fadl': 'قال رسول الله ﷺ: "أحب الكلام إلى الله أربع: سبحان الله، والحمد لله، ولا إله إلا الله، والله أكبر، لا يضرك بأيهن بدأت"',
       'source': 'رواه مسلم'
     },
@@ -315,13 +306,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(tasbih['icon'], color: tasbih['color']),
-              SizedBox(width: 8),
-              Text('فضل ${tasbih['text']}'),
-            ],
-          ),
+          title: Text('فضل ${tasbih['text']}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,12 +680,6 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                               children: [
                                 Row(
                                   children: [
-                                    Icon(
-                                      _tasbihList[_currentTasbihIndex]['icon'],
-                                      color: _tasbihList[_currentTasbihIndex]['color'],
-                                      size: 24,
-                                    ),
-                                    SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         'الذكر الحالي',
@@ -794,10 +773,15 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                           color: mostUsedTasbih['color'].withOpacity(0.1),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: Icon(
-                                          mostUsedTasbih['icon'],
-                                          color: mostUsedTasbih['color'],
-                                          size: 24,
+                                        child: Center(
+                                          child: Text(
+                                            "${_tasbihList.indexOf(mostUsedTasbih) + 1}",
+                                            style: TextStyle(
+                                              color: mostUsedTasbih['color'],
+                                              fontWeight: FontWeight.bold, 
+                                              fontSize: 18,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                       SizedBox(width: 16),
@@ -922,7 +906,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
     );
   }
   
-  // بناء زر متناسق مع quote_details_screen
+  // بناء زر متناسق مع quote_details_screen - مصغر
   Widget _buildMatchingStyleButton({
     required IconData icon,
     required String title,
@@ -930,20 +914,20 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
     required VoidCallback onPressed,
   }) {
     return Card(
-      elevation: 8,
+      elevation: 5,
       shadowColor: color.withOpacity(0.3),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          // تعديل للتوافق مع جميع الشاشات - تقليل العرض
-          width: MediaQuery.of(context).size.width * 0.25,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          // تعديل للتوافق مع جميع الشاشات - تصغير حجم الأزرار
+          width: MediaQuery.of(context).size.width * 0.2, // تقليل من 0.25 إلى 0.2
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8), // تقليل الحشو من 12,8 إلى 8,8
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
@@ -958,10 +942,10 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // أيقونة دائرية
+              // أيقونة دائرية (أصغر)
               Container(
-                width: 40,
-                height: 40,
+                width: 32, // تقليل من 40 إلى 32
+                height: 32, // تقليل من 40 إلى 32
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   shape: BoxShape.circle,
@@ -973,18 +957,18 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                 child: Icon(
                   icon,
                   color: Colors.white,
-                  size: 20,
+                  size: 16, // تقليل من 20 إلى 16
                 ),
               ),
-              const SizedBox(height: 8),
-              // عنوان الزر
+              const SizedBox(height: 6), // تقليل من 8 إلى 6
+              // نص الزر (أصغر)
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  fontSize: 11, // تقليل من 13 إلى 11
                 ),
               ),
             ],
@@ -1025,7 +1009,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
         ),
         body: AppLoadingIndicator(
           message: 'جاري تحضير المسبحة...',
-          loadingType: LoadingType.bouncingBall,
+          loadingType: LoadingType.staggeredDotsWave, // تغيير من bouncingBall إلى staggeredDotsWave
         ),
       );
     }
@@ -1083,7 +1067,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                 ),
               ),
               children: [
-                // إجمالي العدد
+                // إجمالي العدد مع إضافة وظيفة عرض الإحصائيات
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: InkWell(
@@ -1128,124 +1112,65 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                               fontSize: 18,
                             ),
                           ),
+                          const SizedBox(width: 12),
+                          // إضافة رمز يوحي بوجود إحصائيات
+                          const Icon(
+                            Icons.info_outline,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
                 
-                // عبارة التسبيح الحالية
+                // عبارة التسبيح الحالية - بطاقة أصغر قليلاً بدون أيقونات
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Card(
-                    elevation: 8,
-                    shadowColor: _tasbihList[_currentTasbihIndex]['color'].withOpacity(0.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0), // تقليل من 8.0 إلى 6.0
+                  child: GestureDetector(
+                    onTap: _incrementCounter,
                     child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), // تقليل من 20,20 إلى 16,14
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _tasbihList[_currentTasbihIndex]['color'],
-                            Color.lerp(_tasbihList[_currentTasbihIndex]['color'], Colors.white, 0.3)!,
-                          ],
-                          begin: Alignment.topRight,
-                          end: Alignment.bottomLeft,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
+                        color: _tasbihList[_currentTasbihIndex]['color'],
+                        borderRadius: BorderRadius.circular(12), // تقليل من 16 إلى 12
+                        boxShadow: [
+                          BoxShadow(
+                            color: _tasbihList[_currentTasbihIndex]['color'].withOpacity(0.3),
+                            blurRadius: 8, // تقليل من 10 إلى 8
+                            offset: const Offset(0, 3), // تقليل من 0,4 إلى 0,3
+                          ),
+                        ],
                       ),
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // أيقونة التسبيح
+                          // نص التسبيح (أصغر)
+                          Text(
+                            _currentTasbih,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16, // تقليل من 20 إلى 16
+                            ),
+                          ),
+                          const SizedBox(height: 12), // تقليل من 16 إلى 12
+                          // العداد (أصغر)
                           Container(
-                            width: 48,
-                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6), // تقليل من 20,10 إلى 14,6
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
+                              borderRadius: BorderRadius.circular(16), // تقليل من 20 إلى 16
                             ),
-                            child: Icon(
-                              _tasbihList[_currentTasbihIndex]['icon'],
-                              color: Colors.white,
-                              size: 26,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          // نص التسبيح
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
                             child: Text(
-                              _currentTasbih,
-                              textAlign: TextAlign.center,
+                              '$_counter / $_maxCount',
                               style: const TextStyle(
-                                fontSize: 22,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                shadows: [
-                                  Shadow(
-                                    offset: Offset(0, 1),
-                                    blurRadius: 3.0,
-                                    color: Color.fromARGB(100, 0, 0, 0),
-                                  ),
-                                ],
+                                fontSize: 15, // تقليل من 18 إلى 15
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          // العداد
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'العدد: ',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                AnimatedFlipCounter(
-                                  duration: const Duration(milliseconds: 500),
-                                  value: _counter,
-                                  textStyle: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                const Text(
-                                  ' / ',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                Text(
-                                  '$_maxCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
                         ],
@@ -1354,6 +1279,7 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                   ),
                 ),
                 
+                // الأزرار المصغرة
                 // الأزرار
                 SafeArea(
                   child: Padding(
@@ -1530,9 +1456,14 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                         ],
                                       ),
                                       child: Center(
-                                        child: isSelected 
-                                            ? Icon(Icons.check, color: Colors.white, size: 22)
-                                            : Icon(tasbih['icon'], color: Colors.white, size: 22),
+                                        child: Text(
+                                          "${index + 1}",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                     SizedBox(width: 16),
@@ -1557,24 +1488,13 @@ class _TasbihScreenState extends State<TasbihScreen> with SingleTickerProviderSt
                                                   color: isSelected ? tasbih['color'].withOpacity(0.1) : Colors.grey.shade100,
                                                   borderRadius: BorderRadius.circular(30),
                                                 ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.repeat,
-                                                      size: 14,
-                                                      color: isSelected ? tasbih['color'] : Colors.grey,
-                                                    ),
-                                                    SizedBox(width: 4),
-                                                    Text(
-                                                      '${tasbih['count']} مرة',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: isSelected ? tasbih['color'] : Colors.grey,
-                                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                                      ),
-                                                    ),
-                                                  ],
+                                                child: Text(
+                                                  '${tasbih['count']} مرة',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isSelected ? tasbih['color'] : Colors.grey,
+                                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                  ),
                                                 ),
                                               ),
                                             ],
