@@ -46,6 +46,7 @@ dependencies:
 
   flutter_localization: ^0.3.2
   share_plus: ^11.0.0
+  animated_react_button: ^0.0.4
 
 
 dev_dependencies:
