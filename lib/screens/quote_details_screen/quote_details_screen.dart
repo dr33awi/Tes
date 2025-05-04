@@ -5,7 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:test_athkar_app/models/daily_quote_model.dart';
 import 'package:test_athkar_app/screens/favorites_screen/favorites_screen.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
-    show kPrimary, kPrimaryLight, kSurface;
+    show kPrimary,kSurface;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -170,7 +170,7 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
     });
   }
 
-  // إجراء المشاركة
+  // إجراء المشاركة (النسخة المبسطة)
   void _shareQuote(BuildContext context) async {
     setState(() => _isSharePressed = true);
     
@@ -179,214 +179,10 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
     
     final String text = '${widget.quoteItem.quote}\n\n${widget.quoteItem.source}';
     
-    // عرض قائمة منبثقة بخيارات المشاركة المختلفة
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 10,
-                offset: Offset(0, -5),
-              ),
-            ],
-          ),
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // مقبض السحب
-              Container(
-                width: 50,
-                height: 5,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(2.5),
-                ),
-              ),
-              
-              // العنوان
-              Padding(
-                padding: const EdgeInsets.only(bottom: 20.0),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.share_rounded,
-                      color: kPrimary,
-                      size: 24,
-                    ),
-                    SizedBox(width: 12),
-                    Text(
-                      'مشاركة الاقتباس عبر',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: kPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // خيارات المشاركة
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 20,
-                runSpacing: 20,
-                children: [
-                  // واتساب
-                  _buildSocialShareOption(
-                    context: context, 
-                    icon: Icons.whatshot, 
-                    color: Color(0xFF25D366),
-                    title: 'واتساب',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await Share.share(
-                        text,
-                        subject: 'اقتباس من تطبيق أذكار',
-                      );
-                    },
-                  ),
-                  
-                  // تلجرام
-                  _buildSocialShareOption(
-                    context: context, 
-                    icon: Icons.send, 
-                    color: Color(0xFF0088cc),
-                    title: 'تلجرام',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await Share.share(
-                        text,
-                        subject: 'اقتباس من تطبيق أذكار',
-                      );
-                    },
-                  ),
-                  
-                  // تويتر
-                  _buildSocialShareOption(
-                    context: context, 
-                    icon: Icons.flutter_dash, 
-                    color: Color(0xFF1DA1F2),
-                    title: 'تويتر',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await Share.share(
-                        text,
-                        subject: 'اقتباس من تطبيق أذكار',
-                      );
-                    },
-                  ),
-                  
-                  // فيسبوك
-                  _buildSocialShareOption(
-                    context: context, 
-                    icon: Icons.facebook, 
-                    color: Color(0xFF1877F2),
-                    title: 'فيسبوك',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await Share.share(
-                        text,
-                        subject: 'اقتباس من تطبيق أذكار',
-                      );
-                    },
-                  ),
-                  
-                  // ماسنجر
-                  _buildSocialShareOption(
-                    context: context, 
-                    icon: Icons.message, 
-                    color: Color(0xFF00B2FF),
-                    title: 'ماسنجر',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await Share.share(
-                        text,
-                        subject: 'اقتباس من تطبيق أذكار',
-                      );
-                    },
-                  ),
-                  
-                  // نسخ
-                  _buildSocialShareOption(
-                    context: context, 
-                    icon: Icons.copy, 
-                    color: Colors.orange,
-                    title: 'نسخ النص',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Clipboard.setData(ClipboardData(text: text)).then((_) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle, color: Colors.white),
-                                const SizedBox(width: 12),
-                                const Text('تم النسخ إلى الحافظة', style: TextStyle(fontSize: 16)),
-                              ],
-                            ),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: kPrimary,
-                            duration: const Duration(seconds: 2),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      });
-                    },
-                  ),
-                  
-                  // مشاركة أخرى
-                  _buildSocialShareOption(
-                    context: context, 
-                    icon: Icons.more_horiz, 
-                    color: Colors.blueGrey,
-                    title: 'المزيد',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await Share.share(
-                        text,
-                        subject: 'اقتباس من تطبيق أذكار',
-                      );
-                    },
-                  ),
-                ],
-              ),
-              
-              SizedBox(height: 20),
-              
-              // زر إلغاء
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey.shade200,
-                  foregroundColor: Colors.black87,
-                  minimumSize: Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  'إلغاء',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    // مشاركة النص مباشرة بدون عرض القائمة المنبثقة
+    await Share.share(
+      text,
+      subject: 'اقتباس من تطبيق أذكار',
     );
     
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -849,7 +645,7 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                   duration: const Duration(milliseconds: 300),
                   child: FadeInAnimation(
                     child: Material(
-                      color: kPrimary.withOpacity(0.1),
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                       child: InkWell(
                         onTap: () => Navigator.of(context).pop(),
@@ -966,50 +762,6 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-  
-  // دالة إضافية لبناء خيارات المشاركة الاجتماعية
-  Widget _buildSocialShareOption({
-    required BuildContext context, 
-    required IconData icon, 
-    required Color color,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 80,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 30,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
         ),
       ),
     );

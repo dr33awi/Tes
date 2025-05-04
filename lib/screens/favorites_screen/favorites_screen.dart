@@ -462,7 +462,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     ? _buildCategoriesGrid()
                     : _buildCategoryContent(),
               
-              // زر الرجوع - تم تعديله هنا ليطابق نمط quote_details_screen
+              // زر الرجوع - تم تعديله هنا لإزالة الظل
               Positioned(
                 top: 16,
                 right: 16,
@@ -470,7 +470,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   duration: const Duration(milliseconds: 300),
                   child: FadeInAnimation(
                     child: Material(
-                      color: kPrimary.withOpacity(0.1),
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                       child: InkWell(
                         onTap: () {
