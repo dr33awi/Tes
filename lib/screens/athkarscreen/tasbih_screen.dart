@@ -9,7 +9,7 @@ import 'package:circular_seek_bar/circular_seek_bar.dart';
 import 'package:animated_flip_counter/animated_flip_counter.dart';
 import 'package:flutter/services.dart';
 import 'package:test_athkar_app/screens/home_screen/widgets/common/app_loading_indicator.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 
 class TasbihScreen extends StatefulWidget {
   const TasbihScreen({Key? key}) : super(key: key);
