@@ -1,15 +1,37 @@
+// lib/main.dart - تعديلات للإشعارات
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
+import 'package:test_athkar_app/services/adhan_notification_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-void main() {
+void main() async {
+  // تأكد من تهيئة Flutter
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // تحديد اتجاه الشاشة
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+  
+  // تهيئة خدمة الإشعارات
+  final adhanNotificationService = AdhanNotificationService();
+  await adhanNotificationService.initialize();
+  
+  // طلب إذن الإشعارات على أندرويد 13 وما فوق
+  if (Theme.of(context, nullOk: true) == null) {
+    // إذا لم يكن هناك سياق، يجب إنشاء سياق مؤقت
+    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+        FlutterLocalNotificationsPlugin();
+    flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+  }
+  
+  // تشغيل التطبيق
   runApp(const MyApp());
 }
 

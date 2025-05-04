@@ -30,6 +30,13 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     _initService();
   }
   
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Pasar el contexto actual al servicio para mostrar diálogos
+    _prayerService.setContext(context);
+  }
+  
   Future<void> _initService() async {
     await _prayerService.initialize();
     _loadPrayerTimes();
@@ -42,23 +49,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     });
 
     try {
-      // التحقق من أذونات الموقع
+      // Verificar permisos de ubicación
       _hasLocationPermission = await _prayerService.checkLocationPermission();
       
       if (!_hasLocationPermission) {
+        // Intentar solicitar permisos
         _hasLocationPermission = await _prayerService.requestLocationPermission();
-        if (!_hasLocationPermission) {
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-            _errorMessage = 'لم يتم منح إذن الوصول إلى الموقع';
-          });
-          return;
-        }
       }
 
-      // استخدام API للحصول على المواقيت
-      final prayerTimes = await _prayerService.getPrayerTimesFromAPI();
+      // Obtener horarios de oración - usará ubicación predeterminada si es necesario
+      final prayerTimes = await _prayerService.getPrayerTimesFromAPI(
+        useDefaultLocationIfNeeded: true
+      );
       
       if (mounted) {
         setState(() {
@@ -200,11 +202,16 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // معلومات الموقع
+            // información de ubicación
             _buildLocationCard(),
+            
+            // Mensaje sobre permisos de ubicación si estamos usando ubicación predeterminada
+            if (!_hasLocationPermission)
+              _buildLocationPermissionWarning(),
+              
             const SizedBox(height: 20),
 
-            // أوقات الصلاة
+            // tiempos de oración
             AnimationLimiter(
               child: ListView.builder(
                 physics: const NeverScrollableScrollPhysics(),
@@ -228,6 +235,78 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
             
             const SizedBox(height: 20),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Widget para advertencia sobre permisos de ubicación
+  Widget _buildLocationPermissionWarning() {
+    return AnimationConfiguration.synchronized(
+      duration: const Duration(milliseconds: 400),
+      child: SlideAnimation(
+        horizontalOffset: 50.0,
+        child: FadeInAnimation(
+          child: Container(
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.orange,
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'تنبيه: يتم استخدام موقع افتراضي',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'لم يتم منح إذن الوصول للموقع. نستخدم حاليًا موقعًا افتراضيًا لحساب مواقيت الصلاة.',
+                        style: TextStyle(
+                          color: Colors.orange.shade800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final hasPermission = await _prayerService.requestLocationPermission();
+                    if (hasPermission) {
+                      _loadPrayerTimes();
+                    }
+                  },
+                  child: Text(
+                    'منح الإذن',
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -491,37 +570,78 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadPrayerTimes,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: _loadPrayerTimes,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'إعادة المحاولة',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
-              ),
-              child: const Text(
-                'إعادة المحاولة',
-                style: TextStyle(fontSize: 16),
-              ),
+                const SizedBox(width: 12),
+                // Botón para usar ubicación predeterminada
+                if (!_hasLocationPermission)
+                  OutlinedButton(
+                    onPressed: () async {
+                      try {
+                        // Obtener horarios usando ubicación predeterminada
+                        final prayerTimes = await _prayerService.getPrayerTimesLocally();
+                        
+                        setState(() {
+                          _prayerTimes = prayerTimes;
+                          _locationName = _prayerService.locationName;
+                          _hasError = false;
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _errorMessage = 'فشل استخدام الموقع الافتراضي: $e';
+                        });
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: kPrimary),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'استخدام الموقع الافتراضي',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+              ],
             ),
             if (!_hasLocationPermission) ... [
               const SizedBox(height: 16),
-              OutlinedButton(
+              OutlinedButton.icon(
                 onPressed: () async {
-                  await _prayerService.requestLocationPermission();
-                  await _loadPrayerTimes();
+                  final hasPermission = await _prayerService.requestLocationPermission();
+                  if (hasPermission) {
+                    _loadPrayerTimes();
+                  }
                 },
+                icon: const Icon(Icons.location_on),
+                label: const Text(
+                  'منح إذن الموقع',
+                  style: TextStyle(fontSize: 16),
+                ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: kPrimary),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                child: const Text(
-                  'طلب إذن الموقع',
-                  style: TextStyle(fontSize: 16),
                 ),
               ),
             ],
