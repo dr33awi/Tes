@@ -38,7 +38,6 @@ dependencies:
   another_flutter_splash_screen: ^1.2.1 # شاشة البداية (Splash Screen)
   flutter_native_splash: ^2.4.6        # توليد شاشة بداية أصلية تلقائيًا
 
-
   # 📄 مؤشرات الصفحات
   smooth_page_indicator: ^1.2.1        # إنشاء مؤشرات للصفحات المتنقلة (PageView)
   auto_size_text: ^3.0.0
@@ -46,7 +45,16 @@ dependencies:
 
   flutter_localization: ^0.3.2
   share_plus: ^11.0.0
+  
+  # إضافات لمواقيت الصلاة
+  http: ^1.1.0                         # للاتصال بواجهة برمجة التطبيقات
+  geolocator: ^10.0.1                  # للحصول على موقع المستخدم
+  permission_handler: ^11.0.0          # للتعامل مع أذونات الموقع
+  adhan: ^2.0.0+1
 
+
+
+  
 
 dev_dependencies:
   flutter_test:
