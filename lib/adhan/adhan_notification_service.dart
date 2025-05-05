@@ -1,9 +1,10 @@
-// lib/services/adhan_notification_service.dart
+// lib/adhan/adhan_notification_service.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:permission_handler/permission_handler.dart';
 
 class AdhanNotificationService {
   // Implementación del patrón Singleton
@@ -24,6 +25,9 @@ class AdhanNotificationService {
     'المغرب': true,
     'العشاء': true,
   };
+  
+  // BuildContext para diálogos
+  BuildContext? _context;
 
   // Inicialización del servicio de notificaciones
   Future<void> initialize() async {
@@ -55,10 +59,74 @@ class AdhanNotificationService {
       // Cargar configuración guardada
       await _loadNotificationSettings();
       
+      // Create notification channel for Android
+      await _createNotificationChannel();
+      
       debugPrint('Servicio de notificaciones inicializado correctamente');
     } catch (e) {
       debugPrint('Error al inicializar el servicio de notificaciones: $e');
     }
+  }
+  
+  // Create notification channel for Android
+  Future<void> _createNotificationChannel() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin = 
+        _notificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        
+    if (androidPlugin != null) {
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'adhan_channel',
+        'مواقيت الصلاة',
+        description: 'إشعارات أوقات الصلاة',
+        importance: Importance.high,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound('adhan'),
+      );
+      
+      await androidPlugin.createNotificationChannel(channel);
+      debugPrint('Created Android notification channel');
+    }
+  }
+  
+  // Request notification permissions
+  Future<bool> requestNotificationPermission() async {
+    // For Android 13+
+    bool permissionGranted = await Permission.notification.request().isGranted;
+    
+    // For iOS
+    final IOSFlutterLocalNotificationsPlugin? iosPlugin = 
+        _notificationsPlugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+        
+    if (iosPlugin != null) {
+      bool? iosPermission = await iosPlugin.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      
+      permissionGranted = permissionGranted && (iosPermission ?? false);
+    }
+    
+    return permissionGranted;
+  }
+  
+  // Check notification permission status
+  Future<bool> checkNotificationPermission() async {
+    return await Permission.notification.status.isGranted;
+  }
+  
+  // Check and request permissions if needed
+  Future<bool> checkAndRequestPermissions() async {
+    if (await checkNotificationPermission()) {
+      return true;
+    }
+    
+    return await requestNotificationPermission();
+  }
+  
+  // Set context para mostrar diálogos
+  void setContext(BuildContext context) {
+    _context = context;
   }
   
   // Manejar cuando se toca una notificación
@@ -134,6 +202,7 @@ class AdhanNotificationService {
         priority: Priority.high,
         sound: const RawResourceAndroidNotificationSound('adhan'),
         styleInformation: const BigTextStyleInformation(''),
+        fullScreenIntent: true,
       );
       
       final iosDetails = const DarwinNotificationDetails(

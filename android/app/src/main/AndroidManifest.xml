@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- Permisos para awesome_notifications -->
+    <!-- Permisos para notificaciones -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -50,29 +50,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            
-        <!-- Receptores para awesome_notifications -->
-        <receiver android:name="me.carda.awesome_notifications.notifications.broadcastReceivers.DismissedNotificationReceiver"
-            android:exported="false"/>
-        <receiver android:name="me.carda.awesome_notifications.notifications.broadcastReceivers.ActionButtonsReceiver"
-            android:exported="false"/>
-        <receiver android:name="me.carda.awesome_notifications.notifications.broadcastReceivers.ScheduledNotificationReceiver"
-            android:exported="false"/>
-        <receiver android:name="me.carda.awesome_notifications.notifications.broadcastReceivers.KeepOnTopActionReceiver"
-            android:exported="false"/>
-        <receiver android:name="me.carda.awesome_notifications.notifications.broadcastReceivers.RefreshSchedulesReceiver"
-            android:exported="false"/>
-            
-        <!-- Receptor para reinicio del dispositivo -->
-        <receiver android:name="me.carda.awesome_notifications.notifications.broadcastReceivers.BootCompletedReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
-            </intent-filter>
-        </receiver>
     </application>
     
     <!-- Required to query activities that can process text, see:

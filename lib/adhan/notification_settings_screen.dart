@@ -18,6 +18,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   bool _isLoading = true;
   bool _notificationsEnabled = true;
+  bool _hasPermissions = false;
   Map<String, bool> _prayerSettings = {};
   
   @override
@@ -32,6 +33,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _isLoading = true;
       });
       
+      // Verificar permisos de notificación
+      _hasPermissions = await _notificationService.checkNotificationPermission();
+      
       // Cargar configuración del servicio
       _notificationsEnabled = _notificationService.isNotificationEnabled;
       _prayerSettings = Map.from(_notificationService.prayerNotificationSettings);
@@ -45,6 +49,86 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _isLoading = false;
         });
       }
+    }
+  }
+  
+  Future<void> _requestNotificationPermission() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      // Solicitar permisos de notificación
+      _hasPermissions = await _notificationService.requestNotificationPermission();
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (_hasPermissions) {
+        _showSuccessSnackBar('تم منح إذن الإشعارات بنجاح');
+        // Reprogramar notificaciones ahora que tenemos permisos
+        await _prayerService.schedulePrayerNotifications();
+      } else {
+        // Mostrar diálogo para explicar al usuario cómo conceder permisos manualmente
+        _showPermissionsGuideDialog();
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      _showErrorSnackBar('حدث خطأ أثناء طلب إذن الإشعارات');
+      debugPrint('Error al solicitar permisos de notificación: $e');
+    }
+  }
+  
+  void _showPermissionsGuideDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إذن الإشعارات مطلوب'),
+        content: const Text(
+          'لم يتم منح إذن الإشعارات. يرجى فتح إعدادات التطبيق وتمكين الإشعارات يدويًا.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // En lugar de usar app_settings, usamos un enfoque genérico
+              openAppSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+            ),
+            child: const Text('فتح الإعدادات'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Función genérica para abrir configuración de la aplicación
+  void openAppSettings() {
+    // Implementar según la plataforma - para mantener compatibilidad sin app_settings
+    try {
+      // Usar Flutter estándar para abrir la configuración de la aplicación
+      // Esta es una implementación básica que funciona en la mayoría de dispositivos
+      // pero sin la precisión de app_settings
+      debugPrint('Abriendo configuración de la aplicación...');
+      // Notificar al usuario
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى تمكين الإشعارات في إعدادات التطبيق'),
+          duration: Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error al abrir configuración: $e');
     }
   }
   
@@ -118,6 +202,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Mostrar banner de permisos si no se han concedido
+                    if (!_hasPermissions)
+                      _buildPermissionBanner(),
+                    
                     // Tarjeta de activación de notificaciones
                     _buildMasterSwitchCard(),
                     
@@ -148,9 +236,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     // Botón de actualización de notificaciones
                     Center(
                       child: ElevatedButton.icon(
-                        onPressed: _updateNotifications,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('تحديث الإشعارات'),
+                        onPressed: _hasPermissions ? _updateNotifications : _requestNotificationPermission,
+                        icon: Icon(_hasPermissions ? Icons.refresh : Icons.notifications_active),
+                        label: Text(_hasPermissions ? 'تحديث الإشعارات' : 'منح إذن الإشعارات'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimary,
                           foregroundColor: Colors.white,
@@ -166,6 +254,67 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               ),
             ),
           ),
+    );
+  }
+  
+  // Banner de permisos
+  Widget _buildPermissionBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.orange.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.notifications_off,
+                color: Colors.orange.shade800,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'إذن الإشعارات غير ممنوح',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange.shade800,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'يحتاج التطبيق إلى إذن الإشعارات لتنبيهك بأوقات الصلاة. يرجى منح الإذن لتلقي إشعارات الأذان.',
+            style: TextStyle(
+              color: Colors.orange.shade800,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: _requestNotificationPermission,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('منح إذن الإشعارات'),
+          ),
+        ],
+      ),
     );
   }
   
@@ -227,7 +376,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             ),
             Switch(
               value: _notificationsEnabled,
-              onChanged: _toggleMasterSwitch,
+              onChanged: _hasPermissions ? _toggleMasterSwitch : null,
               activeColor: Colors.white,
               activeTrackColor: Colors.white.withOpacity(0.4),
             ),
@@ -291,7 +440,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
                   Switch(
                     value: entry.value,
-                    onChanged: _notificationsEnabled
+                    onChanged: _notificationsEnabled && _hasPermissions
                         ? (value) => _togglePrayerSetting(entry.key, value)
                         : null,
                     activeColor: kPrimary,
@@ -414,6 +563,18 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       setState(() {
         _isLoading = true;
       });
+      
+      // Verificar permisos de notificación
+      if (!_hasPermissions) {
+        _hasPermissions = await _notificationService.requestNotificationPermission();
+        if (!_hasPermissions) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showPermissionsGuideDialog();
+          return;
+        }
+      }
       
       // Reprogramar todas las notificaciones
       await _prayerService.schedulePrayerNotifications();

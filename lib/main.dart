@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
 import 'package:test_athkar_app/adhan/adhan_notification_service.dart';
+import 'package:test_athkar_app/adhan/permission_service.dart';
 
 void main() async {
   // تأكد من تهيئة Flutter
@@ -16,13 +17,17 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
-  // تهيئة خدمة الإشعارات - تمت إزالة الشفرة المسببة للخطأ
+  // Request permissions
   try {
+    final permissionService = PermissionService();
+    await permissionService.requestNotificationPermission();
+    
+    // Initialize notification service
     final adhanNotificationService = AdhanNotificationService();
     await adhanNotificationService.initialize();
     debugPrint('Notification service initialized successfully');
   } catch (e) {
-    debugPrint('Error initializing notification service: $e');
+    debugPrint('Error initializing services: $e');
     // تجاهل الخطأ والمتابعة
   }
   
