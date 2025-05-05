@@ -1,6 +1,6 @@
 // lib/widgets/location_permission_dialog.dart
 import 'package:flutter/material.dart';
-import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
+import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kPrimaryLight;
 
 class LocationPermissionDialog extends StatelessWidget {
@@ -157,7 +157,7 @@ class LocationPermissionDialog extends StatelessWidget {
   }
 }
 
-// Función de ayuda para mostrar el diálogo
+// Función para mostrar el diálogo de forma simplificada
 Future<bool> showLocationPermissionDialog({
   required BuildContext context,
   required String title,
@@ -166,7 +166,7 @@ Future<bool> showLocationPermissionDialog({
   String secondaryButtonText = 'إلغاء',
   IconData icon = Icons.location_on,
 }) async {
-  final result = await showDialog<bool>(
+  return await showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (context) => Directionality(
@@ -177,34 +177,28 @@ Future<bool> showLocationPermissionDialog({
         primaryButtonText: primaryButtonText,
         secondaryButtonText: secondaryButtonText,
         icon: icon,
-        onPrimaryButtonPressed: () {
-          Navigator.of(context).pop(true);
-        },
-        onSecondaryButtonPressed: () {
-          Navigator.of(context).pop(false);
-        },
+        onPrimaryButtonPressed: () => Navigator.of(context).pop(true),
+        onSecondaryButtonPressed: () => Navigator.of(context).pop(false),
       ),
     ),
-  );
-  
-  return result ?? false;
+  ) ?? false;
 }
 
-// Diálogos predefinidos para diferentes escenarios de permisos de ubicación
+// Diálogos predefinidos para diferentes escenarios
 
-// 1. Diálogo para solicitar activar el servicio de ubicación
+/// Diálogo para solicitar activar el servicio de ubicación
 Future<bool> showLocationServiceDialog(BuildContext context) {
   return showLocationPermissionDialog(
     context: context,
     title: 'تفعيل خدمة الموقع',
-    message: 'تحتاج مواقيت الصلاة إلى تفعيل خدمة الموقع للحصول على أوقات دقيقة للصلاة في موقعك الحالي. هل ترغب في فتح إعدادات الموقع?',
+    message: 'تحتاج مواقيت الصلاة إلى تفعيل خدمة الموقع للحصول على أوقات دقيقة للصلاة في موقعك الحالي. هل ترغب في فتح إعدادات الموقع؟',
     primaryButtonText: 'فتح الإعدادات',
     secondaryButtonText: 'ليس الآن',
     icon: Icons.location_on,
   );
 }
 
-// 2. Diálogo para explicar por qué necesitamos permisos de ubicación
+/// Diálogo para explicar por qué necesitamos permisos de ubicación
 Future<bool> showLocationPermissionRationaleDialog(BuildContext context) {
   return showLocationPermissionDialog(
     context: context,
@@ -216,7 +210,7 @@ Future<bool> showLocationPermissionRationaleDialog(BuildContext context) {
   );
 }
 
-// 3. Diálogo para abrir la configuración de la aplicación
+/// Diálogo para abrir la configuración de la aplicación
 Future<bool> showOpenAppSettingsDialog(BuildContext context) {
   return showLocationPermissionDialog(
     context: context,
@@ -228,7 +222,7 @@ Future<bool> showOpenAppSettingsDialog(BuildContext context) {
   );
 }
 
-// 4. Diálogo para usar ubicación por defecto
+/// Diálogo para usar ubicación por defecto
 Future<bool> showDefaultLocationDialog(BuildContext context) {
   return showLocationPermissionDialog(
     context: context,

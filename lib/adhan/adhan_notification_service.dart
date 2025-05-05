@@ -1,16 +1,22 @@
 // lib/services/adhan_notification_service.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 
 class AdhanNotificationService {
-  // تطبيق نمط Singleton
+  // Implementación del patrón Singleton
   static final AdhanNotificationService _instance = AdhanNotificationService._internal();
   factory AdhanNotificationService() => _instance;
   AdhanNotificationService._internal();
 
-  // إعدادات تفضيلات الإشعارات
+  // Plugin de notificaciones
+  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+  
+  // Configuración de notificaciones
   bool _isNotificationEnabled = true;
-  Map<String, bool> _prayerNotificationSettings = {
+  final Map<String, bool> _prayerNotificationSettings = {
     'الفجر': true,
     'الشروق': false,
     'الظهر': true,
@@ -19,78 +25,154 @@ class AdhanNotificationService {
     'العشاء': true,
   };
 
-  // دالة التهيئة لخدمة الإشعارات
+  // Inicialización del servicio de notificaciones
   Future<void> initialize() async {
-    // تحميل الإعدادات المحفوظة
-    await _loadNotificationSettings();
-    debugPrint('تم تهيئة خدمة الإشعارات (نسخة مبسطة)');
+    try {
+      // Inicializar timezone
+      tz_data.initializeTimeZones();
+      
+      // Configurar notificaciones locales
+      const AndroidInitializationSettings androidSettings = 
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+          
+      const DarwinInitializationSettings iosSettings = 
+          DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
+          
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+      
+      await _notificationsPlugin.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
+      
+      // Cargar configuración guardada
+      await _loadNotificationSettings();
+      
+      debugPrint('Servicio de notificaciones inicializado correctamente');
+    } catch (e) {
+      debugPrint('Error al inicializar el servicio de notificaciones: $e');
+    }
   }
   
-  // تحميل إعدادات الإشعارات المحفوظة
+  // Manejar cuando se toca una notificación
+  void _onNotificationTapped(NotificationResponse response) {
+    // Implementar navegación cuando se toca la notificación
+    debugPrint('Notificación tocada: ${response.id}');
+  }
+  
+  // Cargar configuración guardada
   Future<void> _loadNotificationSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // تحميل حالة تفعيل الإشعارات
+      // Cargar estado de activación
       _isNotificationEnabled = prefs.getBool('adhan_notification_enabled') ?? true;
       
-      // تحميل إعدادات كل صلاة
+      // Cargar configuración para cada oración
       for (final prayer in _prayerNotificationSettings.keys) {
-        final enabled = prefs.getBool('adhan_notification_${prayer}') ?? 
+        final enabled = prefs.getBool('adhan_notification_$prayer') ?? 
             _prayerNotificationSettings[prayer]!;
         _prayerNotificationSettings[prayer] = enabled;
       }
     } catch (e) {
-      debugPrint('خطأ في تحميل إعدادات الإشعارات: $e');
+      debugPrint('Error al cargar la configuración de notificaciones: $e');
     }
   }
   
-  // حفظ إعدادات الإشعارات
+  // Guardar configuración
   Future<void> saveNotificationSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // حفظ حالة تفعيل الإشعارات
+      // Guardar estado de activación
       await prefs.setBool('adhan_notification_enabled', _isNotificationEnabled);
       
-      // حفظ إعدادات كل صلاة
+      // Guardar configuración para cada oración
       for (final prayer in _prayerNotificationSettings.keys) {
         await prefs.setBool(
-          'adhan_notification_${prayer}', 
+          'adhan_notification_$prayer', 
           _prayerNotificationSettings[prayer]!
         );
       }
+      
+      debugPrint('Configuración de notificaciones guardada correctamente');
     } catch (e) {
-      debugPrint('خطأ في حفظ إعدادات الإشعارات: $e');
+      debugPrint('Error al guardar la configuración de notificaciones: $e');
     }
   }
   
-  // جدولة إشعار لوقت صلاة (وهمي حاليًا)
+  // Programar notificación para un tiempo de oración
   Future<void> schedulePrayerNotification({
     required String prayerName,
     required DateTime prayerTime,
-    int notificationId = 0,
+    required int notificationId,
   }) async {
-    // تحقق من تفعيل الإشعارات وإعدادات الصلاة المحددة
+    // Verificar si las notificaciones están activadas para esta oración
     if (!_isNotificationEnabled || !(_prayerNotificationSettings[prayerName] ?? false)) {
       return;
     }
     
-    // التأكد من أن وقت الصلاة في المستقبل
+    // Verificar si el tiempo de oración está en el futuro
     if (prayerTime.isBefore(DateTime.now())) {
       return;
     }
     
-    // إخراج معلومات توضيحية في وضع التصحيح
-    debugPrint('(محاكاة) جدولة إشعار لصلاة $prayerName في $prayerTime');
+    try {
+      // Configurar detalles de la notificación
+      final androidDetails = AndroidNotificationDetails(
+        'adhan_channel',
+        'مواقيت الصلاة',
+        channelDescription: 'إشعارات أوقات الصلاة',
+        importance: Importance.high,
+        priority: Priority.high,
+        sound: const RawResourceAndroidNotificationSound('adhan'),
+        styleInformation: const BigTextStyleInformation(''),
+      );
+      
+      final iosDetails = const DarwinNotificationDetails(
+        sound: 'adhan.aiff',
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      
+      final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+      
+      // Contenido de la notificación
+      final title = 'حان وقت صلاة $prayerName';
+      final body = 'حان الآن وقت صلاة $prayerName';
+      
+      // Programar notificación
+      await _notificationsPlugin.zonedSchedule(
+        notificationId,
+        title,
+        body,
+        tz.TZDateTime.from(prayerTime, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: 
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      
+      debugPrint('Notificación programada para $prayerName a las $prayerTime');
+    } catch (e) {
+      debugPrint('Error al programar notificación para $prayerName: $e');
+    }
   }
   
-  // جدولة إشعارات جميع الصلوات للأوقات المحددة
+  // Programar notificaciones para todos los tiempos de oración
   Future<void> scheduleAllPrayerNotifications(List<Map<String, dynamic>> prayerTimes) async {
-    // إلغاء جميع الإشعارات السابقة
+    // Cancelar notificaciones anteriores
     await cancelAllNotifications();
     
-    // جدولة إشعارات جديدة لكل صلاة
+    // Programar nuevas notificaciones
     for (int i = 0; i < prayerTimes.length; i++) {
       final prayer = prayerTimes[i];
       await schedulePrayerNotification(
@@ -100,15 +182,20 @@ class AdhanNotificationService {
       );
     }
     
-    debugPrint('(محاكاة) تمت جدولة ${prayerTimes.length} إشعارات للصلوات');
+    debugPrint('Programadas ${prayerTimes.length} notificaciones para las oraciones');
   }
   
-  // إلغاء جميع الإشعارات
+  // Cancelar todas las notificaciones
   Future<void> cancelAllNotifications() async {
-    debugPrint('(محاكاة) تم إلغاء جميع الإشعارات');
+    try {
+      await _notificationsPlugin.cancelAll();
+      debugPrint('Todas las notificaciones canceladas');
+    } catch (e) {
+      debugPrint('Error al cancelar notificaciones: $e');
+    }
   }
   
-  // دوال للحصول على/تعيين الإعدادات
+  // Getters y setters
   bool get isNotificationEnabled => _isNotificationEnabled;
   
   set isNotificationEnabled(bool value) {

@@ -16,6 +16,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   final AdhanNotificationService _notificationService = AdhanNotificationService();
   final PrayerTimesService _prayerService = PrayerTimesService();
   
+  bool _isLoading = true;
   bool _notificationsEnabled = true;
   Map<String, bool> _prayerSettings = {};
   
@@ -26,10 +27,61 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
   
   Future<void> _loadSettings() async {
-    setState(() {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      // Cargar configuración del servicio
       _notificationsEnabled = _notificationService.isNotificationEnabled;
       _prayerSettings = Map.from(_notificationService.prayerNotificationSettings);
-    });
+    } catch (e) {
+      // Manejar errores
+      debugPrint('Error al cargar configuración: $e');
+      _showErrorSnackBar('حدث خطأ أثناء تحميل الإعدادات');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+  
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: kPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
   
   @override
@@ -49,71 +101,75 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
         ),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: kPrimary,
-          ),
+          icon: const Icon(Icons.arrow_back, color: kPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // بطاقة تفعيل الإشعارات
-              _buildMasterSwitchCard(),
-              
-              const SizedBox(height: 20),
-              
-              // عنوان إعدادات الصلوات
-              const Text(
-                'إعدادات إشعارات الصلوات',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: kPrimary,
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // إعدادات الصلوات الفردية
-              _buildPrayerSettingsCard(),
-              
-              const SizedBox(height: 24),
-              
-              // معلومات توضيحية
-              _buildInfoCard(),
-              
-              const SizedBox(height: 24),
-              
-              // زر تحديث الإشعارات
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _updateNotifications,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('تحديث الإشعارات'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: kPrimary))
+        : Directionality(
+            textDirection: TextDirection.rtl,
+            child: RefreshIndicator(
+              color: kPrimary,
+              onRefresh: _loadSettings,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tarjeta de activación de notificaciones
+                    _buildMasterSwitchCard(),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Título de configuraciones de oraciones
+                    const Text(
+                      'إعدادات إشعارات الصلوات',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: kPrimary,
+                      ),
                     ),
-                  ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Configuraciones individuales de oraciones 
+                    _buildPrayerSettingsCard(),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Información explicativa
+                    _buildInfoCard(),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Botón de actualización de notificaciones
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _updateNotifications,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('تحديث الإشعارات'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
   
-  // بطاقة تفعيل/تعطيل الإشعارات
+  // Tarjeta de activación/desactivación de notificaciones
   Widget _buildMasterSwitchCard() {
     return Card(
       elevation: 4,
@@ -125,10 +181,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              kPrimary,
-              kPrimaryLight,
-            ],
+            colors: [kPrimary, kPrimaryLight],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
@@ -174,21 +227,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             ),
             Switch(
               value: _notificationsEnabled,
-              onChanged: (value) async {
-                setState(() {
-                  _notificationsEnabled = value;
-                });
-                
-                _notificationService.isNotificationEnabled = value;
-                
-                if (value) {
-                  // إعادة جدولة الإشعارات عند تفعيلها
-                  await _prayerService.schedulePrayerNotifications();
-                } else {
-                  // إلغاء جميع الإشعارات عند إيقافها
-                  await _notificationService.cancelAllNotifications();
-                }
-              },
+              onChanged: _toggleMasterSwitch,
               activeColor: Colors.white,
               activeTrackColor: Colors.white.withOpacity(0.4),
             ),
@@ -198,7 +237,29 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // بطاقة إعدادات الصلوات الفردية
+  // Método separado para manejar la activación/desactivación principal
+  Future<void> _toggleMasterSwitch(bool value) async {
+    setState(() {
+      _notificationsEnabled = value;
+    });
+    
+    try {
+      _notificationService.isNotificationEnabled = value;
+      
+      if (value) {
+        // Reprogramar notificaciones al activarlas
+        await _prayerService.schedulePrayerNotifications();
+      } else {
+        // Cancelar todas las notificaciones al desactivarlas
+        await _notificationService.cancelAllNotifications();
+      }
+    } catch (e) {
+      debugPrint('Error al cambiar estado de notificaciones: $e');
+      _showErrorSnackBar('حدث خطأ أثناء تغيير إعدادات الإشعارات');
+    }
+  }
+  
+  // Tarjeta de configuraciones individuales de oraciones
   Widget _buildPrayerSettingsCard() {
     return Card(
       elevation: 4,
@@ -231,17 +292,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   Switch(
                     value: entry.value,
                     onChanged: _notificationsEnabled
-                        ? (value) async {
-                            setState(() {
-                              _prayerSettings[entry.key] = value;
-                            });
-                            
-                            await _notificationService.setPrayerNotificationEnabled(
-                              entry.key, 
-                              value
-                            );
-                            await _prayerService.schedulePrayerNotifications();
-                          }
+                        ? (value) => _togglePrayerSetting(entry.key, value)
                         : null,
                     activeColor: kPrimary,
                   ),
@@ -254,7 +305,22 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // أيقونة لكل صلاة
+  // Método separado para manejar la activación/desactivación individual
+  Future<void> _togglePrayerSetting(String prayer, bool value) async {
+    setState(() {
+      _prayerSettings[prayer] = value;
+    });
+    
+    try {
+      await _notificationService.setPrayerNotificationEnabled(prayer, value);
+      await _prayerService.schedulePrayerNotifications();
+    } catch (e) {
+      debugPrint('Error al cambiar configuración de $prayer: $e');
+      _showErrorSnackBar('حدث خطأ أثناء تغيير إعدادات الإشعار');
+    }
+  }
+  
+  // Iconos para cada oración
   IconData _getPrayerIcon(String prayer) {
     switch (prayer) {
       case 'الفجر':
@@ -274,7 +340,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
   
-  // بطاقة معلومات
+  // Tarjeta de información
   Widget _buildInfoCard() {
     return Card(
       elevation: 2,
@@ -341,52 +407,33 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // تحديث إشعارات الصلاة
+  // Actualizar notificaciones de oración
   Future<void> _updateNotifications() async {
     try {
-      // إعادة جدولة جميع الإشعارات
+      // Mostrar indicador de carga
+      setState(() {
+        _isLoading = true;
+      });
+      
+      // Reprogramar todas las notificaciones
       await _prayerService.schedulePrayerNotifications();
       
-      // إظهار رسالة تأكيد
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                const Text('تم تحديث إشعارات الصلاة بنجاح'),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: kPrimary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        // Mostrar mensaje de confirmación
+        _showSuccessSnackBar('تم تحديث إشعارات الصلاة بنجاح');
       }
     } catch (e) {
-      // إظهار رسالة خطأ
+      debugPrint('Error al actualizar notificaciones: $e');
+      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                const Text('حدث خطأ أثناء تحديث الإشعارات'),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.red,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        // Mostrar mensaje de error
+        _showErrorSnackBar('حدث خطأ أثناء تحديث الإشعارات');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }

@@ -15,12 +15,13 @@ class PrayerSettingsScreen extends StatefulWidget {
 class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   final PrayerTimesService _prayerService = PrayerTimesService();
   
-  // قيم الإعدادات
   late String _selectedMethod;
   late String _selectedMadhab;
   late Map<String, int> _adjustments;
+  bool _isLoading = true;
+  bool _hasChanges = false;
   
-  // قائمة بأسماء الصلوات لضبط التعديلات
+  // Lista de nombres de oración para ajustes
   final List<String> _prayerNames = [
     'الفجر',
     'الشروق',
@@ -33,121 +34,235 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    // تحميل الإعدادات الحالية
     _loadCurrentSettings();
   }
   
-  void _loadCurrentSettings() {
-    final settings = _prayerService.getUserSettings();
-    setState(() {
-      _selectedMethod = settings['calculationMethod'];
-      _selectedMadhab = settings['madhab'];
-      _adjustments = Map<String, int>.from(settings['adjustments']);
-    });
+  Future<void> _loadCurrentSettings() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      final settings = _prayerService.getUserSettings();
+      
+      setState(() {
+        _selectedMethod = settings['calculationMethod'];
+        _selectedMadhab = settings['madhab'];
+        _adjustments = Map<String, int>.from(settings['adjustments']);
+        _isLoading = false;
+      });
+      
+      // Depuración
+      debugPrint('Configuración cargada: Método = $_selectedMethod, Madhab = $_selectedMadhab');
+    } catch (e) {
+      debugPrint('Error al cargar configuración: $e');
+      
+      // Valores por defecto en caso de error
+      setState(() {
+        _selectedMethod = 'Umm al-Qura';
+        _selectedMadhab = 'Shafi';
+        _adjustments = {};
+        _isLoading = false;
+      });
+      
+      _showErrorSnackBar('حدث خطأ أثناء تحميل الإعدادات');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kSurface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'إعدادات مواقيت الصلاة',
-          style: TextStyle(
-            color: kPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: kPrimary,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: AnimationLimiter(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: AnimationConfiguration.toStaggeredList(
-                duration: const Duration(milliseconds: 600),
-                childAnimationBuilder: (widget) => SlideAnimation(
-                  horizontalOffset: 50.0,
-                  child: FadeInAnimation(
-                    child: widget,
-                  ),
-                ),
-                children: [
-                  _buildSectionTitle('طريقة حساب المواقيت'),
-                  _buildCalculationMethodSelector(),
-                  const SizedBox(height: 24),
-                  
-                  _buildSectionTitle('المذهب الفقهي'),
-                  _buildMadhabSelector(),
-                  const SizedBox(height: 24),
-                  
-                  _buildSectionTitle('تعديلات المواقيت (بالدقائق)'),
-                  _buildAdjustmentsSection(),
-                  const SizedBox(height: 24),
-                  
-                  // زر حفظ الإعدادات
-                  Center(
-                    child: ElevatedButton.icon(
-                      onPressed: _saveSettings,
-                      icon: const Icon(Icons.save),
-                      label: const Text('حفظ الإعدادات'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // زر إعادة الضبط
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: _resetSettings,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('إعادة ضبط الإعدادات'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: kPrimary,
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // شرح الإعدادات
-                  _buildInfoCard(),
-                ],
-              ),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: kSurface,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: true,
+          title: const Text(
+            'إعدادات مواقيت الصلاة',
+            style: TextStyle(
+              color: kPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
             ),
           ),
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back,
+              color: kPrimary,
+            ),
+            onPressed: () => _onBackPressed(),
+          ),
         ),
+        body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          : Directionality(
+              textDirection: TextDirection.rtl,
+              child: AnimationLimiter(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: AnimationConfiguration.toStaggeredList(
+                      duration: const Duration(milliseconds: 600),
+                      childAnimationBuilder: (widget) => SlideAnimation(
+                        horizontalOffset: 50.0,
+                        child: FadeInAnimation(
+                          child: widget,
+                        ),
+                      ),
+                      children: [
+                        _buildSectionTitle('طريقة حساب المواقيت'),
+                        _buildCalculationMethodSelector(),
+                        const SizedBox(height: 24),
+                        
+                        _buildSectionTitle('المذهب الفقهي'),
+                        _buildMadhabSelector(),
+                        const SizedBox(height: 24),
+                        
+                        _buildSectionTitle('تعديلات المواقيت (بالدقائق)'),
+                        _buildAdjustmentsSection(),
+                        const SizedBox(height: 24),
+                        
+                        // Botones de acción
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _saveSettings,
+                                icon: const Icon(Icons.save),
+                                label: const Text('حفظ الإعدادات'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kPrimary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            OutlinedButton.icon(
+                              onPressed: _resetSettings,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('إعادة ضبط'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: kPrimary,
+                                side: BorderSide(color: kPrimary),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Información explicativa
+                        _buildInfoCard(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
       ),
     );
   }
   
-  // عنوان قسم
+  // Verificar cambios antes de salir
+  Future<bool> _onWillPop() async {
+    if (_hasChanges) {
+      return await _showUnsavedChangesDialog() ?? false;
+    }
+    return true;
+  }
+  
+  void _onBackPressed() {
+    if (_hasChanges) {
+      _showUnsavedChangesDialog().then((confirmed) {
+        if (confirmed ?? false) {
+          Navigator.of(context).pop();
+        }
+      });
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+  
+  Future<bool?> _showUnsavedChangesDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حفظ التغييرات؟'),
+        content: const Text('لديك تغييرات غير محفوظة. هل ترغب في المتابعة بدون حفظ؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+            ),
+            child: const Text('متابعة بدون حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Mostrar mensaje de error
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+  
+  // Mostrar mensaje de éxito
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: kPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+  
+  // Título de sección
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: kPrimary,
@@ -156,7 +271,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // اختيار طريقة الحساب
+  // Selector de método de cálculo
   Widget _buildCalculationMethodSelector() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -177,7 +292,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             ),
             const SizedBox(height: 16),
             
-            // قائمة بطرق الحساب المتاحة
+            // Lista de métodos de cálculo disponibles
             ...List.generate(
               _prayerService.getAvailableCalculationMethods().length,
               (index) {
@@ -191,7 +306,9 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                   onChanged: (value) {
                     setState(() {
                       _selectedMethod = value!;
+                      _hasChanges = true;
                     });
+                    debugPrint('Método seleccionado: $_selectedMethod');
                   },
                 );
               },
@@ -202,7 +319,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // اختيار المذهب
+  // Selector de madhab
   Widget _buildMadhabSelector() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -223,7 +340,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             ),
             const SizedBox(height: 16),
             
-            // قائمة بالمذاهب المتاحة
+            // Lista de madhabs disponibles
             ...List.generate(
               _prayerService.getAvailableMadhabs().length,
               (index) {
@@ -237,7 +354,9 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                   onChanged: (value) {
                     setState(() {
                       _selectedMadhab = value!;
+                      _hasChanges = true;
                     });
+                    debugPrint('Madhab seleccionado: $_selectedMadhab');
                   },
                 );
               },
@@ -248,7 +367,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // قسم تعديلات المواقيت
+  // Sección de ajustes de tiempo
   Widget _buildAdjustmentsSection() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -269,7 +388,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             ),
             const SizedBox(height: 16),
             
-            // قائمة بالصلوات للتعديل
+            // Lista de oraciones para ajustar
             ...List.generate(
               _prayerNames.length,
               (index) {
@@ -291,8 +410,8 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                         flex: 5,
                         child: Slider(
                           value: (_adjustments[prayerName] ?? 0).toDouble(),
-                          min: -15, // تقديم بحد أقصى 15 دقيقة
-                          max: 15, // تأخير بحد أقصى 15 دقيقة
+                          min: -15, // Adelantar máximo 15 minutos
+                          max: 15, // Retrasar máximo 15 minutos
                           divisions: 30,
                           activeColor: kPrimary,
                           inactiveColor: kPrimary.withOpacity(0.2),
@@ -300,6 +419,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                           onChanged: (double value) {
                             setState(() {
                               _adjustments[prayerName] = value.round();
+                              _hasChanges = true;
                             });
                           },
                         ),
@@ -319,12 +439,13 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
               },
             ),
             
-            // زر إعادة ضبط التعديلات
+            // Botón para resetear ajustes
             Center(
               child: TextButton.icon(
                 onPressed: () {
                   setState(() {
-                    _adjustments.clear();
+                    _adjustments = {};
+                    _hasChanges = true;
                   });
                 },
                 icon: const Icon(Icons.restore),
@@ -340,7 +461,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // بطاقة معلومات
+  // Tarjeta de información
   Widget _buildInfoCard() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -396,7 +517,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // معلومة واحدة
+  // Un elemento de información
   Widget _buildInfoItem(String title, String content) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,7 +532,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
         const SizedBox(height: 4),
         Text(
           content,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
             color: Colors.black87,
             height: 1.4,
@@ -421,47 +542,57 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // حفظ الإعدادات
-  void _saveSettings() {
-    // تحديث الإعدادات في الخدمة
-    _prayerService.updateCalculationMethod(_selectedMethod);
-    _prayerService.updateMadhab(_selectedMadhab);
-    _prayerService.clearAdjustments();
-    
-    // إضافة التعديلات
-    _adjustments.forEach((prayerName, minutes) {
-      if (minutes != 0) {
-        _prayerService.setAdjustment(prayerName, minutes);
-      }
-    });
-    
-    // حفظ الإعدادات
-    _prayerService.saveSettings();
-    
-    // إظهار رسالة تأكيد
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            const Text('تم حفظ الإعدادات بنجاح'),
-          ],
-        ),
-        backgroundColor: kPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-    
-    // العودة للشاشة السابقة
-    Navigator.pop(context, true); // إرسال قيمة true للإشارة إلى تغيير الإعدادات
+  // Guardar configuración
+  Future<void> _saveSettings() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      // Depuración - valores antes de guardar
+      debugPrint('Guardando configuración: Método = $_selectedMethod, Madhab = $_selectedMadhab');
+      
+      // Actualizar configuración en el servicio
+      _prayerService.updateCalculationMethod(_selectedMethod);
+      _prayerService.updateMadhab(_selectedMadhab);
+      _prayerService.clearAdjustments();
+      
+      // Añadir ajustes
+      _adjustments.forEach((prayerName, minutes) {
+        if (minutes != 0) {
+          _prayerService.setAdjustment(prayerName, minutes);
+        }
+      });
+      
+      // Guardar configuración
+      await _prayerService.saveSettings();
+      
+      // Nueva función: recalcular tiempos de oración inmediatamente
+      await _prayerService.recalculatePrayerTimes();
+      
+      // Verificar que se haya guardado correctamente
+      final savedSettings = _prayerService.getUserSettings();
+      debugPrint('Verificación después de guardar: ${savedSettings['calculationMethod']}');
+      
+      setState(() {
+        _isLoading = false;
+        _hasChanges = false; // Resetear indicador de cambios
+      });
+      
+      // Mostrar mensaje de confirmación
+      _showSuccessSnackBar('تم حفظ الإعدادات وتحديث مواقيت الصلاة بنجاح');
+      
+      // Regresar a la pantalla anterior
+      Navigator.pop(context, true); // Enviar true para indicar cambios
+    } catch (e) {
+      debugPrint('Error al guardar configuración: $e');
+      
+      setState(() => _isLoading = false);
+      
+      // Mostrar mensaje de error
+      _showErrorSnackBar('حدث خطأ أثناء حفظ الإعدادات');
+    }
   }
   
-  // إعادة ضبط الإعدادات
+  // Resetear configuración
   void _resetSettings() {
     showDialog(
       context: context,
@@ -479,8 +610,10 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
               setState(() {
                 _selectedMethod = 'Umm al-Qura';
                 _selectedMadhab = 'Shafi';
-                _adjustments.clear();
+                _adjustments = {};
+                _hasChanges = true;
               });
+              debugPrint('Configuración reseteada a los valores predeterminados');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
