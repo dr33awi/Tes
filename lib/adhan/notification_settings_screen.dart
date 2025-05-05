@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
-import 'package:test_athkar_app/services/adhan_notification_service.dart';
-import 'package:test_athkar_app/services/prayer_times_service.dart';
+import 'package:test_athkar_app/adhan/adhan_notification_service.dart';
+import 'package:test_athkar_app/adhan/prayer_times_service.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);

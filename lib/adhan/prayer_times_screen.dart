@@ -1,13 +1,13 @@
 // lib/screens/prayer_times_screen/prayer_times_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/models/prayer_times_model.dart';
+import 'package:test_athkar_app/adhan/prayer_times_model.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
-import 'package:test_athkar_app/services/prayer_times_service.dart';
+import 'package:test_athkar_app/adhan/prayer_times_service.dart';
 import 'package:test_athkar_app/screens/home_screen/widgets/common/app_loading_indicator.dart';
-import 'package:test_athkar_app/screens/prayer_times_screen/prayer_settings_screen.dart';
-import 'package:test_athkar_app/screens/prayer_times_screen/notification_settings_screen.dart';
+import 'package:test_athkar_app/adhan/prayer_settings_screen.dart';
+import 'package:test_athkar_app/adhan/notification_settings_screen.dart';
 
 class PrayerTimesScreen extends StatefulWidget {
   const PrayerTimesScreen({Key? key}) : super(key: key);
@@ -34,13 +34,23 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Pasar el contexto actual al servicio para mostrar diálogos
+    // Передача текущего контекста в сервис для диалогов
     _prayerService.setContext(context);
   }
   
   Future<void> _initService() async {
-    await _prayerService.initialize();
-    _loadPrayerTimes();
+    try {
+      await _prayerService.initialize();
+      _loadPrayerTimes();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'خطأ في تهيئة خدمة مواقيت الصلاة: $e';
+        });
+      }
+    }
   }
 
   Future<void> _loadPrayerTimes() async {
@@ -50,25 +60,41 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     });
 
     try {
-      // Verificar permisos de ubicación
+      // Проверка разрешений на местоположение
       _hasLocationPermission = await _prayerService.checkLocationPermission();
       
       if (!_hasLocationPermission) {
-        // Intentar solicitar permisos
+        // Попытка запросить разрешения
         _hasLocationPermission = await _prayerService.requestLocationPermission();
       }
 
-      // Obtener horarios de oración - usará ubicación predeterminada si es necesario
-      final prayerTimes = await _prayerService.getPrayerTimesFromAPI(
-        useDefaultLocationIfNeeded: true
-      );
+      // Получение времени молитв - будет использоваться местоположение по умолчанию, если необходимо
+      List<PrayerTimeModel> prayerTimes;
+      
+      try {
+        prayerTimes = await _prayerService.getPrayerTimesFromAPI(
+          useDefaultLocationIfNeeded: true
+        );
+      } catch (apiError) {
+        debugPrint('Error getting prayer times from API: $apiError');
+        // Fallback to local calculation with default location
+        prayerTimes = _prayerService.getPrayerTimesLocally();
+      }
       
       if (mounted) {
         setState(() {
           _prayerTimes = prayerTimes;
-          _locationName = _prayerService.locationName ?? 'موقعك الحالي';
+          _locationName = _prayerService.locationName ?? 'الموقع الافتراضي';
           _isLoading = false;
         });
+      }
+      
+      // Attempt to schedule notifications after successfully loading prayer times
+      try {
+        await _prayerService.schedulePrayerNotifications();
+      } catch (notifError) {
+        debugPrint('Error scheduling prayer notifications: $notifError');
+        // Don't show this error to the user since it's not critical
       }
     } catch (e) {
       if (mounted) {
@@ -219,16 +245,16 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // información de ubicación
+            // بطاقة الموقع
             _buildLocationCard(),
             
-            // Mensaje sobre permisos de ubicación si estamos usando ubicación predeterminada
+            // تحذير بشأن أذونات الموقع إذا كنا نستخدم موقعًا افتراضيًا
             if (!_hasLocationPermission)
               _buildLocationPermissionWarning(),
               
             const SizedBox(height: 20),
 
-            // tiempos de oración
+            // أوقات الصلاة
             AnimationLimiter(
               child: ListView.builder(
                 physics: const NeverScrollableScrollPhysics(),
@@ -283,7 +309,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     );
   }
 
-  // Widget para advertencia sobre permisos de ubicación
+  // تحذير بشأن أذونات الموقع
   Widget _buildLocationPermissionWarning() {
     return AnimationConfiguration.synchronized(
       duration: const Duration(milliseconds: 400),
@@ -408,7 +434,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _locationName ?? 'غير معروف',
+                          _locationName ?? 'الموقع الافتراضي',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 14,
@@ -631,13 +657,14 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Botón para usar ubicación predeterminada
+                
+                // زر استخدام الموقع الافتراضي
                 if (!_hasLocationPermission)
                   OutlinedButton(
                     onPressed: () async {
                       try {
-                        // Obtener horarios usando ubicación predeterminada
-                        final prayerTimes = await _prayerService.getPrayerTimesLocally();
+                        // الحصول على أوقات الصلاة باستخدام الموقع الافتراضي
+                        final prayerTimes = _prayerService.getPrayerTimesLocally();
                         
                         setState(() {
                           _prayerTimes = prayerTimes;

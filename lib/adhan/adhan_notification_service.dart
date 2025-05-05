@@ -1,11 +1,6 @@
 // lib/services/adhan_notification_service.dart
-import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
 
 class AdhanNotificationService {
   // تطبيق نمط Singleton
@@ -13,10 +8,6 @@ class AdhanNotificationService {
   factory AdhanNotificationService() => _instance;
   AdhanNotificationService._internal();
 
-  // تعريف كائن الإشعارات
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = 
-      FlutterLocalNotificationsPlugin();
-  
   // إعدادات تفضيلات الإشعارات
   bool _isNotificationEnabled = true;
   Map<String, bool> _prayerNotificationSettings = {
@@ -30,49 +21,9 @@ class AdhanNotificationService {
 
   // دالة التهيئة لخدمة الإشعارات
   Future<void> initialize() async {
-    tz_data.initializeTimeZones();
-    
-    // تعريف إعدادات الإشعارات للأندرويد
-    const AndroidInitializationSettings androidSettings = 
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    // تعريف إعدادات الإشعارات للآيفون
-    final DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-      onDidReceiveLocalNotification: (int id, String? title, String? body, String? payload) async {
-        // يمكن معالجة الإشعارات المستلمة هنا
-      },
-    );
-    
-    // تطبيق الإعدادات
-    final InitializationSettings initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-    
-    // تهيئة الإشعارات مع معالج الإجراءات
-    await _flutterLocalNotificationsPlugin.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // يمكن معالجة النقر على الإشعارات هنا
-      },
-    );
-    
-    // طلب إذن الإشعارات على نظام iOS
-    if (Platform.isIOS) {
-      await _flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-    }
-    
     // تحميل الإعدادات المحفوظة
     await _loadNotificationSettings();
+    debugPrint('تم تهيئة خدمة الإشعارات (نسخة مبسطة)');
   }
   
   // تحميل إعدادات الإشعارات المحفوظة
@@ -114,7 +65,7 @@ class AdhanNotificationService {
     }
   }
   
-  // جدولة إشعار لوقت صلاة
+  // جدولة إشعار لوقت صلاة (وهمي حاليًا)
   Future<void> schedulePrayerNotification({
     required String prayerName,
     required DateTime prayerTime,
@@ -130,61 +81,14 @@ class AdhanNotificationService {
       return;
     }
     
-    try {
-      // إعدادات الإشعارات للأندرويد
-      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'adhan_channel_id',
-        'مواقيت الصلاة',
-        channelDescription: 'إشعارات مواقيت الصلاة',
-        importance: Importance.max,
-        priority: Priority.high,
-        sound: const RawResourceAndroidNotificationSound('adhan'),
-        styleInformation: const BigTextStyleInformation(''),
-      );
-      
-      // إعدادات الإشعارات للآيفون
-      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-        sound: 'adhan.mp3',
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-      
-      // تجميع الإعدادات
-      final NotificationDetails notificationDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-      
-      // إنشاء محتوى الإشعار
-      final title = 'حان وقت صلاة $prayerName';
-      final body = 'حان الآن وقت صلاة $prayerName';
-      
-      // جدولة الإشعار
-      final tz.TZDateTime scheduledDate = tz.TZDateTime.from(prayerTime, tz.local);
-      
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        notificationId,
-        title,
-        body,
-        scheduledDate,
-        notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: 
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
-      
-      debugPrint('تمت جدولة إشعار لصلاة $prayerName في $scheduledDate');
-    } catch (e) {
-      debugPrint('خطأ في جدولة الإشعار: $e');
-    }
+    // إخراج معلومات توضيحية في وضع التصحيح
+    debugPrint('(محاكاة) جدولة إشعار لصلاة $prayerName في $prayerTime');
   }
   
   // جدولة إشعارات جميع الصلوات للأوقات المحددة
   Future<void> scheduleAllPrayerNotifications(List<Map<String, dynamic>> prayerTimes) async {
     // إلغاء جميع الإشعارات السابقة
-    await _flutterLocalNotificationsPlugin.cancelAll();
+    await cancelAllNotifications();
     
     // جدولة إشعارات جديدة لكل صلاة
     for (int i = 0; i < prayerTimes.length; i++) {
@@ -195,11 +99,13 @@ class AdhanNotificationService {
         notificationId: i,
       );
     }
+    
+    debugPrint('(محاكاة) تمت جدولة ${prayerTimes.length} إشعارات للصلوات');
   }
   
   // إلغاء جميع الإشعارات
   Future<void> cancelAllNotifications() async {
-    await _flutterLocalNotificationsPlugin.cancelAll();
+    debugPrint('(محاكاة) تم إلغاء جميع الإشعارات');
   }
   
   // دوال للحصول على/تعيين الإعدادات
