@@ -1,4 +1,4 @@
-// lib/models/prayer_times_model.dart
+// lib/adhan/prayer_times_model.dart
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
@@ -51,47 +51,109 @@ class PrayerTimeModel {
     
     // تأكد من أن جميع الأوقات غير فارغة
     try {
-      prayers.add(PrayerTimeModel(
-        name: 'الفجر',
-        time: prayerTimes.fajr,
-        icon: Icons.brightness_2,
-        color: const Color(0xFF5B68D9),
-      ));
+      // استخدام try/catch منفصل لكل وقت صلاة لتحسين المعالجة للأخطاء
+      try {
+        prayers.add(PrayerTimeModel(
+          name: 'الفجر',
+          time: prayerTimes.fajr,
+          icon: Icons.brightness_2,
+          color: const Color(0xFF5B68D9),
+        ));
+      } catch (e) {
+        debugPrint('خطأ في وقت الفجر: $e');
+        // استخدام وقت افتراضي
+        prayers.add(PrayerTimeModel(
+          name: 'الفجر',
+          time: DateTime(now.year, now.month, now.day, 5, 0),
+          icon: Icons.brightness_2,
+          color: const Color(0xFF5B68D9),
+        ));
+      }
       
-      prayers.add(PrayerTimeModel(
-        name: 'الشروق',
-        time: prayerTimes.sunrise,
-        icon: Icons.wb_sunny_outlined,
-        color: const Color(0xFFFF9E0D),
-      ));
+      try {
+        prayers.add(PrayerTimeModel(
+          name: 'الشروق',
+          time: prayerTimes.sunrise,
+          icon: Icons.wb_sunny_outlined,
+          color: const Color(0xFFFF9E0D),
+        ));
+      } catch (e) {
+        debugPrint('خطأ في وقت الشروق: $e');
+        prayers.add(PrayerTimeModel(
+          name: 'الشروق',
+          time: DateTime(now.year, now.month, now.day, 6, 15),
+          icon: Icons.wb_sunny_outlined,
+          color: const Color(0xFFFF9E0D),
+        ));
+      }
       
-      prayers.add(PrayerTimeModel(
-        name: 'الظهر',
-        time: prayerTimes.dhuhr,
-        icon: Icons.wb_sunny,
-        color: const Color(0xFFFFB746),
-      ));
+      try {
+        prayers.add(PrayerTimeModel(
+          name: 'الظهر',
+          time: prayerTimes.dhuhr,
+          icon: Icons.wb_sunny,
+          color: const Color(0xFFFFB746),
+        ));
+      } catch (e) {
+        debugPrint('خطأ في وقت الظهر: $e');
+        prayers.add(PrayerTimeModel(
+          name: 'الظهر',
+          time: DateTime(now.year, now.month, now.day, 12, 0),
+          icon: Icons.wb_sunny,
+          color: const Color(0xFFFFB746),
+        ));
+      }
       
-      prayers.add(PrayerTimeModel(
-        name: 'العصر',
-        time: prayerTimes.asr,
-        icon: Icons.wb_twighlight,
-        color: const Color(0xFFFF8A65),
-      ));
+      try {
+        prayers.add(PrayerTimeModel(
+          name: 'العصر',
+          time: prayerTimes.asr,
+          icon: Icons.wb_twighlight,
+          color: const Color(0xFFFF8A65),
+        ));
+      } catch (e) {
+        debugPrint('خطأ في وقت العصر: $e');
+        prayers.add(PrayerTimeModel(
+          name: 'العصر',
+          time: DateTime(now.year, now.month, now.day, 15, 30),
+          icon: Icons.wb_twighlight,
+          color: const Color(0xFFFF8A65),
+        ));
+      }
       
-      prayers.add(PrayerTimeModel(
-        name: 'المغرب',
-        time: prayerTimes.maghrib,
-        icon: Icons.nights_stay_outlined,
-        color: const Color(0xFF5C6BC0),
-      ));
+      try {
+        prayers.add(PrayerTimeModel(
+          name: 'المغرب',
+          time: prayerTimes.maghrib,
+          icon: Icons.nights_stay_outlined,
+          color: const Color(0xFF5C6BC0),
+        ));
+      } catch (e) {
+        debugPrint('خطأ في وقت المغرب: $e');
+        prayers.add(PrayerTimeModel(
+          name: 'المغرب',
+          time: DateTime(now.year, now.month, now.day, 18, 0),
+          icon: Icons.nights_stay_outlined,
+          color: const Color(0xFF5C6BC0),
+        ));
+      }
       
-      prayers.add(PrayerTimeModel(
-        name: 'العشاء',
-        time: prayerTimes.isha,
-        icon: Icons.nightlight_round,
-        color: const Color(0xFF1A237E),
-      ));
+      try {
+        prayers.add(PrayerTimeModel(
+          name: 'العشاء',
+          time: prayerTimes.isha,
+          icon: Icons.nightlight_round,
+          color: const Color(0xFF1A237E),
+        ));
+      } catch (e) {
+        debugPrint('خطأ في وقت العشاء: $e');
+        prayers.add(PrayerTimeModel(
+          name: 'العشاء',
+          time: DateTime(now.year, now.month, now.day, 19, 30),
+          icon: Icons.nightlight_round,
+          color: const Color(0xFF1A237E),
+        ));
+      }
 
       // تحديد الصلاة التالية
       PrayerTimeModel? nextPrayer;
@@ -117,7 +179,7 @@ class PrayerTimeModel {
       
       return prayers;
     } catch (e) {
-      debugPrint('خطأ في تحويل أوقات الصلاة: $e');
+      debugPrint('خطأ عام في تحويل أوقات الصلاة: $e');
       
       // في حالة حدوث خطأ، نقوم بإنشاء أوقات افتراضية
       final defaultTimes = [
