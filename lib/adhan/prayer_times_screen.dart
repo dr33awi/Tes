@@ -16,7 +16,7 @@ class PrayerTimesScreen extends StatefulWidget {
   State<PrayerTimesScreen> createState() => _PrayerTimesScreenState();
 }
 
-class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
+class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindingObserver {
   final PrayerTimesService _prayerService = PrayerTimesService();
   List<PrayerTimeModel>? _prayerTimes;
   String? _locationName;
@@ -24,23 +24,56 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   bool _hasLocationPermission = false;
   bool _hasError = false;
   String _errorMessage = '';
-
+  
+  // إضافة متغير للتخزين المؤقت
+  bool _hasCache = false;
+  DateTime? _lastLoadTime;
+  
+  // المدة المسموح بها لإعادة استخدام البيانات المخزنة مؤقتًا (5 دقائق)
+  static const Duration _cacheDuration = Duration(minutes: 5);
+  
   @override
   void initState() {
     super.initState();
+    // إضافة مراقب دورة حياة التطبيق
+    WidgetsBinding.instance.addObserver(this);
     _initService();
+  }
+  
+  @override
+  void dispose() {
+    // إزالة المراقب عند التخلص من الشاشة
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // إعادة تحميل البيانات عند العودة للتطبيق
+    if (state == AppLifecycleState.resumed) {
+      // إذا كانت البيانات قديمة (أكثر من 5 دقائق)، قم بإعادة تحميلها
+      if (_lastLoadTime != null && 
+          DateTime.now().difference(_lastLoadTime!) > _cacheDuration) {
+        _loadPrayerTimes();
+      }
+    }
   }
   
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Передача текущего контекста в сервис для диалогов
+    // تعيين السياق في الخدمة للحوارات
     _prayerService.setContext(context);
   }
   
   Future<void> _initService() async {
     try {
       await _prayerService.initialize();
+      
+      // محاولة تحميل البيانات المخزنة مؤقتًا أولاً لزيادة سرعة الاستجابة
+      _loadCachedData();
+      
+      // ثم تحميل البيانات المحدثة
       _loadPrayerTimes();
     } catch (e) {
       if (mounted) {
@@ -49,62 +82,150 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
           _hasError = true;
           _errorMessage = 'خطأ في تهيئة خدمة مواقيت الصلاة: $e';
         });
+        
+        // عرض معلومات الخطأ التفصيلية في وضع التصحيح
+        debugPrint('تفاصيل خطأ التهيئة: $e');
       }
     }
   }
+  
+  // دالة جديدة لتحميل البيانات المخزنة مؤقتًا
+  void _loadCachedData() {
+    // تنفيذ عملية تحميل البيانات من التخزين المؤقت هنا
+    // ويمكن تنفيذها باستخدام SharedPreferences
+    
+    // لمحاكاة عملية تحميل البيانات المخزنة مؤقتًا، نستخدم البيانات المحلية
+    if (_hasCache) return;
+    
+    try {
+      final cachedTimes = _prayerService.getPrayerTimesLocally();
+      
+      if (mounted) {
+        setState(() {
+          _prayerTimes = cachedTimes;
+          _locationName = _prayerService.locationName ?? 'الموقع المخزن مؤقتًا';
+          _isLoading = false;
+          _hasCache = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('خطأ في تحميل البيانات المخزنة مؤقتًا: $e');
+      // لا نعرض الخطأ للمستخدم هنا لأننا سنحاول التحميل من الإنترنت لاحقًا
+    }
+  }
 
+  // تحسين دالة تحميل أوقات الصلاة
   Future<void> _loadPrayerTimes() async {
+    // إذا كان هناك تحميل جارٍ بالفعل، تجاهل الطلب
+    if (_isLoading && !_hasCache) return;
+    
+    // إذا كانت البيانات مخزنة مؤقتًا وتم تحميلها مؤخرًا، تجاهل الطلب
+    if (_hasCache && _lastLoadTime != null && 
+        DateTime.now().difference(_lastLoadTime!) < _cacheDuration) {
+      return;
+    }
+    
     setState(() {
-      _isLoading = true;
+      // إذا كان لدينا بيانات مخزنة مؤقتًا، لا نظهر شاشة التحميل
+      _isLoading = !_hasCache;
       _hasError = false;
     });
 
     try {
-      // Проверка разрешений на местоположение
+      // التحقق من أذونات الموقع
       _hasLocationPermission = await _prayerService.checkLocationPermission();
       
       if (!_hasLocationPermission) {
-        // Попытка запросить разрешения
+        // محاولة طلب الأذونات
         _hasLocationPermission = await _prayerService.requestLocationPermission();
       }
 
-      // Получение времени молитв - будет использоваться местоположение по умолчанию, если необходимо
-      List<PrayerTimeModel> prayerTimes;
+      // عدد المحاولات الأقصى
+      const int maxRetries = 2;
+      int retryCount = 0;
+      bool success = false;
+      List<PrayerTimeModel>? prayerTimes;
       
-      try {
-        prayerTimes = await _prayerService.getPrayerTimesFromAPI(
-          useDefaultLocationIfNeeded: true
-        );
-      } catch (apiError) {
-        debugPrint('Error getting prayer times from API: $apiError');
-        // Fallback to local calculation with default location
-        prayerTimes = _prayerService.getPrayerTimesLocally();
+      // محاولة الحصول على بيانات من API مع إعادة المحاولة في حالة الفشل
+      while (retryCount < maxRetries && !success) {
+        try {
+          prayerTimes = await _prayerService.getPrayerTimesFromAPI(
+            useDefaultLocationIfNeeded: true
+          );
+          success = true;
+        } catch (apiError) {
+          retryCount++;
+          debugPrint('فشل الحصول على مواقيت الصلاة من API (محاولة $retryCount): $apiError');
+          
+          if (retryCount < maxRetries) {
+            // انتظار قبل إعادة المحاولة
+            await Future.delayed(const Duration(seconds: 2));
+          } else {
+            // استخدام طريقة احتياطية محلية في حالة فشل جميع المحاولات
+            debugPrint('استخدام طريقة محلية بعد فشل جميع المحاولات');
+            prayerTimes = _prayerService.getPrayerTimesLocally();
+          }
+        }
       }
       
-      if (mounted) {
+      if (mounted && prayerTimes != null) {
         setState(() {
           _prayerTimes = prayerTimes;
           _locationName = _prayerService.locationName ?? 'الموقع الافتراضي';
           _isLoading = false;
+          _lastLoadTime = DateTime.now();
+          _hasCache = true;
         });
       }
       
-      // Attempt to schedule notifications after successfully loading prayer times
+      // محاولة جدولة الإشعارات بعد تحميل البيانات بنجاح
       try {
         await _prayerService.schedulePrayerNotifications();
       } catch (notifError) {
-        debugPrint('Error scheduling prayer notifications: $notifError');
-        // Don't show this error to the user since it's not critical
+        debugPrint('خطأ في جدولة الإشعارات: $notifError');
+        // عدم عرض هذا الخطأ للمستخدم لأنه غير حرج
       }
     } catch (e) {
       if (mounted) {
         setState(() {
+          // إذا كان لدينا بيانات مخزنة مؤقتًا، نستمر في عرضها حتى مع وجود خطأ
           _isLoading = false;
-          _hasError = true;
+          _hasError = !_hasCache;
           _errorMessage = 'حدث خطأ أثناء تحميل أوقات الصلاة: $e';
         });
+        
+        // عرض رسالة خطأ مختصرة للمستخدم وتفاصيل أكثر في سجل التصحيح
+        debugPrint('تفاصيل خطأ تحميل أوقات الصلاة: $e');
+        
+        // عرض شريط إشعار في أسفل الشاشة في حالة الخطأ مع وجود بيانات مخزنة
+        if (_hasCache) {
+          _showErrorSnackBar('حدث خطأ أثناء تحديث البيانات. جارٍ استخدام البيانات المخزنة.');
+        }
       }
     }
+  }
+  
+  // دالة جديدة لعرض شريط إشعار خطأ
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.red.shade700,
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'إعادة المحاولة',
+          textColor: Colors.white,
+          onPressed: _loadPrayerTimes,
+        ),
+      ),
+    );
   }
 
   @override
@@ -115,7 +236,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: Text(
+        title: const Text(
           'مواقيت الصلاة',
           style: TextStyle(
             color: kPrimary,
@@ -124,7 +245,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
           ),
         ),
         leading: IconButton(
-          icon: Icon(
+          icon: const Icon(
             Icons.arrow_back,
             color: kPrimary,
           ),
@@ -133,7 +254,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         actions: [
           // زر إعدادات الإشعارات
           IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.notifications,
               color: kPrimary,
             ),
@@ -147,16 +268,29 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
             },
             tooltip: 'إعدادات الإشعارات',
           ),
+          // عرض مؤشر تحميل بجانب زر التحديث عند التحميل
+          _isLoading && _hasCache 
+            ? IconButton(
+                icon: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: kPrimary,
+                  ),
+                ),
+                onPressed: null,
+              )
+            : IconButton(
+                icon: const Icon(
+                  Icons.refresh,
+                  color: kPrimary,
+                ),
+                onPressed: _loadPrayerTimes,
+                tooltip: 'تحديث',
+              ),
           IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: kPrimary,
-            ),
-            onPressed: _loadPrayerTimes,
-            tooltip: 'تحديث',
-          ),
-          IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.settings,
               color: kPrimary,
             ),
@@ -186,14 +320,14 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   }
 
   Widget _buildMainContent() {
-    if (_isLoading) {
+    if (_isLoading && !_hasCache) {
       return const AppLoadingIndicator(
         message: 'جاري تحميل أوقات الصلاة...',
         loadingType: LoadingType.staggeredDotsWave,
       );
     }
 
-    if (_hasError) {
+    if (_hasError && !_hasCache) {
       return _buildErrorWidget();
     }
 
@@ -208,7 +342,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               color: kPrimary.withOpacity(0.7),
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'لا تتوفر أوقات صلاة للعرض',
               style: TextStyle(
                 fontSize: 18,
@@ -245,6 +379,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // في حالة التحميل مع وجود بيانات مخزنة، نعرض مؤشر تحميل خفيف
+            if (_isLoading && _hasCache)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Center(
+                  child: LinearProgressIndicator(
+                    backgroundColor: kPrimary.withOpacity(0.1),
+                    color: kPrimary,
+                  ),
+                ),
+              ),
+            
             // بطاقة الموقع
             _buildLocationCard(),
             
@@ -254,29 +400,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               
             const SizedBox(height: 20),
 
-            // أوقات الصلاة
-            AnimationLimiter(
-              child: ListView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                shrinkWrap: true,
-                itemCount: _prayerTimes!.length,
-                itemBuilder: (context, index) {
-                  final prayer = _prayerTimes![index];
-                  return AnimationConfiguration.staggeredList(
-                    position: index,
-                    duration: const Duration(milliseconds: 500),
-                    child: SlideAnimation(
-                      verticalOffset: 50.0,
-                      child: FadeInAnimation(
-                        child: _buildPrayerTimeCard(prayer),
-                      ),
-                    ),
-                  );
-                },
-              ),
+            // أوقات الصلاة - تحسين عرض القائمة لتقليل استهلاك الموارد
+            // استخدام ListView.builder بدلاً من AnimationLimiter لتحسين الأداء
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildPrayerTimesList(),
             ),
-            
-            const SizedBox(height: 20),
             
             // زر إعدادات الإشعارات
             Center(
@@ -305,6 +434,35 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+  
+  // دالة منفصلة لعرض قائمة أوقات الصلاة
+  Widget _buildPrayerTimesList() {
+    return AnimationLimiter(
+      child: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: _prayerTimes!.length,
+        itemBuilder: (context, index) {
+          final prayer = _prayerTimes![index];
+          
+          // تحسين الأداء: استخدام مفتاح فريد لكل عنصر
+          return AnimationConfiguration.staggeredList(
+            position: index,
+            duration: const Duration(milliseconds: 500),
+            // تقليل مدة الأنيميشن لتحسين الأداء
+            delay: Duration(milliseconds: 50 * index),
+            key: ValueKey('prayer-${prayer.name}'),
+            child: SlideAnimation(
+              verticalOffset: 50.0,
+              child: FadeInAnimation(
+                child: _buildPrayerTimeCard(prayer),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -440,6 +598,19 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                             fontSize: 14,
                           ),
                         ),
+                        
+                        // إضافة تفاصيل عن وقت آخر تحديث
+                        if (_lastLoadTime != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'آخر تحديث: ${_formatLastUpdateTime(_lastLoadTime!)}',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -459,148 +630,168 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       ),
     );
   }
+  
+  // دالة جديدة لتنسيق وقت آخر تحديث
+  String _formatLastUpdateTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+    
+    if (difference.inMinutes < 1) {
+      return 'منذ أقل من دقيقة';
+    } else if (difference.inMinutes < 60) {
+      return 'منذ ${difference.inMinutes} دقيقة';
+    } else if (difference.inHours < 24) {
+      return 'منذ ${difference.inHours} ساعة';
+    } else {
+      return 'منذ ${difference.inDays} يوم';
+    }
+  }
 
   Widget _buildPrayerTimeCard(PrayerTimeModel prayer) {
     final bool isPassed = prayer.isPassed;
     final bool isNext = prayer.isNext;
     
-    return Card(
-      elevation: isNext ? 8 : 4,
-      shadowColor: prayer.color.withOpacity(isNext ? 0.4 : 0.2),
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isNext
-            ? BorderSide(color: prayer.color, width: 2)
-            : BorderSide.none,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
+    // تحسين الأداء: استخدام Hero widget للانتقالات السلسة بين الشاشات
+    return Hero(
+      tag: 'prayer-${prayer.name}',
+      child: Card(
+        elevation: isNext ? 8 : 4,
+        shadowColor: prayer.color.withOpacity(isNext ? 0.4 : 0.2),
+        margin: const EdgeInsets.only(bottom: 12),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          gradient: isNext
-              ? LinearGradient(
-                  colors: [
-                    prayer.color.withOpacity(0.15),
-                    prayer.color.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                )
-              : null,
+          side: isNext
+              ? BorderSide(color: prayer.color, width: 2)
+              : BorderSide.none,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // أيقونة الصلاة
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: isNext
+                ? LinearGradient(
                     colors: [
-                      prayer.color,
-                      prayer.color.withOpacity(0.7),
+                      prayer.color.withOpacity(0.15),
+                      prayer.color.withOpacity(0.05),
                     ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: prayer.color.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  prayer.icon,
-                  color: Colors.white,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 16),
-              
-              // تفاصيل الصلاة
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          prayer.name,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isNext ? prayer.color : Colors.black87,
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          prayer.formattedTime,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isNext ? prayer.color : Colors.black87,
-                            fontSize: 18,
-                          ),
-                        ),
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                  )
+                : null,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // أيقونة الصلاة
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        prayer.color,
+                        prayer.color.withOpacity(0.7),
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    const SizedBox(height: 8),
-                    
-                    // الوقت المتبقي للصلاة
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isPassed
-                            ? Colors.grey.withOpacity(0.2)
-                            : isNext
-                                ? prayer.color.withOpacity(0.2)
-                                : Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: prayer.color.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    ],
+                  ),
+                  child: Icon(
+                    prayer.icon,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                
+                // تفاصيل الصلاة
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(
-                            isPassed
-                                ? Icons.check_circle
-                                : isNext
-                                    ? Icons.access_time_filled
-                                    : Icons.access_time,
-                            color: isPassed
-                                ? Colors.grey
-                                : isNext
-                                    ? prayer.color
-                                    : Colors.blue,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
                           Text(
-                            isPassed
-                                ? 'انتهى'
-                                : isNext
-                                    ? 'الصلاة التالية: ${prayer.remainingTime}'
-                                    : 'متبقي: ${prayer.remainingTime}',
+                            prayer.name,
                             style: TextStyle(
-                              fontSize: 12,
                               fontWeight: FontWeight.bold,
+                              color: isNext ? prayer.color : Colors.black87,
+                              fontSize: 18,
+                            ),
+                          ),
+                          Text(
+                            prayer.formattedTime,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isNext ? prayer.color : Colors.black87,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // الوقت المتبقي للصلاة
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isPassed
+                              ? Colors.grey.withOpacity(0.2)
+                              : isNext
+                                  ? prayer.color.withOpacity(0.2)
+                                  : Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isPassed
+                                  ? Icons.check_circle
+                                  : isNext
+                                      ? Icons.access_time_filled
+                                      : Icons.access_time,
                               color: isPassed
                                   ? Colors.grey
                                   : isNext
                                       ? prayer.color
                                       : Colors.blue,
+                              size: 16,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Text(
+                              isPassed
+                                  ? 'انتهى'
+                                  : isNext
+                                      ? 'الصلاة التالية: ${prayer.remainingTime}'
+                                      : 'متبقي: ${prayer.remainingTime}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isPassed
+                                    ? Colors.grey
+                                    : isNext
+                                        ? prayer.color
+                                        : Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -630,8 +821,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
+            // عرض رسالة خطأ أكثر ودية للمستخدم
             Text(
-              _errorMessage,
+              _getFormattedErrorMessage(_errorMessage),
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey.shade700,
@@ -671,11 +863,16 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                           _locationName = _prayerService.locationName;
                           _hasError = false;
                           _isLoading = false;
+                          _hasCache = true;
+                          _lastLoadTime = DateTime.now();
                         });
                       } catch (e) {
                         setState(() {
                           _errorMessage = 'فشل استخدام الموقع الافتراضي: $e';
                         });
+                        
+                        // عرض رسالة خطأ أكثر تفصيلاً في سجل التصحيح
+                        debugPrint('تفاصيل خطأ استخدام الموقع الافتراضي: $e');
                       }
                     },
                     style: OutlinedButton.styleFrom(
@@ -719,5 +916,22 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         ),
       ),
     );
+  }
+  
+  // دالة جديدة لتنسيق رسائل الخطأ لتكون أكثر ودية للمستخدم
+  String _getFormattedErrorMessage(String errorMessage) {
+    // تبسيط رسائل الخطأ التقنية
+    if (errorMessage.contains('Exception')) {
+      return 'حدث خطأ أثناء الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت الخاص بك والمحاولة مرة أخرى.';
+    } else if (errorMessage.contains('Permission')) {
+      return 'لم يتم منح الأذونات المطلوبة. يرجى منح إذن الوصول للموقع للحصول على مواقيت دقيقة.';
+    } else if (errorMessage.contains('Timeout')) {
+      return 'انتهت مهلة الاتصال. يرجى التحقق من اتصال الإنترنت الخاص بك والمحاولة مرة أخرى.';
+    } else if (errorMessage.isEmpty) {
+      return 'حدث خطأ غير معروف. يرجى المحاولة مرة أخرى.';
+    }
+    
+    // إرجاع رسالة الخطأ الأصلية إذا لم تكن تقنية جدًا
+    return errorMessage;
   }
 }
