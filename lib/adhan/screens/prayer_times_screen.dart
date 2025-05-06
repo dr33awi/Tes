@@ -1,26 +1,12 @@
-// lib/prayer/screens/prayer_times_screen.dart
+// lib/adhan/screens/prayer_times_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
-import 'package:test_athkar_app/adhan/widgets/app_loading_indicator.dart';
+import 'package:test_athkar_app/screens/home_screen/widgets/common/app_loading_indicator.dart';
 import 'package:test_athkar_app/adhan/screens/prayer_settings_screen.dart';
 import 'package:test_athkar_app/adhan/screens/notification_settings_screen.dart';
-
-
-
-
-Future<void> _navigateToNotificationSettings() async {
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const NotificationSettingsScreen(),
-    ),
-  );
-  
-  // Opcional: actualizar algo después de regresar
-  _loadPrayerTimes();
-}
+import 'package:permission_handler/permission_handler.dart';
 
 class PrayerTimesScreen extends StatefulWidget {
   const PrayerTimesScreen({Key? key}) : super(key: key);
@@ -32,7 +18,7 @@ class PrayerTimesScreen extends StatefulWidget {
 class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindingObserver {
   final PrayerTimesService _prayerService = PrayerTimesService();
   
-  // State variables
+  // Variables de estado
   List<PrayerTimeModel>? _prayerTimes;
   String? _locationName;
   bool _isLoading = true;
@@ -41,17 +27,17 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   bool _hasError = false;
   String _errorMessage = '';
   
-  // Cache variables
+  // Variables para caché
   bool _hasCache = false;
   DateTime? _lastLoadTime;
   
-  // Allowed duration to reuse cached data (5 minutes)
+  // Duración permitida para reutilizar datos en caché (5 minutos)
   static const Duration _cacheDuration = Duration(minutes: 5);
   
   // Theme colors
-  late final Color kPrimary;
-  late final Color kPrimaryLight;
-  late final Color kSurface;
+  late Color kPrimary;
+  late Color kPrimaryLight;
+  late Color kSurface;
   
   @override
   void initState() {
@@ -87,9 +73,67 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     kSurface = Theme.of(context).scaffoldBackgroundColor;
   }
   
+  // Método para verificar el permiso de ubicación
+  Future<bool> _checkLocationPermission() async {
+    return await Permission.location.status.isGranted;
+  }
+
+  // Método para solicitar permiso de ubicación
+  Future<bool> _requestLocationPermission() async {
+    PermissionStatus status = await Permission.location.request();
+    
+    if (status.isPermanentlyDenied) {
+      // Si el permiso fue denegado permanentemente, mostrar diálogo
+      _showOpenSettingsDialog();
+      return false;
+    }
+    
+    return status.isGranted;
+  }
+
+  // Método para mostrar diálogo para abrir configuración
+  void _showOpenSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إذن الموقع مطلوب'),
+        content: const Text(
+          'تم رفض إذن الموقع بشكل دائم. يرجى فتح إعدادات التطبيق وتفعيل إذن الموقع يدويًا.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              openAppSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+            ),
+            child: const Text('فتح الإعدادات'),
+          ),
+        ],
+      ),
+    );
+  }
+  
   Future<void> _initService() async {
     try {
+      // Inicializar el servicio de tiempos de oración
       await _prayerService.initialize();
+      
+      // Verificar permiso de ubicación
+      _hasLocationPermission = await _checkLocationPermission();
+      
+      // Si no tiene permiso, intentar solicitar
+      if (!_hasLocationPermission) {
+        _hasLocationPermission = await _requestLocationPermission();
+      }
+      
+      // Cargar datos de caché y luego cargar tiempos actualizados
       _loadCachedData();
       _loadPrayerTimes();
     } catch (e) {
@@ -99,6 +143,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           _hasError = true;
           _errorMessage = 'خطأ في تهيئة خدمة مواقيت الصلاة';
         });
+        debugPrint('Error de inicialización detallado: $e');
       }
     }
   }
@@ -118,7 +163,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         });
       }
     } catch (e) {
-      debugPrint('Error loading cached data: $e');
+      debugPrint('Error al cargar datos en caché: $e');
     }
   }
 
@@ -145,10 +190,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     });
 
     try {
-      _hasLocationPermission = await _prayerService.checkLocationPermission();
+      _hasLocationPermission = await _checkLocationPermission();
       
       if (!_hasLocationPermission) {
-        _hasLocationPermission = await _prayerService.requestLocationPermission();
+        _hasLocationPermission = await _requestLocationPermission();
       }
 
       if (forceRefresh) {
@@ -168,10 +213,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           success = true;
         } catch (apiError) {
           retryCount++;
+          debugPrint('Error al obtener tiempos de oración de API (intento $retryCount): $apiError');
           
           if (retryCount < maxRetries) {
             await Future.delayed(const Duration(seconds: 2));
           } else {
+            debugPrint('Usando método local después de fallar todos los intentos');
             prayerTimes = _prayerService.getPrayerTimesLocally();
           }
         }
@@ -190,8 +237,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
       
       try {
         await _prayerService.schedulePrayerNotifications();
-      } catch (e) {
-        debugPrint('Error scheduling notifications: $e');
+      } catch (notifError) {
+        debugPrint('Error al programar notificaciones: $notifError');
       }
     } catch (e) {
       if (mounted) {
@@ -201,6 +248,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           _hasError = !_hasCache;
           _errorMessage = 'حدث خطأ أثناء تحميل أوقات الصلاة';
         });
+        
+        debugPrint('Detalles del error al cargar tiempos de oración: $e');
         
         if (_hasCache) {
           _showErrorSnackBar('حدث خطأ أثناء تحديث البيانات. جارٍ استخدام البيانات المخزنة.');
@@ -290,7 +339,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
             Icons.notifications,
             color: kPrimary,
           ),
-          onPressed: () => _navigateToNotificationSettings(),
+          onPressed: _navigateToNotificationSettings,
           tooltip: 'إعدادات الإشعارات',
         ),
         _isRefreshing 
@@ -316,21 +365,23 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
             Icons.settings,
             color: kPrimary,
           ),
-          onPressed: () => _navigateToPrayerSettings(),
+          onPressed: _navigateToPrayerSettings,
           tooltip: 'الإعدادات',
         ),
       ],
     );
   }
   
+  // Método para navegar a la pantalla de configuración de notificaciones
   Future<void> _navigateToNotificationSettings() async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const PrayerSettingsScreen(),
+        builder: (context) => const NotificationSettingsScreen(),
       ),
     );
     
+    // Actualizar los tiempos de oración después de regresar
     _loadPrayerTimes();
   }
   
@@ -352,6 +403,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         
         _showSuccessSnackBar('تم تحديث مواقيت الصلاة وفقًا للإعدادات الجديدة');
       } catch (e) {
+        debugPrint('Error al recargar tiempos después de cambiar configuración: $e');
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -656,13 +709,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         ),
       ),
     );
-  }
-  
-  Future<void> _requestLocationPermission() async {
-    final hasPermission = await _prayerService.requestLocationPermission();
-    if (hasPermission) {
-      _loadPrayerTimes(forceRefresh: true);
-    }
   }
 
   Widget _buildLocationCard() {
