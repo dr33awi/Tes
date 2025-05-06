@@ -505,13 +505,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
             
             const SizedBox(height: 16),
 
-            // عرض أقسام الصلوات بالتصميم الجديد
-            _buildPrayerCategoriesGrid(),
-            
-            const SizedBox(height: 24),
-            
-            // أزرار الإجراءات
-            _buildActionButtons(),
+            // عرض أقسام الصلوات بالتصميم الجديد مشابه لأقسام الأذكار
+            _buildPrayerCategoriesList(),
             
             const SizedBox(height: 24),
           ],
@@ -997,142 +992,33 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     }
   }
   
-  // بناء أزرار الإجراءات مع نفس تصميم صفحة الأذكار
-  Widget _buildActionButtons() {
-    return Column(
-      children: [
-        // عنوان الإعدادات
-        Row(
-          children: [
-            Icon(
-              Icons.settings,
-              color: kPrimary,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'الإعدادات',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: kPrimary,
-              ),
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // أزرار في صف
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _navigateToNotificationSettings,
-                icon: const Icon(Icons.notifications_active),
-                label: const Text('إعدادات الإشعارات'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            
-            // زر إعدادات الحساب
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _navigateToPrayerSettings,
-                icon: const Icon(Icons.tune),
-                label: const Text('إعدادات الحساب'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kPrimary,
-                  side: BorderSide(color: kPrimary),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  // تم إلغاء الأزرار التي كانت في الأسفل
+  // يمكن استخدام أزرار القائمة العلوية فقط
   
-  // بناء شبكة أقسام الصلوات مشابه لشاشة الأذكار
-  Widget _buildPrayerCategoriesGrid() {
-    // قائمة أقسام الصلوات
-    List<Map<String, dynamic>> prayerCategories = [];
-    
-    // إضافة الصلوات المتاحة إلى القائمة
-    if (_prayerTimes != null && _prayerTimes!.isNotEmpty) {
-      for (var prayer in _prayerTimes!) {
-        prayerCategories.add({
-          'name': prayer.name,
-          'englishName': prayer.englishName,
-          'icon': prayer.icon,
-          'color': prayer.color,
-          'time': prayer.formattedTime,
-          'remainingTime': prayer.remainingTime,
-          'isPassed': prayer.isPassed,
-          'isNext': prayer.isNext,
-        });
-      }
+  // بناء قائمة أقسام الصلوات (مشابه لشاشة الأذكار)
+  Widget _buildPrayerCategoriesList() {
+    if (_prayerTimes == null || _prayerTimes!.isEmpty) {
+      return const SizedBox.shrink();
     }
     
     return AnimationLimiter(
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1.0,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-        ),
+      child: ListView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: prayerCategories.length,
+        itemCount: _prayerTimes!.length,
         itemBuilder: (context, index) {
-          final prayer = prayerCategories[index];
+          final prayer = _prayerTimes![index];
           final bool isPressed = _isPressed && _pressedIndex == index;
           
-          return AnimationConfiguration.staggeredGrid(
+          return AnimationConfiguration.staggeredList(
             position: index,
             duration: const Duration(milliseconds: 500),
-            columnCount: 2,
             child: SlideAnimation(
               verticalOffset: 50.0,
               child: FadeInAnimation(
-                child: GestureDetector(
-                  onTapDown: (_) {
-                    setState(() {
-                      _isPressed = true;
-                      _pressedIndex = index;
-                    });
-                  },
-                  onTapUp: (_) {
-                    setState(() {
-                      _isPressed = false;
-                      _pressedIndex = null;
-                    });
-                  },
-                  onTapCancel: () {
-                    setState(() {
-                      _isPressed = false;
-                      _pressedIndex = null;
-                    });
-                  },
-                  child: Transform.scale(
-                    scale: isPressed ? 0.95 : 1.0,
-                    child: _buildPrayerCategoryCard(prayer, index),
-                  ),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildPrayerCategoryCard(prayer, index, isPressed),
                 ),
               ),
             ),
@@ -1142,302 +1028,224 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // بناء بطاقة قسم الصلاة
-  Widget _buildPrayerCategoryCard(Map<String, dynamic> prayer, int index) {
-    final Color color = prayer['color'];
-    final bool isNext = prayer['isNext'];
-    final bool isPassed = prayer['isPassed'];
-    
-    return Card(
-      elevation: isNext ? 8 : 4,
-      shadowColor: color.withOpacity(isNext ? 0.4 : 0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isNext
-            ? BorderSide(color: color, width: 2)
-            : BorderSide.none,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              color,
-              color.withOpacity(0.7),
-            ],
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            stops: const [0.3, 1.0],
+  // بناء بطاقة قسم الصلاة (مشابه لشاشة الأذكار)
+  Widget _buildPrayerCategoryCard(PrayerTimeModel prayer, int index, bool isPressed) {
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() {
+          _isPressed = true;
+          _pressedIndex = index;
+        });
+      },
+      onTapUp: (_) {
+        setState(() {
+          _isPressed = false;
+          _pressedIndex = null;
+        });
+      },
+      onTapCancel: () {
+        setState(() {
+          _isPressed = false;
+          _pressedIndex = null;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        transform: Matrix4.identity()..scale(isPressed ? 0.95 : 1.0),
+        child: Card(
+          elevation: prayer.isNext ? 4 : 2,
+          shadowColor: prayer.color.withOpacity(prayer.isNext ? 0.4 : 0.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: prayer.isNext
+                ? BorderSide(color: prayer.color, width: 1.5)
+                : BorderSide.none,
           ),
-        ),
-        child: Stack(
-          children: [
-            // أيقونة زخرفية في الخلفية
-            Positioned(
-              right: -20,
-              bottom: -20,
-              child: Icon(
-                prayer['icon'],
-                size: 80,
-                color: Colors.white.withOpacity(0.1),
-              ),
-            ),
-            
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // اسم الصلاة مع أيقونة
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          prayer['icon'],
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          prayer['name'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const Spacer(),
-                  
-                  // وقت الصلاة
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.access_time,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          prayer['time'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // الحالة
-// بناء بطاقة قسم الصلاة
-  Widget _buildPrayerCategoryCard(Map<String, dynamic> prayer, int index) {
-    final Color color = prayer['color'];
-    final bool isNext = prayer['isNext'];
-    final bool isPassed = prayer['isPassed'];
-    
-    return Card(
-      elevation: isNext ? 8 : 4,
-      shadowColor: color.withOpacity(isNext ? 0.4 : 0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isNext
-            ? BorderSide(color: color, width: 2)
-            : BorderSide.none,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              color,
-              color.withOpacity(0.7),
-            ],
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            stops: const [0.3, 1.0],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // أيقونة زخرفية في الخلفية
-            Positioned(
-              right: -20,
-              bottom: -20,
-              child: Icon(
-                prayer['icon'],
-                size: 80,
-                color: Colors.white.withOpacity(0.1),
-              ),
-            ),
-            
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // اسم الصلاة مع أيقونة
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          prayer['icon'],
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          prayer['name'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const Spacer(),
-                  
-                  // وقت الصلاة
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.access_time,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          prayer['time'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // الحالة
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPassed
-                              ? Icons.check_circle
-                              : isNext
-                                  ? Icons.access_time_filled
-                                  : Icons.access_time,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isPassed
-                              ? 'انتهى'
-                              : isNext
-                                  ? 'الصلاة التالية: ${prayer['remainingTime']}'
-                                  : 'متبقي: ${prayer['remainingTime']}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  prayer.color,
+                  prayer.color.withOpacity(0.7),
                 ],
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
               ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            
-            // علامة خاصة للصلاة التالية
-            if (isNext)
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    'التالية',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
+            child: Stack(
+              children: [
+                // أيقونة في الخلفية
+                Positioned(
+                  right: -15,
+                  bottom: -15,
+                  child: Icon(
+                    prayer.icon,
+                    size: 60,
+                    color: Colors.white.withOpacity(0.1),
                   ),
                 ),
-              ),
-          ],
+                
+                // محتوى البطاقة
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      // دائرة الأيقونة
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            prayer.icon,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      
+                      // معلومات الصلاة
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              prayer.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time,
+                                        color: Colors.white,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        prayer.formattedTime,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        prayer.isPassed
+                                            ? Icons.check_circle
+                                            : prayer.isNext
+                                                ? Icons.access_time_filled
+                                                : Icons.access_time,
+                                        color: Colors.white,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        prayer.isPassed
+                                            ? 'انتهى'
+                                            : prayer.isNext
+                                                ? 'التالية: ${prayer.remainingTime}'
+                                                : '${prayer.remainingTime}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // أيقونة السهم للانتقال
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.white.withOpacity(0.7),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // علامة خاصة للصلاة التالية
+                if (prayer.isNext)
+                  Positioned(
+                    top: 0,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(6),
+                          bottomRight: Radius.circular(6),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        'التالية',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: prayer.color,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // Method for using default location
-  Future<void> _useDefaultLocation() async {
+  // استخدام الموقع الافتراضي
+  void _useDefaultLocation() {
     try {
-      await _prayerService.setDefaultLocation();
+      _prayerService.setDefaultLocation(); // Removed await since this returns void
       final prayerTimes = _prayerService.getPrayerTimesLocally();
       
       setState(() {
@@ -1458,7 +1266,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     }
   }
 
-  // Method to format error messages
+  // تنسيق رسائل الخطأ
   String _getFormattedErrorMessage(String errorMessage) {
     if (errorMessage.contains('Exception')) {
       return 'حدث خطأ أثناء الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت الخاص بك والمحاولة مرة أخرى.';
@@ -1472,3 +1280,4 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     
     return errorMessage;
   }
+}
