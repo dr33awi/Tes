@@ -3,6 +3,10 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+/// Model class for prayer time data
+///
+/// Represents a prayer time with name, time, icon, and other display properties.
+/// Provides utility methods for formatting time and calculating remaining time.
 class PrayerTimeModel {
   final String name;
   final DateTime time;
@@ -18,7 +22,7 @@ class PrayerTimeModel {
     this.isNext = false,
   });
 
-  // Formato de tiempo en formato 12 horas
+  /// Format time in 12-hour format with AM/PM
   String get formattedTime {
     final hour = time.hour > 12 ? time.hour - 12 : time.hour == 0 ? 12 : time.hour;
     final minute = time.minute.toString().padLeft(2, '0');
@@ -26,18 +30,23 @@ class PrayerTimeModel {
     return '$hour:$minute $period';
   }
   
-  // Formato alternativo usando intl
+  /// Format time using intl library
   String get formattedTimeWithIntl {
-    final formatter = DateFormat.jm();
-    return formatter.format(time);
+    try {
+      final formatter = DateFormat.jm();
+      return formatter.format(time);
+    } catch (e) {
+      // Fallback to basic formatting if intl formatting fails
+      return formattedTime;
+    }
   }
 
-  // Verificar si el tiempo ya pasó
+  /// Check if prayer time has already passed
   bool get isPassed => DateTime.now().isAfter(time);
 
-  // Calcular tiempo restante hasta la oración
+  /// Calculate remaining time until prayer
   String get remainingTime {
-    if (isPassed) return 'انتهى';
+    if (isPassed) return 'انتهى'; // Passed
     
     final now = DateTime.now();
     final difference = time.difference(now);
@@ -46,13 +55,29 @@ class PrayerTimeModel {
     final minutes = difference.inMinutes % 60;
     
     if (hours > 0) {
-      return '$hours ساعة و $minutes دقيقة';
+      return '$hours ساعة و $minutes دقيقة'; // hours and minutes
     } else {
-      return '$minutes دقيقة';
+      return '$minutes دقيقة'; // minutes only
     }
   }
   
-  // Crear una copia del modelo con modificaciones
+  /// Get time in milliseconds since epoch
+  int get timeInMillis => time.millisecondsSinceEpoch;
+  
+  /// Get prayer name in English for internal use
+  String get englishName {
+    switch (name) {
+      case 'الفجر': return 'Fajr';
+      case 'الشروق': return 'Sunrise';
+      case 'الظهر': return 'Dhuhr';
+      case 'العصر': return 'Asr';
+      case 'المغرب': return 'Maghrib';
+      case 'العشاء': return 'Isha';
+      default: return name;
+    }
+  }
+  
+  /// Create a copy with modified properties
   PrayerTimeModel copyWith({
     String? name,
     DateTime? time,
@@ -69,13 +94,13 @@ class PrayerTimeModel {
     );
   }
 
-  // Convertir tiempos de oración de Adhan a modelos PrayerTimeModel
+  /// Convert PrayerTimes from Adhan library to PrayerTimeModel list
   static List<PrayerTimeModel> fromPrayerTimes(PrayerTimes prayerTimes) {
     final now = DateTime.now();
     final List<PrayerTimeModel> prayers = [];
     
     try {
-      // Mapa de definiciones de oración para simplificar el código
+      // Map prayer definitions for simpler code
       final prayerDefinitions = [
         {
           'name': 'الفجر',
@@ -127,7 +152,7 @@ class PrayerTimeModel {
         },
       ];
       
-      // Crear modelos de oración con manejo de errores para cada uno individualmente
+      // Create prayer models with individual error handling
       for (final prayerDef in prayerDefinitions) {
         try {
           final time = prayerDef['time'] as DateTime;
@@ -139,9 +164,9 @@ class PrayerTimeModel {
             color: prayerDef['color'] as Color,
           ));
         } catch (e) {
-          debugPrint('Error al procesar tiempo de ${prayerDef['name']}: $e');
+          debugPrint('Error processing ${prayerDef['name']} time: $e');
           
-          // Usar tiempo por defecto en caso de error
+          // Use default time in case of error
           prayers.add(PrayerTimeModel(
             name: prayerDef['name'] as String,
             time: DateTime(
@@ -157,32 +182,39 @@ class PrayerTimeModel {
         }
       }
 
-      // Determinar la próxima oración
-      PrayerTimeModel? nextPrayer;
-      for (final prayer in prayers) {
-        if (prayer.time.isAfter(now)) {
-          if (nextPrayer == null || prayer.time.isBefore(nextPrayer.time)) {
-            nextPrayer = prayer;
-          }
-        }
-      }
+      // Determine next prayer
+      _markNextPrayer(prayers);
 
-      // Actualizar oración marcada como siguiente
-      if (nextPrayer != null) {
-        final index = prayers.indexWhere((p) => p.name == nextPrayer!.name);
-        if (index != -1) {
-          prayers[index] = prayers[index].copyWith(isNext: true);
-        }
-      }
-      
       return prayers;
     } catch (e) {
-      debugPrint('Error general al procesar tiempos de oración: $e');
+      debugPrint('General error processing prayer times: $e');
       return _createDefaultPrayerTimes(now);
     }
   }
   
-  // Método privado para crear tiempos de oración predeterminados
+  /// Mark the next upcoming prayer in the list
+  static void _markNextPrayer(List<PrayerTimeModel> prayers) {
+    final now = DateTime.now();
+    
+    PrayerTimeModel? nextPrayer;
+    for (final prayer in prayers) {
+      if (prayer.time.isAfter(now)) {
+        if (nextPrayer == null || prayer.time.isBefore(nextPrayer.time)) {
+          nextPrayer = prayer;
+        }
+      }
+    }
+
+    // Update prayer marked as next
+    if (nextPrayer != null) {
+      final index = prayers.indexWhere((p) => p.name == nextPrayer!.name);
+      if (index != -1) {
+        prayers[index] = prayers[index].copyWith(isNext: true);
+      }
+    }
+  }
+  
+  /// Create default prayer times
   static List<PrayerTimeModel> _createDefaultPrayerTimes(DateTime now) {
     final defaultDefinitions = [
       {
@@ -246,24 +278,19 @@ class PrayerTimeModel {
       ));
     }
     
-    // Determinar la próxima oración
-    PrayerTimeModel? nextPrayer;
-    for (final prayer in prayers) {
-      if (prayer.time.isAfter(now)) {
-        if (nextPrayer == null || prayer.time.isBefore(nextPrayer.time)) {
-          nextPrayer = prayer;
-        }
-      }
-    }
-    
-    // Actualizar oración marcada como siguiente
-    if (nextPrayer != null) {
-      final index = prayers.indexWhere((p) => p.name == nextPrayer!.name);
-      if (index != -1) {
-        prayers[index] = prayers[index].copyWith(isNext: true);
-      }
-    }
+    // Mark next prayer
+    _markNextPrayer(prayers);
     
     return prayers;
+  }
+  
+  /// Compare two PrayerTimeModel objects for sorting
+  static int compareByTime(PrayerTimeModel a, PrayerTimeModel b) {
+    return a.time.compareTo(b.time);
+  }
+  
+  @override
+  String toString() {
+    return 'PrayerTimeModel(name: $name, time: $formattedTime, isNext: $isNext)';
   }
 }

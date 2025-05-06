@@ -2,8 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
-import 'package:test_athkar_app/adhan/adhan_notification_service.dart';
-import 'package:test_athkar_app/adhan/prayer_times_service.dart';
+import 'package:test_athkar_app/adhan/services/adhan_notification_service.dart';
+import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -196,60 +197,82 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             child: RefreshIndicator(
               color: kPrimary,
               onRefresh: _loadSettings,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Mostrar banner de permisos si no se han concedido
-                    if (!_hasPermissions)
-                      _buildPermissionBanner(),
-                    
-                    // Tarjeta de activación de notificaciones
-                    _buildMasterSwitchCard(),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Título de configuraciones de oraciones
-                    const Text(
-                      'إعدادات إشعارات الصلوات',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: kPrimary,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Configuraciones individuales de oraciones 
-                    _buildPrayerSettingsCard(),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Información explicativa
-                    _buildInfoCard(),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Botón de actualización de notificaciones
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: _hasPermissions ? _updateNotifications : _requestNotificationPermission,
-                        icon: Icon(_hasPermissions ? Icons.refresh : Icons.notifications_active),
-                        label: Text(_hasPermissions ? 'تحديث الإشعارات' : 'منح إذن الإشعارات'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+              child: AnimationLimiter(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: AnimationConfiguration.toStaggeredList(
+                      duration: const Duration(milliseconds: 600),
+                      childAnimationBuilder: (widget) => SlideAnimation(
+                        horizontalOffset: 50.0,
+                        child: FadeInAnimation(
+                          child: widget,
                         ),
                       ),
+                      children: [
+                        // Mostrar banner de permisos si no se han concedido
+                        if (!_hasPermissions)
+                          _buildPermissionBanner(),
+                        
+                        // Tarjeta de activación de notificaciones
+                        _buildMasterSwitchCard(),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Título de configuraciones de oraciones
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.notifications_active,
+                              color: kPrimary.withOpacity(0.7),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'إعدادات إشعارات الصلوات',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: kPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Configuraciones individuales de oraciones 
+                        _buildPrayerSettingsCard(),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Información explicativa
+                        _buildInfoCard(),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Botón de actualización de notificaciones
+                        Center(
+                          child: ElevatedButton.icon(
+                            onPressed: _hasPermissions ? _updateNotifications : _requestNotificationPermission,
+                            icon: Icon(_hasPermissions ? Icons.refresh : Icons.notifications_active),
+                            label: Text(_hasPermissions ? 'تحديث الإشعارات' : 'منح إذن الإشعارات'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kPrimary,
+                              foregroundColor: Colors.white,
+                              elevation: 4,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -263,12 +286,26 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            Colors.orange.withOpacity(0.15),
+            Colors.orange.withOpacity(0.05),
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.orange.withOpacity(0.5),
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -298,6 +335,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             style: TextStyle(
               color: Colors.orange.shade800,
               fontSize: 14,
+              height: 1.3,
             ),
           ),
           const SizedBox(height: 12),
@@ -306,9 +344,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange.shade800,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: const Text('منح إذن الإشعارات'),
@@ -321,10 +360,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   // Tarjeta de activación/desactivación de notificaciones
   Widget _buildMasterSwitchCard() {
     return Card(
-      elevation: 4,
-      shadowColor: kPrimary.withOpacity(0.3),
+      elevation: 8,
+      shadowColor: kPrimary.withOpacity(0.4),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -334,20 +373,34 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimary.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.notifications_active,
                 color: Colors.white,
-                size: 24,
+                size: 28,
               ),
             ),
             const SizedBox(width: 16),
@@ -374,11 +427,16 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 ],
               ),
             ),
-            Switch(
-              value: _notificationsEnabled,
-              onChanged: _hasPermissions ? _toggleMasterSwitch : null,
-              activeColor: Colors.white,
-              activeTrackColor: Colors.white.withOpacity(0.4),
+            Transform.scale(
+              scale: 1.2,
+              child: Switch(
+                value: _notificationsEnabled,
+                onChanged: _hasPermissions ? _toggleMasterSwitch : null,
+                activeColor: Colors.white,
+                activeTrackColor: Colors.white.withOpacity(0.4),
+                inactiveThumbColor: Colors.white.withOpacity(0.8),
+                inactiveTrackColor: Colors.white.withOpacity(0.2),
+              ),
             ),
           ],
         ),
@@ -412,40 +470,69 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   Widget _buildPrayerSettingsCard() {
     return Card(
       elevation: 4,
+      shadowColor: kPrimary.withOpacity(0.2),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: _prayerSettings.entries.map((entry) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Icon(
-                    _getPrayerIcon(entry.key),
-                    color: kPrimary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: entry.value ? kPrimary.withOpacity(0.07) : null,
+                  border: entry.value 
+                      ? Border.all(color: kPrimary.withOpacity(0.3), width: 1) 
+                      : null,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      _getPrayerIcon(entry.key),
+                      color: entry.value ? kPrimary : Colors.grey,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.key,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: entry.value ? kPrimary : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _getPrayerDescription(entry.key),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  Switch(
-                    value: entry.value,
-                    onChanged: _notificationsEnabled && _hasPermissions
-                        ? (value) => _togglePrayerSetting(entry.key, value)
-                        : null,
-                    activeColor: kPrimary,
-                  ),
-                ],
+                    Transform.scale(
+                      scale: 1.1,
+                      child: Switch(
+                        value: entry.value,
+                        onChanged: _notificationsEnabled && _hasPermissions
+                            ? (value) => _togglePrayerSetting(entry.key, value)
+                            : null,
+                        activeColor: kPrimary,
+                        activeTrackColor: kPrimary.withOpacity(0.4),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }).toList(),
@@ -489,12 +576,33 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
   
+  // Descripción para cada oración
+  String _getPrayerDescription(String prayer) {
+    switch (prayer) {
+      case 'الفجر':
+        return 'صلاة الفجر - قبل شروق الشمس';
+      case 'الشروق':
+        return 'وقت شروق الشمس';
+      case 'الظهر':
+        return 'صلاة الظهر - منتصف النهار';
+      case 'العصر':
+        return 'صلاة العصر - بعد الظهر';
+      case 'المغرب':
+        return 'صلاة المغرب - عند غروب الشمس';
+      case 'العشاء':
+        return 'صلاة العشاء - بعد المغرب';
+      default:
+        return '';
+    }
+  }
+  
   // Tarjeta de información
   Widget _buildInfoCard() {
     return Card(
-      elevation: 2,
+      elevation: 4,
+      shadowColor: Colors.orange.withOpacity(0.3),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -507,7 +615,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: Colors.orange.withOpacity(0.3),
             width: 1,
@@ -518,12 +626,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Colors.orange.shade800,
-                  size: 24,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.info_outline,
+                    color: Colors.orange.shade800,
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Text(
                   'معلومات عن إشعارات الصلاة',
                   style: TextStyle(
@@ -535,24 +650,58 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              'سيتم إرسال إشعارات للصلوات المفعلة في وقتها المحدد. تأكد من السماح للتطبيق بالعمل في الخلفية وعدم إيقافه من قبل نظام التشغيل.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.orange.shade800,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'يمكنك تحديث الإشعارات عند تغيير الموقع الجغرافي أو تغيير إعدادات حساب مواقيت الصلاة.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.orange.shade800,
+              child: Column(
+                children: [
+                  _buildInfoItem(
+                    Icons.notifications_active,
+                    'سيتم إرسال إشعارات للصلوات المفعلة في وقتها المحدد. تأكد من السماح للتطبيق بالعمل في الخلفية وعدم إيقافه من قبل نظام التشغيل.'
+                  ),
+                  const SizedBox(height: 8),
+                  _buildInfoItem(
+                    Icons.update,
+                    'يمكنك تحديث الإشعارات عند تغيير الموقع الجغرافي أو تغيير إعدادات حساب مواقيت الصلاة.'
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+  
+  // Un elemento de información
+  Widget _buildInfoItem(IconData icon, String content) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          color: Colors.orange.shade700,
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            content,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.orange.shade900,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
   

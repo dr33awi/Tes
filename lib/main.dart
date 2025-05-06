@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
-import 'package:test_athkar_app/adhan/adhan_notification_service.dart';
-import 'package:test_athkar_app/adhan/permission_service.dart';
+import 'package:test_athkar_app/adhan/screens/services/adhan_notification_service.dart';
+import 'package:test_athkar_app/adhan/screens/services/permission_service.dart';
 
 void main() async {
   // تأكد من تهيئة Flutter

@@ -8,64 +8,90 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/adhan/prayer_times_model.dart';
 import 'package:test_athkar_app/adhan/location_permission_dialog.dart';
-import 'package:test_athkar_app/adhan/adhan_notification_service.dart';
+import 'package:test_athkar_app/adhan/services/adhan_notification_service.dart';
 
-/// Servicio para gestionar los tiempos de oración
+/// Service for managing prayer times
 /// 
-/// Este servicio proporciona métodos para obtener tiempos de oración basados
-/// en la ubicación del usuario y configuración personalizada, gestionar
-/// permisos de ubicación y programar notificaciones.
+/// This service provides methods for:
+/// - Calculating prayer times based on location and user preferences
+/// - Managing location permissions
+/// - Handling prayer time settings (calculation method, madhab, adjustments)
+/// - Scheduling prayer time notifications
+/// - Loading and saving user preferences
 class PrayerTimesService {
-  // Implementación del patrón Singleton
+  // Singleton implementation
   static final PrayerTimesService _instance = PrayerTimesService._internal();
   factory PrayerTimesService() => _instance;
   PrayerTimesService._internal();
 
-  // Variables de configuración y estado
+  // Configuration variables
   late CalculationParameters _calculationParameters;
   late Madhab _madhab;
   final Map<String, int> _adjustments = {};
   
-  // Nueva variable para almacenar el nombre del método seleccionado
+  // Current calculation method name
   String _currentCalculationMethodName = 'Umm al-Qura';
   
-  // Información de ubicación
+  // Location information
   double? _latitude;
   double? _longitude;
   String? _locationName;
   
-  // BuildContext para diálogos
+  // Context for dialogs
   BuildContext? _context;
   
-  // Cache para tiempos de oración
+  // Cache for prayer times and settings
   List<PrayerTimeModel>? _cachedPrayerTimes;
+  DateTime? _lastCalculationTime;
   
-  // Función de inicialización
-  Future<void> initialize() async {
+  // Initialization flag
+  bool _isInitialized = false;
+  
+  // Notification service instance
+  final AdhanNotificationService _notificationService = AdhanNotificationService();
+  
+  /// Initialize the service
+  Future<bool> initialize() async {
+    if (_isInitialized) {
+      debugPrint('Prayer times service already initialized');
+      return true;
+    }
+    
     try {
+      // Load saved settings
       await _loadSettings();
-      final AdhanNotificationService notificationService = AdhanNotificationService();
-      await notificationService.initialize();
-    } catch (e) {
-      debugPrint('Error al inicializar servicio de tiempos de oración: $e');
-      // Usar configuración predeterminada en caso de error
+      
+      // Initialize notification service
+      await _notificationService.initialize();
+      
+      _isInitialized = true;
+      debugPrint('Prayer times service initialized successfully');
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('Error initializing prayer times service: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      // Use default settings in case of error
       _setDefaultSettings();
+      return false;
     }
   }
   
-  // Establecer configuración predeterminada
+  /// Set default settings
   void _setDefaultSettings() {
-    // Usar método Umm al-Qura como predeterminado
+    // Use Umm al-Qura method as default
     _calculationParameters = CalculationMethod.umm_al_qura.getParameters();
     _madhab = Madhab.shafi;
     _calculationParameters.madhab = _madhab;
     _adjustments.clear();
     _currentCalculationMethodName = 'Umm al-Qura';
+    
+    debugPrint('Using default prayer time settings');
   }
   
-  // Cargar configuración guardada
+  /// Load saved settings
   Future<void> _loadSettings() async {
-    // Configuración predeterminada
+    // Default configuration
     String calculationMethod = 'Umm al-Qura';
     String madhab = 'Shafi';
     _adjustments.clear();
@@ -73,13 +99,13 @@ class PrayerTimesService {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Cargar método de cálculo
+      // Load calculation method
       calculationMethod = prefs.getString('prayer_calculation_method') ?? calculationMethod;
       
-      // Cargar madhab
+      // Load madhab
       madhab = prefs.getString('prayer_madhab') ?? madhab;
       
-      // Cargar ajustes de tiempo
+      // Load time adjustments
       final adjustmentsJson = prefs.getString('prayer_adjustments');
       if (adjustmentsJson != null) {
         final Map<String, dynamic> decoded = json.decode(adjustmentsJson);
@@ -88,43 +114,44 @@ class PrayerTimesService {
         });
       }
       
-      // Cargar ubicación guardada si existe
+      // Load saved location if exists
       _latitude = prefs.getDouble('prayer_location_latitude');
       _longitude = prefs.getDouble('prayer_location_longitude');
       _locationName = prefs.getString('prayer_location_name');
       
-      debugPrint('Configuración cargada: Método = $calculationMethod, Madhab = $madhab');
+      debugPrint('Settings loaded: Method = $calculationMethod, Madhab = $madhab');
     } catch (e) {
-      debugPrint('Error al cargar configuración de tiempos de oración: $e');
+      debugPrint('Error loading prayer time settings: $e');
+      // Continue with defaults in case of error
     }
     
-    // Aplicar configuración
+    // Apply settings
     _setCalculationMethod(calculationMethod);
     _setMadhab(madhab);
   }
   
-  // Guardar configuración
-  Future<void> saveSettings() async {
+  /// Save settings
+  Future<bool> saveSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Verificar configuración actual antes de guardar
+      // Get current configuration
       final currentMethod = getCalculationMethodName();
       final currentMadhab = getMadhabName();
       
-      debugPrint('Guardando configuración - Método: $currentMethod, Madhab: $currentMadhab');
+      debugPrint('Saving settings - Method: $currentMethod, Madhab: $currentMadhab');
       
-      // Guardar método de cálculo
+      // Save calculation method
       await prefs.setString('prayer_calculation_method', currentMethod);
       
-      // Guardar madhab
+      // Save madhab
       await prefs.setString('prayer_madhab', currentMadhab);
       
-      // Guardar ajustes de tiempo
+      // Save time adjustments
       final String adjustmentsJson = json.encode(_adjustments);
       await prefs.setString('prayer_adjustments', adjustmentsJson);
       
-      // Guardar ubicación si disponible
+      // Save location if available
       if (_latitude != null && _longitude != null) {
         await prefs.setDouble('prayer_location_latitude', _latitude!);
         await prefs.setDouble('prayer_location_longitude', _longitude!);
@@ -134,52 +161,64 @@ class PrayerTimesService {
         }
       }
       
-      // Verificar guardado
+      // Verify saved settings
       final savedMethod = prefs.getString('prayer_calculation_method');
       final savedMadhab = prefs.getString('prayer_madhab');
       
-      debugPrint('Configuración guardada y verificada - Método: $savedMethod, Madhab: $savedMadhab');
+      debugPrint('Settings saved and verified - Method: $savedMethod, Madhab: $savedMadhab');
       
-      // Reinicializar la caché de tiempos de oración para reflejar los nuevos ajustes
+      // Clear cached prayer times to force recalculation
       _cachedPrayerTimes = null;
+      _lastCalculationTime = null;
       
+      return true;
     } catch (e) {
-      debugPrint('Error al guardar configuración de tiempos de oración: $e');
-      rethrow;
+      debugPrint('Error saving prayer time settings: $e');
+      return false;
     }
   }
   
-  // Nueva función para recalcular los tiempos de oración automáticamente
-  Future<void> recalculatePrayerTimes() async {
-    // Limpiar caché de tiempos de oración para forzar un recálculo
+  /// Recalculate prayer times with current settings
+  Future<bool> recalculatePrayerTimes() async {
+    // Clear cache to force recalculation
     _cachedPrayerTimes = null;
+    _lastCalculationTime = null;
     
-    debugPrint('Recalculando tiempos de oración con método: ${getCalculationMethodName()}');
+    debugPrint('Recalculating prayer times with method: ${getCalculationMethodName()}');
     
-    // Recalcular los tiempos de oración con la nueva configuración
     try {
+      // Recalculate prayer times
       final prayerTimes = await getPrayerTimesFromAPI(useDefaultLocationIfNeeded: true);
-      debugPrint('Tiempos de oración recalculados correctamente. Tamaño: ${prayerTimes.length}');
+      debugPrint('Prayer times recalculated successfully. Count: ${prayerTimes.length}');
       
-      // Programar notificaciones con los nuevos tiempos
+      // Schedule notifications with new times
       await schedulePrayerNotifications();
+      
+      return true;
     } catch (e) {
-      debugPrint('Error al recalcular tiempos de oración: $e');
+      debugPrint('Error recalculating prayer times: $e');
+      
       try {
-        // Intentar método local como respaldo
+        // Try local calculation as fallback
         final localTimes = getPrayerTimesLocally();
-        debugPrint('Tiempos recalculados localmente. Tamaño: ${localTimes.length}');
+        debugPrint('Prayer times recalculated locally. Count: ${localTimes.length}');
+        
+        // Schedule notifications with local times
+        await schedulePrayerNotifications();
+        
+        return true;
       } catch (e2) {
-        debugPrint('Error también al recalcular localmente: $e2');
+        debugPrint('Error with local calculation fallback: $e2');
+        return false;
       }
     }
   }
   
-  // Establecer método de cálculo
+  /// Set calculation method
   void _setCalculationMethod(String method) {
-    debugPrint('Estableciendo método de cálculo interno: $method');
+    debugPrint('Setting internal calculation method: $method');
     
-    // Guardar el nombre del método para referencia futura
+    // Save method name for future reference
     _currentCalculationMethodName = method;
     
     switch (method) {
@@ -220,29 +259,27 @@ class PrayerTimesService {
         _calculationParameters = CalculationMethod.north_america.getParameters();
         break;
       default:
-        debugPrint('Método de cálculo no reconocido, usando predeterminado: $method');
+        debugPrint('Unrecognized calculation method, using default: $method');
         _calculationParameters = CalculationMethod.umm_al_qura.getParameters();
         _currentCalculationMethodName = 'Umm al-Qura';
     }
     
-    // Asegurarse de que se aplica el madhab actual
+    // Apply current madhab
     _calculationParameters.madhab = _madhab;
     
-    // Limpiar caché para forzar un recálculo
+    // Clear cache to force recalculation
     _cachedPrayerTimes = null;
+    _lastCalculationTime = null;
   }
   
-  // Obtener nombre del método de cálculo actual
+  /// Get current calculation method name
   String getCalculationMethodName() {
     return _currentCalculationMethodName;
   }
   
-  // Determinar método de cálculo actual
+  /// Determine current calculation method enum
   CalculationMethod getCurrentCalculationMethod() {
-    // Este es un método simplificado, en una implementación real
-    // se debería comparar la configuración actual con los parámetros de cada método
-    
-    // Convertir el nombre del método a un enum de CalculationMethod
+    // Convert method name to CalculationMethod enum
     switch (_currentCalculationMethodName) {
       case 'Muslim World League':
         return CalculationMethod.muslim_world_league;
@@ -273,55 +310,56 @@ class PrayerTimesService {
     }
   }
   
-  // Establecer madhab
+  /// Set madhab
   void _setMadhab(String madhabName) {
     _madhab = madhabName == 'Hanafi' ? Madhab.hanafi : Madhab.shafi;
     _calculationParameters.madhab = _madhab;
     
-    // Limpiar caché para forzar un recálculo
+    // Clear cache to force recalculation
     _cachedPrayerTimes = null;
+    _lastCalculationTime = null;
   }
   
-  // Obtener nombre del madhab actual
+  /// Get current madhab name
   String getMadhabName() {
     return _madhab == Madhab.hanafi ? 'Hanafi' : 'Shafi';
   }
   
-  // Verificar permisos de ubicación
+  /// Check location permission
   Future<bool> checkLocationPermission() async {
     try {
-      // Verificar estado de permisos
+      // Check permission status
       PermissionStatus status = await Permission.location.status;
       
       if (status.isGranted) {
-        // Verificar si el servicio de ubicación está activado
+        // Check if location service is enabled
         bool isServiceEnabled = await Geolocator.isLocationServiceEnabled();
         return isServiceEnabled;
       }
     } catch (e) {
-      debugPrint('Error al verificar permisos de ubicación: $e');
+      debugPrint('Error checking location permission: $e');
     }
     
     return false;
   }
   
-  // Solicitar permisos de ubicación
+  /// Request location permission
   Future<bool> requestLocationPermission() async {
     try {
-      // Verificar estado de permisos
+      // Check permission status
       PermissionStatus status = await Permission.location.status;
       
       if (status.isGranted) {
-        // Asegurarse de que el servicio de ubicación está activado
+        // Ensure location service is enabled
         bool isServiceEnabled = await Geolocator.isLocationServiceEnabled();
         
         if (!isServiceEnabled && _context != null) {
-          // Solicitar activar servicio de ubicación
+          // Request to enable location service
           final shouldOpen = await showLocationServiceDialog(_context!);
           
           if (shouldOpen) {
             await Geolocator.openLocationSettings();
-            // Verificar nuevamente después de abrir configuración
+            // Check again after opening settings
             isServiceEnabled = await Geolocator.isLocationServiceEnabled();
           }
         }
@@ -329,7 +367,7 @@ class PrayerTimesService {
         return isServiceEnabled;
       } else if (status.isDenied) {
         if (_context != null) {
-          // Mostrar explicación de por qué necesitamos ubicación
+          // Show explanation why we need location
           final shouldRequest = await showLocationPermissionRationaleDialog(_context!);
           
           if (shouldRequest) {
@@ -337,57 +375,61 @@ class PrayerTimesService {
             return status.isGranted;
           }
         } else {
-          // Si no hay contexto, intentar solicitar directamente
+          // If no context, try to request directly
           status = await Permission.location.request();
           return status.isGranted;
         }
       } else if (status.isPermanentlyDenied) {
         if (_context != null) {
-          // Solicitar abrir configuración de la aplicación para cambiar permisos
+          // Request to open app settings to change permissions
           final shouldOpenSettings = await showOpenAppSettingsDialog(_context!);
           
           if (shouldOpenSettings) {
             await openAppSettings();
-            // Verificar nuevamente después de abrir configuración
+            // Check again after opening settings
             status = await Permission.location.status;
             return status.isGranted;
           }
         }
       }
     } catch (e) {
-      debugPrint('Error al solicitar permisos de ubicación: $e');
+      debugPrint('Error requesting location permission: $e');
     }
     
     return false;
   }
   
-  // Obtener ubicación actual
+  /// Get current location
   Future<Position?> _getCurrentLocation() async {
     try {
-      // Verificar si tenemos permisos
+      // Check if we have permission
       bool hasPermission = await checkLocationPermission();
       
-      // Si no tenemos permisos, intentar solicitarlos
+      // If no permission, try to request it
       if (!hasPermission) {
         hasPermission = await requestLocationPermission();
       }
       
       if (hasPermission) {
-        // Obtener ubicación con precisión específica y tiempo límite
+        // Get location with specific accuracy and timeout
         Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.medium,
           timeLimit: const Duration(seconds: 15),
         );
         
-        // Cachear la ubicación
+        // Cache the location
         _latitude = position.latitude;
         _longitude = position.longitude;
         
-        // Intentar obtener nombre de ubicación
-        _locationName = await _getLocationName(position.latitude, position.longitude) 
-                     ?? 'موقعك الحالي';
+        // Try to get location name
+        String? locationName = await _getLocationName(position.latitude, position.longitude);
+        if (locationName != null) {
+          _locationName = locationName;
+        } else {
+          _locationName = 'موقعك الحالي'; // Your current location
+        }
         
-        // Guardar ubicación para futuras referencias
+        // Save location for future reference
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setDouble('prayer_location_latitude', position.latitude);
@@ -396,16 +438,17 @@ class PrayerTimesService {
             await prefs.setString('prayer_location_name', _locationName!);
           }
         } catch (e) {
-          debugPrint('Error al guardar ubicación: $e');
+          debugPrint('Error saving location: $e');
+          // Continue despite error saving location
         }
         
         return position;
       }
     } catch (e) {
-      debugPrint('Error al obtener ubicación: $e');
+      debugPrint('Error getting location: $e');
     }
     
-    // Si llegamos aquí, intentar usar ubicación cacheada
+    // If we get here, try to use cached location
     if (_latitude != null && _longitude != null) {
       return Position(
         longitude: _longitude!,
@@ -424,10 +467,10 @@ class PrayerTimesService {
     return null;
   }
   
-  // Obtener nombre de ubicación a partir de coordenadas
+  /// Get location name from coordinates
   Future<String?> _getLocationName(double latitude, double longitude) async {
     try {
-      // Usar API de geocodificación inversa de OpenStreetMap
+      // Use OpenStreetMap reverse geocoding API
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse?' +
         'lat=$latitude&lon=$longitude&format=json&accept-language=ar'
@@ -437,21 +480,21 @@ class PrayerTimesService {
         url, 
         headers: {'User-Agent': 'Islamic Prayer Times App'}
       ).timeout(
-        const Duration(seconds: 10), 
-        onTimeout: () => throw TimeoutException('Tiempo de espera excedido al obtener nombre de ubicación')
+        const Duration(seconds: 10),
+        onTimeout: () => throw TimeoutException('Timeout while getting location name')
       );
       
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         
-        // Intentar extraer nombre de lugar de diferentes maneras
+        // Try to extract place name in different ways
         String? name;
         
-        // Ciudad o pueblo
+        // City or town
         if (data['address'] != null) {
           final address = data['address'] as Map<String, dynamic>;
           
-          // Intentar diferentes niveles de ubicación
+          // Try different location levels
           name = address['city'] ?? 
                  address['town'] ?? 
                  address['village'] ?? 
@@ -459,7 +502,7 @@ class PrayerTimesService {
                  address['country'];
         }
         
-        // Usar nombre mostrado si no encontramos nada específico
+        // Use display name if nothing specific found
         if (name == null && data['display_name'] != null) {
           final parts = data['display_name'].toString().split(',');
           if (parts.isNotEmpty) {
@@ -470,103 +513,115 @@ class PrayerTimesService {
         return name;
       }
     } catch (e) {
-      debugPrint('Error al obtener nombre de ubicación: $e');
+      debugPrint('Error getting location name: $e');
     }
     
     return null;
   }
   
-  // Establecer contexto para mostrar diálogos
+  /// Set context for showing dialogs
   void setContext(BuildContext context) {
     _context = context;
+    // Also set context in notification service
+    _notificationService.setContext(context);
   }
   
-  // Obtener tiempos de oración desde API
+  /// Get prayer times from API or location
   Future<List<PrayerTimeModel>> getPrayerTimesFromAPI({
     bool useDefaultLocationIfNeeded = true
   }) async {
     try {
-      // Primero, intentar obtener ubicación actual
+      // First, try to get current location
       final position = await _getCurrentLocation();
       
       if (position != null) {
-        // Éxito al obtener ubicación
+        // Success getting location
         _latitude = position.latitude;
         _longitude = position.longitude;
         
-        // Si no tenemos nombre de ubicación, intentar obtenerlo
+        // If no location name, try to get it
         if (_locationName == null) {
           _locationName = await _getLocationName(position.latitude, position.longitude) ?? 'موقعك الحالي';
         }
         
-        // Calcular tiempos de oración con ubicación actual
+        // Calculate prayer times with current location
         final prayerTimes = getPrayerTimesLocally();
         
-        // Cachear resultados
+        // Cache results
         _cachedPrayerTimes = prayerTimes;
+        _lastCalculationTime = DateTime.now();
         
         return prayerTimes;
       } else if (useDefaultLocationIfNeeded) {
-        // Si no podemos obtener ubicación, usar ubicación predeterminada (Meca)
+        // If can't get location, use default location (Mecca)
         _setDefaultLocation();
         
         final prayerTimes = getPrayerTimesLocally();
         
-        // Cachear resultados
+        // Cache results
         _cachedPrayerTimes = prayerTimes;
+        _lastCalculationTime = DateTime.now();
         
         return prayerTimes;
       } else {
-        // Si no queremos usar ubicación predeterminada, lanzar excepción
-        throw Exception('No se pudo obtener la ubicación actual');
+        // If we don't want to use default location, throw exception
+        throw Exception('Could not get current location');
       }
     } catch (e) {
-      debugPrint('Error al obtener tiempos de oración desde API: $e');
+      debugPrint('Error getting prayer times from API: $e');
       
-      // En caso de error, usar ubicación predeterminada si es necesario
+      // In case of error, use default location if needed
       if (useDefaultLocationIfNeeded) {
         _setDefaultLocation();
         return getPrayerTimesLocally();
       }
       
-      // Propagar el error si no podemos usar ubicación predeterminada
+      // Propagate error if we can't use default location
       rethrow;
     }
   }
   
-  // Establecer ubicación predeterminada (Meca)
+  /// Set default location (Mecca)
   void _setDefaultLocation() {
     _latitude = 21.4225;
     _longitude = 39.8262;
-    _locationName = 'مكة المكرمة (الموقع الافتراضي)';
+    _locationName = 'مكة المكرمة (الموقع الافتراضي)'; // Mecca (Default Location)
   }
   
-  // Obtener tiempos de oración localmente
+  /// Get prayer times locally using Adhan library
   List<PrayerTimeModel> getPrayerTimesLocally() {
     try {
-      // Si hay tiempos en caché y no ha habido cambios en la configuración, usarlos
-      if (_cachedPrayerTimes != null) {
-        debugPrint('Usando tiempos de oración en caché');
-        return _cachedPrayerTimes!;
+      // If we have cached times and no configuration changes, use them
+      final now = DateTime.now();
+      if (_cachedPrayerTimes != null && _lastCalculationTime != null) {
+        // Cache valid for same day only
+        final isSameDay = now.year == _lastCalculationTime!.year && 
+                         now.month == _lastCalculationTime!.month &&
+                         now.day == _lastCalculationTime!.day;
+        
+        if (isSameDay) {
+          debugPrint('Using cached prayer times');
+          return _cachedPrayerTimes!;
+        }
       }
       
-      debugPrint('Calculando tiempos de oración con método: ${getCalculationMethodName()}');
+      debugPrint('Calculating prayer times with method: ${getCalculationMethodName()}');
       
-      // Asegurarse de que tenemos datos de ubicación
+      // Ensure we have location data
       if (_latitude == null || _longitude == null) {
-        // Usar valores predeterminados para Meca
+        // Use default values for Mecca
         _setDefaultLocation();
       }
       
-      // Crear objeto de coordenadas
+      // Create coordinates object
       final coordinates = Coordinates(_latitude!, _longitude!);
       
-      // Aplicar ajustes a parámetros de cálculo
+      // Apply adjustments to calculation parameters
       try {
-        // Reiniciar ajustes para evitar acumulación
+        // Reset adjustments to avoid accumulation
         _calculationParameters.adjustments = PrayerAdjustments();
         
-        // Aplicar ajustes configurados
+        // Apply configured adjustments
         for (final entry in _adjustments.entries) {
           switch (entry.key) {
             case 'الفجر':
@@ -590,52 +645,52 @@ class PrayerTimesService {
           }
         }
       } catch (e) {
-        debugPrint('Error al aplicar ajustes: $e');
-        // Ignorar error de ajustes y continuar sin ellos
+        debugPrint('Error applying adjustments: $e');
+        // Ignore adjustment errors and continue without them
       }
       
-      // Crear componentes de fecha para hora actual
-      final now = DateTime.now();
+      // Create date components for current time
       final date = DateComponents(now.year, now.month, now.day);
       
-      // Calcular tiempos de oración
+      // Calculate prayer times
       try {
         final prayerTimes = PrayerTimes(coordinates, date, _calculationParameters);
         
-        // Convertir tiempos de oración al modelo personalizado
+        // Convert prayer times to custom model
         final prayerModels = PrayerTimeModel.fromPrayerTimes(prayerTimes);
         
-        // Cachear resultados
+        // Cache results
         _cachedPrayerTimes = prayerModels;
+        _lastCalculationTime = now;
         
-        debugPrint('Tiempos de oración calculados correctamente con método: ${getCalculationMethodName()}');
+        debugPrint('Prayer times calculated successfully with method: ${getCalculationMethodName()}');
         
         return prayerModels;
       } catch (e) {
-        debugPrint('Error al calcular tiempos de oración: $e');
+        debugPrint('Error calculating prayer times: $e');
         
-        // Verificar si tenemos resultados en caché
+        // Check if we have cached results
         if (_cachedPrayerTimes != null) {
           return _cachedPrayerTimes!;
         }
         
-        // Si no hay caché, lanzar el error para manejarlo en el método de respaldo
+        // If no cache, throw error to be handled in fallback method
         throw e;
       }
     } catch (e) {
-      debugPrint('Error al obtener tiempos de oración localmente: $e');
+      debugPrint('Error getting prayer times locally: $e');
       
-      // Si tenemos resultados en caché, usarlos como último recurso
+      // If we have cached results, use them as last resort
       if (_cachedPrayerTimes != null) {
         return _cachedPrayerTimes!;
       }
       
-      // Crear tiempos predeterminados si todo lo demás falla
+      // Create default times if all else fails
       return _createDefaultPrayerTimes();
     }
   }
   
-  // Crear tiempos de oración predeterminados
+  /// Create default prayer times
   List<PrayerTimeModel> _createDefaultPrayerTimes() {
     final now = DateTime.now();
     final defaultPrayers = [
@@ -677,7 +732,7 @@ class PrayerTimesService {
       ),
     ];
     
-    // Determinar la oración siguiente
+    // Determine next prayer
     PrayerTimeModel? nextPrayer;
     for (final prayer in defaultPrayers) {
       if (prayer.time.isAfter(now)) {
@@ -687,7 +742,7 @@ class PrayerTimesService {
       }
     }
     
-    // Actualizar la oración marcada como siguiente
+    // Update prayer marked as next
     if (nextPrayer != null) {
       final index = defaultPrayers.indexWhere((p) => p.name == nextPrayer!.name);
       if (index != -1) {
@@ -695,40 +750,41 @@ class PrayerTimesService {
       }
     }
     
-    // Cachear estos resultados para uso futuro
+    // Cache these results for future use
     _cachedPrayerTimes = defaultPrayers;
+    _lastCalculationTime = now;
     
     return defaultPrayers;
   }
   
-  // Programar notificaciones de oración
-  Future<void> schedulePrayerNotifications() async {
+  /// Schedule prayer notifications
+  Future<bool> schedulePrayerNotifications() async {
     try {
-      // Obtener tiempos de oración
+      // Get prayer times
       List<PrayerTimeModel> prayerTimes;
       try {
-        // Intentar obtener tiempos actualizados
+        // Try to get updated times
         prayerTimes = await getPrayerTimesFromAPI(useDefaultLocationIfNeeded: true);
       } catch (e) {
-        debugPrint('Error al obtener tiempos de oración para notificaciones: $e');
+        debugPrint('Error getting prayer times for notifications: $e');
         
-        // Usar caché si está disponible
+        // Use cache if available
         if (_cachedPrayerTimes != null) {
           prayerTimes = _cachedPrayerTimes!;
         } else {
-          // Usar tiempos predeterminados en caso de error
+          // Use default times in case of error
           prayerTimes = _createDefaultPrayerTimes();
         }
       }
       
-      // Preparar lista de tiempos de oración para programar notificaciones
+      // Prepare list of prayer times for scheduling notifications
       final List<Map<String, dynamic>> notificationTimes = [];
       
       final now = DateTime.now();
       
       for (final prayer in prayerTimes) {
-        // Ignorar Sunrise ya que no es un tiempo de oración real
-        // y tiempos que ya han pasado
+        // Ignore Sunrise since it's not a real prayer time
+        // and times that have already passed
         if (prayer.name != 'الشروق' && prayer.time.isAfter(now)) {
           notificationTimes.add({
             'name': prayer.name,
@@ -737,65 +793,72 @@ class PrayerTimesService {
         }
       }
       
-      // Programar notificaciones para todos los tiempos de oración futuros de hoy
+      // Schedule notifications for all future prayer times today
       if (notificationTimes.isNotEmpty) {
-        final AdhanNotificationService notificationService = AdhanNotificationService();
-        await notificationService.scheduleAllPrayerNotifications(notificationTimes);
+        final scheduledCount = await _notificationService.scheduleAllPrayerNotifications(notificationTimes);
+        debugPrint('Scheduled $scheduledCount prayer notifications');
+        return scheduledCount > 0;
+      } else {
+        debugPrint('No future prayer times today to schedule notifications for');
+        return false;
       }
     } catch (e) {
-      debugPrint('Error al programar notificaciones de oración: $e');
+      debugPrint('Error scheduling prayer notifications: $e');
+      return false;
     }
   }
   
-  // Actualizar método de cálculo
+  /// Update calculation method
   void updateCalculationMethod(String method) {
-    // Depuración
-    debugPrint('Actualizando método de cálculo a: $method');
+    // Debug
+    debugPrint('Updating calculation method to: $method');
     
-    // Comprobar que el método existe en los disponibles
+    // Check if method exists in available ones
     if (!getAvailableCalculationMethods().contains(method)) {
-      debugPrint('ADVERTENCIA: Método de cálculo no reconocido: $method');
-      method = 'Umm al-Qura'; // Valor predeterminado seguro
+      debugPrint('WARNING: Unrecognized calculation method: $method');
+      method = 'Umm al-Qura'; // Safe default
     }
     
     _setCalculationMethod(method);
     
-    // Verificar que se ha establecido correctamente
-    debugPrint('Método de cálculo actualizado: ${getCalculationMethodName()}');
+    // Verify it was set correctly
+    debugPrint('Calculation method updated: ${getCalculationMethodName()}');
   }
   
-  // Actualizar madhab
+  /// Update madhab
   void updateMadhab(String madhabName) {
-    // Depuración
-    debugPrint('Actualizando madhab a: $madhabName');
+    // Debug
+    debugPrint('Updating madhab to: $madhabName');
     
-    // Comprobar que el madhab existe en los disponibles
+    // Check if madhab exists in available ones
     if (!getAvailableMadhabs().contains(madhabName)) {
-      debugPrint('ADVERTENCIA: Madhab no reconocido: $madhabName');
-      madhabName = 'Shafi'; // Valor predeterminado seguro
+      debugPrint('WARNING: Unrecognized madhab: $madhabName');
+      madhabName = 'Shafi'; // Safe default
     }
     
     _setMadhab(madhabName);
     
-    // Verificar que se ha establecido correctamente
-    debugPrint('Madhab actualizado: ${getMadhabName()}');
+    // Verify it was set correctly
+    debugPrint('Madhab updated: ${getMadhabName()}');
   }
   
-  // Añadir ajuste para tiempo de oración
+  /// Add adjustment for prayer time
   void setAdjustment(String prayerName, int minutes) {
     _adjustments[prayerName] = minutes;
-    // Limpiar caché para forzar un recálculo
+    // Clear cache to force recalculation
     _cachedPrayerTimes = null;
+    _lastCalculationTime = null;
   }
   
-  // Eliminar todos los ajustes
+  /// Remove all adjustments
   void clearAdjustments() {
     _adjustments.clear();
-    // Limpiar caché para forzar un recálculo
+    // Clear cache to force recalculation
     _cachedPrayerTimes = null;
+    _lastCalculationTime = null;
   }
   
-  // Obtener lista de métodos de cálculo disponibles
+  /// Get available calculation methods
   List<String> getAvailableCalculationMethods() {
     return [
       'Muslim World League',
@@ -813,12 +876,12 @@ class PrayerTimesService {
     ];
   }
   
-  // Obtener lista de madhabs disponibles
+  /// Get available madhabs
   List<String> getAvailableMadhabs() {
     return ['Shafi', 'Hanafi'];
   }
   
-  // Obtener configuración actual
+  /// Get current settings
   Map<String, dynamic> getUserSettings() {
     return {
       'calculationMethod': getCalculationMethodName(),
@@ -827,11 +890,14 @@ class PrayerTimesService {
     };
   }
   
-  // Obtener nombre de ubicación
+  /// Get location name
   String? get locationName => _locationName;
+  
+  /// Check if service is initialized
+  bool get isInitialized => _isInitialized;
 }
 
-// Excepción personalizada para tiempos de espera
+/// Custom timeout exception
 class TimeoutException implements Exception {
   final String message;
   

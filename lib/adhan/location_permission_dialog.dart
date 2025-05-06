@@ -27,7 +27,7 @@ class LocationPermissionDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
       ),
       elevation: 10,
       backgroundColor: Colors.transparent,
@@ -37,25 +37,26 @@ class LocationPermissionDialog extends StatelessWidget {
 
   Widget _buildDialogContent(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 15,
             spreadRadius: 2,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Icono en círculo con gradiente
+          // Icono con gradiente y efecto de sombra
           Container(
-            width: 80,
-            height: 80,
+            width: 88,
+            height: 88,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [kPrimary, kPrimaryLight],
@@ -63,30 +64,39 @@ class LocationPermissionDialog extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: kPrimary.withOpacity(0.3),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Icon(
               icon,
               color: Colors.white,
-              size: 40,
+              size: 44,
             ),
           ),
           
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           
-          // Título
+          // Título con estilo mejorado
           Text(
             title,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               color: kPrimary,
+              height: 1.3,
             ),
             textAlign: TextAlign.center,
           ),
           
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           
-          // Mensaje
+          // Mensaje con mejor legibilidad
           Text(
             message,
             style: TextStyle(
@@ -97,55 +107,77 @@ class LocationPermissionDialog extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           
-          // Botones
+          // Botones con diseño mejorado
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Botón secundario
-              OutlinedButton(
-                onPressed: onSecondaryButtonPressed,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: kPrimary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onSecondaryButtonPressed,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: kPrimary, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                child: Text(
-                  secondaryButtonText,
-                  style: const TextStyle(
-                    color: kPrimary,
-                    fontWeight: FontWeight.bold,
+                  child: Text(
+                    secondaryButtonText,
+                    style: const TextStyle(
+                      color: kPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
               
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               
-              // Botón primario
-              ElevatedButton(
-                onPressed: onPrimaryButtonPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              // Botón primario con gradiente
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [kPrimary, kPrimaryLight],
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  elevation: 2,
-                ),
-                child: Text(
-                  primaryButtonText,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                  child: ElevatedButton(
+                    onPressed: onPrimaryButtonPressed,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      primaryButtonText,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ),
               ),

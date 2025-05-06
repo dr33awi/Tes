@@ -4,10 +4,10 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/prayer_times_model.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
-import 'package:test_athkar_app/adhan/prayer_times_service.dart';
+import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:test_athkar_app/screens/home_screen/widgets/common/app_loading_indicator.dart';
-import 'package:test_athkar_app/adhan/prayer_settings_screen.dart';
-import 'package:test_athkar_app/adhan/notification_settings_screen.dart';
+import 'package:test_athkar_app/adhan/screens/prayer_settings_screen.dart';
+import 'package:test_athkar_app/adhan/screens/notification_settings_screen.dart';
 
 class PrayerTimesScreen extends StatefulWidget {
   const PrayerTimesScreen({Key? key}) : super(key: key);
@@ -23,7 +23,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   List<PrayerTimeModel>? _prayerTimes;
   String? _locationName;
   bool _isLoading = true;
-  bool _isRefreshing = false; // Para recargas en segundo plano
+  bool _isRefreshing = false; 
   bool _hasLocationPermission = false;
   bool _hasError = false;
   String _errorMessage = '';
@@ -38,23 +38,19 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   @override
   void initState() {
     super.initState();
-    // Añadir observador de ciclo de vida de la aplicación
     WidgetsBinding.instance.addObserver(this);
     _initService();
   }
   
   @override
   void dispose() {
-    // Remover observador al descartar la pantalla
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Recargar datos al volver a la aplicación
     if (state == AppLifecycleState.resumed) {
-      // Si los datos son antiguos (más de 5 minutos), recargarlos
       if (_lastLoadTime != null && 
           DateTime.now().difference(_lastLoadTime!) > _cacheDuration) {
         _loadPrayerTimes();
@@ -65,18 +61,13 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Establecer contexto en el servicio para diálogos
     _prayerService.setContext(context);
   }
   
   Future<void> _initService() async {
     try {
       await _prayerService.initialize();
-      
-      // Primero cargar datos en caché para mejorar tiempo de respuesta
       _loadCachedData();
-      
-      // Luego cargar datos actualizados
       _loadPrayerTimes();
     } catch (e) {
       if (mounted) {
@@ -85,14 +76,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           _hasError = true;
           _errorMessage = 'خطأ في تهيئة خدمة مواقيت الصلاة';
         });
-        
-        // Mostrar información detallada del error en modo debug
         debugPrint('Error de inicialización detallado: $e');
       }
     }
   }
   
-  // Cargar datos de caché
   void _loadCachedData() {
     if (_hasCache) return;
     
@@ -109,29 +97,22 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
       }
     } catch (e) {
       debugPrint('Error al cargar datos en caché: $e');
-      // No mostrar error al usuario aquí ya que intentaremos cargar desde internet
     }
   }
 
-  // Cargar tiempos de oración con opción de forzar recarga
   Future<void> _loadPrayerTimes({bool forceRefresh = false}) async {
-    // Si hay una carga en curso (sin caché), ignorar solicitud
     if (_isLoading && !_hasCache) return;
     
-    // Si los datos están en caché y se cargaron recientemente, y no es una recarga forzada,
-    // ignorar solicitud
     if (!forceRefresh && _hasCache && _lastLoadTime != null && 
         DateTime.now().difference(_lastLoadTime!) < _cacheDuration) {
       return;
     }
     
     setState(() {
-      // Si hay fuerza de recarga, siempre mostrar pantalla de carga completa
       if (forceRefresh) {
         _isLoading = true;
-        _hasCache = false; // Ignorar caché existente
+        _hasCache = false;
       } else {
-        // Si tenemos datos en caché, no mostrar pantalla de carga completa
         if (_hasCache) {
           _isRefreshing = true;
         } else {
@@ -142,26 +123,21 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     });
 
     try {
-      // Verificar permisos de ubicación
       _hasLocationPermission = await _prayerService.checkLocationPermission();
       
       if (!_hasLocationPermission) {
-        // Intentar solicitar permisos
         _hasLocationPermission = await _prayerService.requestLocationPermission();
       }
 
-      // Si es una recarga forzada, limpiar la caché del servicio
       if (forceRefresh) {
         await _prayerService.recalculatePrayerTimes();
       }
 
-      // Número máximo de reintentos
       const int maxRetries = 2;
       int retryCount = 0;
       bool success = false;
       List<PrayerTimeModel>? prayerTimes;
       
-      // Intentar obtener datos de API con reintentos en caso de fallo
       while (retryCount < maxRetries && !success) {
         try {
           prayerTimes = await _prayerService.getPrayerTimesFromAPI(
@@ -173,10 +149,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           debugPrint('Error al obtener tiempos de oración de API (intento $retryCount): $apiError');
           
           if (retryCount < maxRetries) {
-            // Esperar antes de reintentar
             await Future.delayed(const Duration(seconds: 2));
           } else {
-            // Usar método de respaldo local si fallan todos los intentos
             debugPrint('Usando método local después de fallar todos los intentos');
             prayerTimes = _prayerService.getPrayerTimesLocally();
           }
@@ -194,12 +168,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         });
       }
       
-      // Intentar programar notificaciones después de cargar datos exitosamente
       try {
         await _prayerService.schedulePrayerNotifications();
       } catch (notifError) {
         debugPrint('Error al programar notificaciones: $notifError');
-        // No mostrar este error al usuario ya que no es crítico
       }
     } catch (e) {
       if (mounted) {
@@ -210,10 +182,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           _errorMessage = 'حدث خطأ أثناء تحميل أوقات الصلاة';
         });
         
-        // Mostrar mensaje de error resumido al usuario y detalles en el registro
         debugPrint('Detalles del error al cargar tiempos de oración: $e');
         
-        // Mostrar barra de notificación en caso de error con datos en caché
         if (_hasCache) {
           _showErrorSnackBar('حدث خطأ أثناء تحديث البيانات. جارٍ استخدام البيانات المخزنة.');
         }
@@ -221,7 +191,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     }
   }
   
-  // Mostrar barra de notificación de error
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -235,11 +204,32 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.red.shade700,
         duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         action: SnackBarAction(
           label: 'إعادة المحاولة',
           textColor: Colors.white,
           onPressed: _loadPrayerTimes,
         ),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: kPrimary,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -256,7 +246,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // Barra de aplicación
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
@@ -278,7 +267,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         onPressed: () => Navigator.of(context).pop(),
       ),
       actions: [
-        // Botón de configuración de notificaciones
         IconButton(
           icon: const Icon(
             Icons.notifications,
@@ -287,25 +275,22 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           onPressed: () => _navigateToNotificationSettings(),
           tooltip: 'إعدادات الإشعارات',
         ),
-        // Mostrar indicador de carga junto al botón de actualización durante carga
         _isRefreshing 
-          ? IconButton(
-              icon: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: kPrimary,
-                ),
+          ? Container(
+              width: 48,
+              height: 48,
+              padding: const EdgeInsets.all(12),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: kPrimary,
               ),
-              onPressed: null,
             )
           : IconButton(
               icon: const Icon(
                 Icons.refresh,
                 color: kPrimary,
               ),
-              onPressed: _loadPrayerTimes,
+              onPressed: () => _loadPrayerTimes(forceRefresh: true),
               tooltip: 'تحديث',
             ),
         IconButton(
@@ -320,7 +305,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // Navegación a pantalla de configuración de notificaciones
   Future<void> _navigateToNotificationSettings() async {
     await Navigator.push(
       context,
@@ -329,13 +313,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
       ),
     );
     
-    // Recargar datos al volver
     _loadPrayerTimes();
   }
   
-  // Navegación a pantalla de configuración de parámetros de cálculo
   Future<void> _navigateToPrayerSettings() async {
-    // Ir a pantalla de configuración y esperar resultado
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -343,39 +324,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
       ),
     );
     
-    // Si se cambiaron los ajustes, recargar tiempos inmediatamente
     if (result == true) {
       setState(() {
-        _isLoading = true; // Mostrar indicador de carga
+        _isLoading = true;
       });
       
       try {
-        // Cargar tiempos con la nueva configuración, forzando recarga
         await _loadPrayerTimes(forceRefresh: true);
         
-        // Mostrar notificación de éxito
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('تم تحديث مواقيت الصلاة وفقًا للإعدادات الجديدة'),
-                ),
-              ],
-            ),
-            backgroundColor: kPrimary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        _showSuccessSnackBar('تم تحديث مواقيت الصلاة وفقًا للإعدادات الجديدة');
       } catch (e) {
         debugPrint('Error al recargar tiempos después de cambiar configuración: $e');
         
-        // Mostrar notificación de error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -409,7 +369,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     }
   }
 
-  // Contenido principal
   Widget _buildMainContent() {
     if (_isLoading && !_hasCache) {
       return const AppLoadingIndicator(
@@ -435,15 +394,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Durante carga con datos en caché, mostrar indicador de carga suave
             if (_isRefreshing)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: LinearProgressIndicator(
                   backgroundColor: kPrimary.withOpacity(0.1),
                   color: kPrimary,
+                  borderRadius: BorderRadius.circular(4),
+                  minHeight: 4,
                 ),
               ),
+            
+            const SizedBox(height: 16),
             
             // Tarjeta de ubicación
             _buildLocationCard(),
@@ -452,50 +414,78 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
             if (!_hasLocationPermission)
               _buildLocationPermissionWarning(),
               
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // Tiempos de oración - mejora en la visualización de lista para reducir consumo de recursos
+            // Tiempos de oración
             Padding(
-              padding: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.only(bottom: 24),
               child: _buildPrayerTimesList(),
             ),
             
-            // Botón de configuración de notificaciones
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: _navigateToNotificationSettings,
-                icon: const Icon(Icons.notifications_active),
-                label: const Text('إعدادات إشعارات الأذان'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Botones de acción
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _navigateToNotificationSettings,
+                    icon: const Icon(Icons.notifications_active),
+                    label: const Text('إعدادات إشعارات الأذان'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                // Botón de opciones de cálculo
+                OutlinedButton.icon(
+                  onPressed: _navigateToPrayerSettings,
+                  icon: const Icon(Icons.settings),
+                  label: const Text('إعدادات الحساب'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kPrimary,
+                    side: const BorderSide(color: kPrimary),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
             ),
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
   
-  // Widget para estado vacío
   Widget _buildEmptyStateWidget() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.access_time,
-            size: 70,
-            color: kPrimary.withOpacity(0.7),
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: kPrimary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.access_time,
+              size: 50,
+              color: kPrimary.withOpacity(0.7),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           const Text(
             'لا تتوفر أوقات صلاة للعرض',
             style: TextStyle(
@@ -504,19 +494,30 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
               color: kPrimary,
             ),
           ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loadPrayerTimes,
+          const SizedBox(height: 8),
+          Text(
+            'يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () => _loadPrayerTimes(forceRefresh: true),
+            icon: const Icon(Icons.refresh),
+            label: const Text(
+              'إعادة المحاولة',
+              style: TextStyle(fontSize: 16),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-            ),
-            child: const Text(
-              'إعادة المحاولة',
-              style: TextStyle(fontSize: 16),
+              elevation: 2,
             ),
           ),
         ],
@@ -524,7 +525,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // Lista de tiempos de oración
   Widget _buildPrayerTimesList() {
     return AnimationLimiter(
       child: ListView.builder(
@@ -534,7 +534,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         itemBuilder: (context, index) {
           final prayer = _prayerTimes![index];
           
-          // Optimización: usar key única para cada elemento
           return AnimationConfiguration.staggeredList(
             position: index,
             duration: const Duration(milliseconds: 500),
@@ -552,7 +551,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
 
-  // Advertencia sobre permisos de ubicación
   Widget _buildLocationPermissionWarning() {
     return AnimationConfiguration.synchronized(
       duration: const Duration(milliseconds: 400),
@@ -560,24 +558,39 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         horizontalOffset: 50.0,
         child: FadeInAnimation(
           child: Container(
-            margin: const EdgeInsets.only(top: 10),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: Colors.orange.withOpacity(0.5),
                 width: 1,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Colors.orange,
-                  size: 24,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.info_outline,
+                    color: Colors.orange.shade800,
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,13 +614,24 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
                     ],
                   ),
                 ),
-                TextButton(
+                ElevatedButton(
                   onPressed: _requestLocationPermission,
-                  child: Text(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade800,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                  ),
+                  child: const Text(
                     'منح الإذن',
                     style: TextStyle(
-                      color: Colors.orange.shade800,
                       fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -619,7 +643,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // Solicitar permisos de ubicación
   Future<void> _requestLocationPermission() async {
     final hasPermission = await _prayerService.requestLocationPermission();
     if (hasPermission) {
@@ -627,7 +650,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     }
   }
 
-  // Tarjeta de ubicación
   Widget _buildLocationCard() {
     return AnimationConfiguration.synchronized(
       duration: const Duration(milliseconds: 400),
@@ -642,7 +664,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
             ),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [kPrimary, kPrimaryLight],
@@ -659,11 +681,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Icons.location_on,
                       color: Colors.white,
-                      size: 26,
+                      size: 28,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -685,31 +714,48 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         
-                        // Añadir detalles sobre la última actualización
                         if (_lastLoadTime != null)
                           Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'آخر تحديث: ${_formatLastUpdateTime(_lastLoadTime!)}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 12,
-                              ),
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  size: 12,
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'آخر تحديث: ${_formatLastUpdateTime(_lastLoadTime!)}',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.refresh,
-                      color: Colors.white.withOpacity(0.9),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
                     ),
-                    onPressed: () => _loadPrayerTimes(forceRefresh: true),
-                    tooltip: 'تحديث الموقع',
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.refresh,
+                        color: Colors.white.withOpacity(0.9),
+                        size: 22,
+                      ),
+                      onPressed: () => _loadPrayerTimes(forceRefresh: true),
+                      tooltip: 'تحديث الموقع',
+                    ),
                   ),
                 ],
               ),
@@ -720,7 +766,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // Formatear tiempo de última actualización
   String _formatLastUpdateTime(DateTime time) {
     final now = DateTime.now();
     final difference = now.difference(time);
@@ -736,7 +781,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     }
   }
 
-  // Tarjeta de tiempo de oración
   Widget _buildPrayerTimeCard(PrayerTimeModel prayer) {
     final bool isPassed = prayer.isPassed;
     final bool isNext = prayer.isNext;
@@ -744,7 +788,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     return Card(
       elevation: isNext ? 8 : 4,
       shadowColor: prayer.color.withOpacity(isNext ? 0.4 : 0.2),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: isNext
@@ -771,8 +815,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
             children: [
               // Icono de oración
               Container(
-                width: 50,
-                height: 50,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -794,7 +838,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
                 child: Icon(
                   prayer.icon,
                   color: Colors.white,
-                  size: 26,
+                  size: 28,
                 ),
               ),
               const SizedBox(width: 16),
@@ -815,21 +859,30 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
                             fontSize: 18,
                           ),
                         ),
-                        Text(
-                          prayer.formattedTime,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isNext ? prayer.color : Colors.black87,
-                            fontSize: 18,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isNext 
+                                ? prayer.color.withOpacity(0.1) 
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            prayer.formattedTime,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isNext ? prayer.color : Colors.black87,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     
                     // Tiempo restante hasta la oración
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: isPassed
                             ? Colors.grey.withOpacity(0.2)
@@ -884,7 +937,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
 
-  // Widget de error
   Widget _buildErrorWidget() {
     return Center(
       child: Padding(
@@ -892,12 +944,20 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 80,
-              color: Colors.red.shade400,
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 60,
+                color: Colors.red.shade400,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Text(
               'لا يمكن تحميل أوقات الصلاة',
               style: TextStyle(
@@ -907,8 +967,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
-            // Mostrar mensaje de error más amigable
+            const SizedBox(height: 16),
             Text(
               _getFormattedErrorMessage(_errorMessage),
               style: TextStyle(
@@ -917,12 +976,17 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: () => _loadPrayerTimes(forceRefresh: true),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text(
+                    'إعادة المحاولة',
+                    style: TextStyle(fontSize: 16),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimary,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -930,33 +994,30 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'إعادة المحاولة',
-                    style: TextStyle(fontSize: 16),
-                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 
-                // Botón para usar ubicación predeterminada
                 if (!_hasLocationPermission)
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: _useDefaultLocation,
+                    icon: const Icon(Icons.location_city),
+                    label: const Text(
+                      'استخدام الموقع الافتراضي',
+                      style: TextStyle(fontSize: 16),
+                    ),
                     style: OutlinedButton.styleFrom(
+                      foregroundColor: kPrimary,
                       side: BorderSide(color: kPrimary),
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'استخدام الموقع الافتراضي',
-                      style: TextStyle(fontSize: 16),
-                    ),
                   ),
               ],
             ),
             if (!_hasLocationPermission) ... [
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: _requestLocationPermission,
                 icon: const Icon(Icons.location_on),
@@ -965,7 +1026,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
                   style: TextStyle(fontSize: 16),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: kPrimary),
+                  foregroundColor: Colors.orange.shade800,
+                  side: BorderSide(color: Colors.orange.shade800),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -979,10 +1041,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // Usar ubicación predeterminada
   Future<void> _useDefaultLocation() async {
     try {
-      // Obtener tiempos de oración con ubicación predeterminada
       final prayerTimes = _prayerService.getPrayerTimesLocally();
       
       setState(() {
@@ -993,19 +1053,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         _hasCache = true;
         _lastLoadTime = DateTime.now();
       });
+      
+      _showSuccessSnackBar('تم استخدام الموقع الافتراضي بنجاح');
     } catch (e) {
       setState(() {
         _errorMessage = 'فشل استخدام الموقع الافتراضي';
       });
       
-      // Mostrar mensaje de error más detallado en registro de depuración
       debugPrint('Error detallado al usar ubicación predeterminada: $e');
     }
   }
   
-  // Formatear mensaje de error para ser más amigable
   String _getFormattedErrorMessage(String errorMessage) {
-    // Simplificar mensajes de error técnicos
     if (errorMessage.contains('Exception')) {
       return 'حدث خطأ أثناء الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت الخاص بك والمحاولة مرة أخرى.';
     } else if (errorMessage.contains('Permission')) {
@@ -1016,7 +1075,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
       return 'حدث خطأ غير معروف. يرجى المحاولة مرة أخرى.';
     }
     
-    // Devolver mensaje de error original si no es demasiado técnico
     return errorMessage;
   }
 }

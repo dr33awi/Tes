@@ -6,7 +6,7 @@ import 'package:test_athkar_app/screens/athkarscreen/tasbih_screen.dart';
 import '../../hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary; // للحصول على الألوان الأساسية
 import 'package:test_athkar_app/screens/athkarscreen/athkar_screen.dart';
-import 'package:test_athkar_app/adhan/prayer_times_screen.dart';
+import 'package:test_athkar_app/adhan/screens/prayer_times_screen.dart';
 
 class CategoryGrid extends StatefulWidget {
   const CategoryGrid({Key? key}) : super(key: key);
