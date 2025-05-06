@@ -1,8 +1,6 @@
-// lib/screens/prayer_times_screen/prayer_settings_screen.dart
+// lib/prayer/screens/prayer_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
-    show kPrimary, kPrimaryLight, kSurface;
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 
 class PrayerSettingsScreen extends StatefulWidget {
@@ -31,10 +29,25 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     'العشاء',
   ];
   
+  // Theme colors
+  late final Color kPrimary;
+  late final Color kPrimaryLight;
+  late final Color kSurface;
+  
   @override
   void initState() {
     super.initState();
     _loadCurrentSettings();
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Initialize theme colors
+    kPrimary = Theme.of(context).primaryColor;
+    kPrimaryLight = Theme.of(context).primaryColor.withOpacity(0.7);
+    kSurface = Theme.of(context).scaffoldBackgroundColor;
   }
   
   Future<void> _loadCurrentSettings() async {
@@ -51,13 +64,10 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
         _adjustments = Map<String, int>.from(settings['adjustments']);
         _isLoading = false;
       });
-      
-      // Depuración
-      debugPrint('Configuración cargada: Método = $_selectedMethod, Madhab = $_selectedMadhab');
     } catch (e) {
-      debugPrint('Error al cargar configuración: $e');
+      debugPrint('Error loading settings: $e');
       
-      // Valores por defecto en caso de error
+      // Default values in case of error
       setState(() {
         _selectedMethod = 'Umm al-Qura';
         _selectedMadhab = 'Shafi';
@@ -82,13 +92,13 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
           title: const Text(
             'إعدادات مواقيت الصلاة',
             style: TextStyle(
-              color: kPrimary,
+              color: Colors.black87,
               fontWeight: FontWeight.bold,
               fontSize: 20,
             ),
           ),
           leading: IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.arrow_back,
               color: kPrimary,
             ),
@@ -96,7 +106,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
           ),
         ),
         body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? Center(child: CircularProgressIndicator(color: kPrimary))
           : Directionality(
               textDirection: TextDirection.rtl,
               child: AnimationLimiter(
@@ -125,7 +135,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                         _buildAdjustmentsSection(),
                         const SizedBox(height: 24),
                         
-                        // Botones de acción
+                        // Action buttons
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -163,7 +173,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                         
                         const SizedBox(height: 24),
                         
-                        // Información explicativa
+                        // Info card
                         _buildInfoCard(),
                       ],
                     ),
@@ -175,7 +185,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Verificar cambios antes de salir
+  // Check for changes before exiting
   Future<bool> _onWillPop() async {
     if (_hasChanges) {
       return await _showUnsavedChangesDialog() ?? false;
@@ -218,7 +228,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Mostrar mensaje de error
+  // Show error message
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -237,7 +247,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Mostrar mensaje de éxito
+  // Show success message
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -256,13 +266,13 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Título de sección
+  // Section title
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: kPrimary,
@@ -271,7 +281,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Selector de método de cálculo
+  // Calculation method selector
   Widget _buildCalculationMethodSelector() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -292,7 +302,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Lista de métodos de cálculo disponibles
+            // List of available calculation methods
             ...List.generate(
               _prayerService.getAvailableCalculationMethods().length,
               (index) {
@@ -308,7 +318,6 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                       _selectedMethod = value!;
                       _hasChanges = true;
                     });
-                    debugPrint('Método seleccionado: $_selectedMethod');
                   },
                 );
               },
@@ -319,7 +328,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Selector de madhab
+  // Madhab selector
   Widget _buildMadhabSelector() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -340,7 +349,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Lista de madhabs disponibles
+            // List of available madhabs
             ...List.generate(
               _prayerService.getAvailableMadhabs().length,
               (index) {
@@ -356,7 +365,6 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                       _selectedMadhab = value!;
                       _hasChanges = true;
                     });
-                    debugPrint('Madhab seleccionado: $_selectedMadhab');
                   },
                 );
               },
@@ -367,7 +375,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Sección de ajustes de tiempo
+  // Time adjustments section
   Widget _buildAdjustmentsSection() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -388,7 +396,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Lista de oraciones para ajustar
+            // List of prayers to adjust
             ...List.generate(
               _prayerNames.length,
               (index) {
@@ -410,8 +418,8 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                         flex: 5,
                         child: Slider(
                           value: (_adjustments[prayerName] ?? 0).toDouble(),
-                          min: -15, // Adelantar máximo 15 minutos
-                          max: 15, // Retrasar máximo 15 minutos
+                          min: -15, // Max 15 minutes earlier
+                          max: 15, // Max 15 minutes later
                           divisions: 30,
                           activeColor: kPrimary,
                           inactiveColor: kPrimary.withOpacity(0.2),
@@ -439,7 +447,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
               },
             ),
             
-            // Botón para resetear ajustes
+            // Reset adjustments button
             Center(
               child: TextButton.icon(
                 onPressed: () {
@@ -461,7 +469,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Tarjeta de información
+  // Info card
   Widget _buildInfoCard() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -517,7 +525,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Un elemento de información
+  // Info item
   Widget _buildInfoItem(String title, String content) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,57 +550,50 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // Guardar configuración
+  // Save settings
   Future<void> _saveSettings() async {
     try {
       setState(() => _isLoading = true);
       
-      // Depuración - valores antes de guardar
-      debugPrint('Guardando configuración: Método = $_selectedMethod, Madhab = $_selectedMadhab');
-      
-      // Actualizar configuración en el servicio
+      // Update configuration in service
       _prayerService.updateCalculationMethod(_selectedMethod);
       _prayerService.updateMadhab(_selectedMadhab);
       _prayerService.clearAdjustments();
       
-      // Añadir ajustes
+      // Add adjustments
       _adjustments.forEach((prayerName, minutes) {
         if (minutes != 0) {
           _prayerService.setAdjustment(prayerName, minutes);
         }
       });
       
-      // Guardar configuración
+      // Save settings
       await _prayerService.saveSettings();
       
-      // Nueva función: recalcular tiempos de oración inmediatamente
+      // Recalculate prayer times immediately
       await _prayerService.recalculatePrayerTimes();
-      
-      // Verificar que se haya guardado correctamente
-      final savedSettings = _prayerService.getUserSettings();
-      debugPrint('Verificación después de guardar: ${savedSettings['calculationMethod']}');
       
       setState(() {
         _isLoading = false;
-        _hasChanges = false; // Resetear indicador de cambios
+        _hasChanges = false; // Reset changes indicator
       });
       
-      // Mostrar mensaje de confirmación
+      // Show confirmation message
       _showSuccessSnackBar('تم حفظ الإعدادات وتحديث مواقيت الصلاة بنجاح');
       
-      // Regresar a la pantalla anterior
-      Navigator.pop(context, true); // Enviar true para indicar cambios
+      // Return to previous screen
+      Navigator.pop(context, true); // Send true to indicate changes
     } catch (e) {
-      debugPrint('Error al guardar configuración: $e');
+      debugPrint('Error saving settings: $e');
       
       setState(() => _isLoading = false);
       
-      // Mostrar mensaje de error
+      // Show error message
       _showErrorSnackBar('حدث خطأ أثناء حفظ الإعدادات');
     }
   }
   
-  // Resetear configuración
+  // Reset settings
   void _resetSettings() {
     showDialog(
       context: context,
@@ -613,7 +614,6 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                 _adjustments = {};
                 _hasChanges = true;
               });
-              debugPrint('Configuración reseteada a los valores predeterminados');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,

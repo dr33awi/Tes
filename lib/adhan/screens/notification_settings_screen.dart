@@ -1,10 +1,8 @@
-// lib/screens/settings/notification_settings_screen.dart
+// lib/adhan/screens/notification_settings_screen.dart
 import 'package:flutter/material.dart';
-import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
-    show kPrimary, kPrimaryLight, kSurface;
-import 'package:test_athkar_app/adhan/services/adhan_notification_service.dart';
-import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
+import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -14,7 +12,7 @@ class NotificationSettingsScreen extends StatefulWidget {
 }
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-  final AdhanNotificationService _notificationService = AdhanNotificationService();
+  final PrayerNotificationService _notificationService = PrayerNotificationService();
   final PrayerTimesService _prayerService = PrayerTimesService();
   
   bool _isLoading = true;
@@ -22,10 +20,25 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   bool _hasPermissions = false;
   Map<String, bool> _prayerSettings = {};
   
+  // Theme colors - será inicializado en didChangeDependencies
+  late Color kPrimary;
+  late Color kPrimaryLight;
+  late Color kSurface;
+  
   @override
   void initState() {
     super.initState();
     _loadSettings();
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Inicializar colores del tema
+    kPrimary = Theme.of(context).primaryColor;
+    kPrimaryLight = Theme.of(context).primaryColor.withOpacity(0.7);
+    kSurface = Theme.of(context).scaffoldBackgroundColor;
   }
   
   Future<void> _loadSettings() async {
@@ -41,7 +54,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       _notificationsEnabled = _notificationService.isNotificationEnabled;
       _prayerSettings = Map.from(_notificationService.prayerNotificationSettings);
     } catch (e) {
-      // Manejar errores
       debugPrint('Error al cargar configuración: $e');
       _showErrorSnackBar('حدث خطأ أثناء تحميل الإعدادات');
     } finally {
@@ -100,7 +112,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();
-              // En lugar de usar app_settings, usamos un enfoque genérico
               openAppSettings();
             },
             style: ElevatedButton.styleFrom(
@@ -113,13 +124,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Función genérica para abrir configuración de la aplicación
+  // Función para abrir configuración de la aplicación
   void openAppSettings() {
-    // Implementar según la plataforma - para mantener compatibilidad sin app_settings
     try {
-      // Usar Flutter estándar para abrir la configuración de la aplicación
-      // Esta es una implementación básica que funciona en la mayoría de dispositivos
-      // pero sin la precisión de app_settings
+      // Usar apertura estándar de Flutter para la configuración de la aplicación
       debugPrint('Abriendo configuración de la aplicación...');
       // Notificar al usuario
       ScaffoldMessenger.of(context).showSnackBar(
@@ -180,18 +188,18 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         title: const Text(
           'إعدادات الإشعارات',
           style: TextStyle(
-            color: kPrimary,
+            color: Colors.black87,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kPrimary),
+          icon: Icon(Icons.arrow_back, color: kPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: kPrimary))
+        ? Center(child: CircularProgressIndicator(color: kPrimary))
         : Directionality(
             textDirection: TextDirection.rtl,
             child: RefreshIndicator(
@@ -235,7 +243,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: kPrimary,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
@@ -331,7 +339,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'يحتاج التطبيق إلى إذن الإشعارات لتنبيهك بأوقات الصلاة. يرجى منح الإذن لتلقي إشعارات الأذان.',
+            'يحتاج التطبيق إلى إذن الإشعارات لتنبيهك بأوقات الصلاة. يرجى منح الإذن لتلقي إشعارات.',
             style: TextStyle(
               color: Colors.orange.shade800,
               fontSize: 14,
@@ -444,7 +452,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Método separado para manejar la activación/desactivación principal
+  // Método para manejar activación/desactivación principal
   Future<void> _toggleMasterSwitch(bool value) async {
     setState(() {
       _notificationsEnabled = value;
@@ -541,7 +549,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Método separado para manejar la activación/desactivación individual
+  // Método para manejar activación/desactivación individual
   Future<void> _togglePrayerSetting(String prayer, bool value) async {
     setState(() {
       _prayerSettings[prayer] = value;
@@ -680,7 +688,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Un elemento de información
+  // Elemento de información
   Widget _buildInfoItem(IconData icon, String content) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

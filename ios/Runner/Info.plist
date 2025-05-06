@@ -33,27 +33,21 @@
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>نحتاج إلى إذن الموقع للحصول على مواقيت الصلاة حتى عندما لا يكون التطبيق مفتوحًا</string>
 	
-
-    <!-- إعدادات أخرى -->
-    <key>UIBackgroundModes</key>
-    <array>
-        <string>fetch</string>
-        <string>remote-notification</string>
-    </array>
-    <key>NSUserNotificationsUsageDescription</key>
-    <string>نحتاج إلى إذن الإشعارات لإعلامك بمواقيت الصلاة</string>
-
 	<!-- Permisos para notificaciones -->
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>audio</string>
+		<!-- Eliminado el modo "audio" ya que no usaremos sonidos -->
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
 	
-	<!-- Descripción de los permisos de notificaciones (obligatorio en iOS) -->
+	<!-- Descripción de los permisos de notificaciones -->
 	<key>NSCalendarsUsageDescription</key>
 	<string>نحتاج الوصول إلى التقويم لجدولة إشعارات الصلاة</string>
+	
+	<!-- Descripción de notificaciones -->
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>نحتاج إلى إذن الإشعارات لإعلامك بمواقيت الصلاة</string>
 	
 	<!-- Soporte para idiomas -->
 	<key>CFBundleLocalizations</key>

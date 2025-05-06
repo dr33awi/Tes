@@ -4,34 +4,39 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
-import 'package:test_athkar_app/adhan/screens/services/adhan_notification_service.dart';
-import 'package:test_athkar_app/adhan/screens/services/permission_service.dart';
+import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
+import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 
 void main() async {
-  // تأكد من تهيئة Flutter
+  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تحديد اتجاه الشاشة
+  // Set screen orientation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
   
-  // Request permissions
+  // Initialize services
   try {
-    final permissionService = PermissionService();
-    await permissionService.requestNotificationPermission();
+    // Initialize prayer notification service
+    final notificationService = PrayerNotificationService();
+    await notificationService.initialize();
     
-    // Initialize notification service
-    final adhanNotificationService = AdhanNotificationService();
-    await adhanNotificationService.initialize();
-    debugPrint('Notification service initialized successfully');
+    // Initialize prayer times service
+    final prayerTimesService = PrayerTimesService();
+    await prayerTimesService.initialize();
+    
+    // Schedule notifications for today's prayers
+    await prayerTimesService.schedulePrayerNotifications();
+    
+    debugPrint('Prayer services initialized successfully');
   } catch (e) {
     debugPrint('Error initializing services: $e');
-    // تجاهل الخطأ والمتابعة
+    // Continue despite error
   }
   
-  // تشغيل التطبيق
+  // Run the app
   runApp(const MyApp());
 }
 
@@ -41,7 +46,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ScreenUtilInit(
-      // حجم التصميم الأصلي للتطبيق
+      // Original design size
       designSize: const Size(360, 800),
       minTextAdapt: true,
       splitScreenMode: true,
@@ -69,15 +74,15 @@ class MyApp extends StatelessWidget {
             scaffoldBackgroundColor: const Color(0xFFE7E8E3),
             fontFamily: 'Cairo',
             appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF447055),
+              backgroundColor: Colors.transparent,
               centerTitle: true,
               elevation: 0,
-              iconTheme: IconThemeData(color: Colors.white),
+              iconTheme: IconThemeData(color: Color(0xFF447055)),
               titleTextStyle: TextStyle(
                 fontFamily: 'Cairo',
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: Colors.black87,
               ),
             ),
           ),

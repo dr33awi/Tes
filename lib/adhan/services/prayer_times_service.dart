@@ -1,4 +1,4 @@
-// lib/adhan/prayer_times_service.dart
+// lib/adhan/services/prayer_times_service.dart
 import 'dart:convert';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
@@ -6,9 +6,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_athkar_app/adhan/prayer_times_model.dart';
-import 'package:test_athkar_app/adhan/location_permission_dialog.dart';
-import 'package:test_athkar_app/adhan/services/adhan_notification_service.dart';
+import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
+import 'package:test_athkar_app/adhan/widgets/location_permission_dialog.dart';
+import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
 
 /// Service for managing prayer times
 /// 
@@ -48,7 +48,7 @@ class PrayerTimesService {
   bool _isInitialized = false;
   
   // Notification service instance
-  final AdhanNotificationService _notificationService = AdhanNotificationService();
+  final PrayerNotificationService _notificationService = PrayerNotificationService();
   
   /// Initialize the service
   Future<bool> initialize() async {
@@ -554,7 +554,7 @@ class PrayerTimesService {
         return prayerTimes;
       } else if (useDefaultLocationIfNeeded) {
         // If can't get location, use default location (Mecca)
-        _setDefaultLocation();
+        setDefaultLocation();
         
         final prayerTimes = getPrayerTimesLocally();
         
@@ -572,7 +572,7 @@ class PrayerTimesService {
       
       // In case of error, use default location if needed
       if (useDefaultLocationIfNeeded) {
-        _setDefaultLocation();
+        setDefaultLocation();
         return getPrayerTimesLocally();
       }
       
@@ -582,7 +582,7 @@ class PrayerTimesService {
   }
   
   /// Set default location (Mecca)
-  void _setDefaultLocation() {
+  void setDefaultLocation() {
     _latitude = 21.4225;
     _longitude = 39.8262;
     _locationName = 'مكة المكرمة (الموقع الافتراضي)'; // Mecca (Default Location)
@@ -610,7 +610,7 @@ class PrayerTimesService {
       // Ensure we have location data
       if (_latitude == null || _longitude == null) {
         // Use default values for Mecca
-        _setDefaultLocation();
+        setDefaultLocation();
       }
       
       // Create coordinates object
