@@ -20,10 +20,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   bool _hasPermissions = false;
   Map<String, bool> _prayerSettings = {};
   
-  // Theme colors - será inicializado en didChangeDependencies
+  // ألوان السمة - سيتم تهيئتها في didChangeDependencies
   late Color kPrimary;
   late Color kPrimaryLight;
   late Color kSurface;
+  late Color kInfoColor;
   
   @override
   void initState() {
@@ -35,10 +36,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     
-    // Inicializar colores del tema
+    // تهيئة ألوان السمة
     kPrimary = Theme.of(context).primaryColor;
     kPrimaryLight = Theme.of(context).primaryColor.withOpacity(0.7);
     kSurface = Theme.of(context).scaffoldBackgroundColor;
+    kInfoColor = kPrimary; // جعل لون معلومات الصلاة متناسق مع اللون الرئيسي
   }
   
   Future<void> _loadSettings() async {
@@ -47,14 +49,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _isLoading = true;
       });
       
-      // Verificar permisos de notificación
+      // التحقق من أذونات الإشعارات
       _hasPermissions = await _notificationService.checkNotificationPermission();
       
-      // Cargar configuración del servicio
+      // تحميل الإعدادات من الخدمة
       _notificationsEnabled = _notificationService.isNotificationEnabled;
       _prayerSettings = Map.from(_notificationService.prayerNotificationSettings);
     } catch (e) {
-      debugPrint('Error al cargar configuración: $e');
+      debugPrint('خطأ أثناء تحميل الإعدادات: $e');
       _showErrorSnackBar('حدث خطأ أثناء تحميل الإعدادات');
     } finally {
       if (mounted) {
@@ -71,7 +73,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _isLoading = true;
       });
       
-      // Solicitar permisos de notificación
+      // طلب أذونات الإشعارات
       _hasPermissions = await _notificationService.requestNotificationPermission();
       
       setState(() {
@@ -80,10 +82,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       
       if (_hasPermissions) {
         _showSuccessSnackBar('تم منح إذن الإشعارات بنجاح');
-        // Reprogramar notificaciones ahora que tenemos permisos
+        // إعادة جدولة الإشعارات بعد الحصول على الأذونات
         await _prayerService.schedulePrayerNotifications();
       } else {
-        // Mostrar diálogo para explicar al usuario cómo conceder permisos manualmente
+        // عرض مربع حوار لشرح كيفية منح الأذونات يدويًا
         _showPermissionsGuideDialog();
       }
     } catch (e) {
@@ -92,7 +94,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       });
       
       _showErrorSnackBar('حدث خطأ أثناء طلب إذن الإشعارات');
-      debugPrint('Error al solicitar permisos de notificación: $e');
+      debugPrint('خطأ أثناء طلب أذونات الإشعارات: $e');
     }
   }
   
@@ -124,12 +126,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Función para abrir configuración de la aplicación
+  // وظيفة فتح إعدادات التطبيق
   void openAppSettings() {
     try {
-      // Usar apertura estándar de Flutter para la configuración de la aplicación
-      debugPrint('Abriendo configuración de la aplicación...');
-      // Notificar al usuario
+      // استخدام الطريقة القياسية لفتح إعدادات التطبيق في فلاتر
+      debugPrint('جاري فتح إعدادات التطبيق...');
+      // إخطار المستخدم
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('يرجى تمكين الإشعارات في إعدادات التطبيق'),
@@ -137,7 +139,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         ),
       );
     } catch (e) {
-      debugPrint('Error al abrir configuración: $e');
+      debugPrint('خطأ أثناء فتح الإعدادات: $e');
     }
   }
   
@@ -220,16 +222,16 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                         ),
                       ),
                       children: [
-                        // Mostrar banner de permisos si no se han concedido
+                        // عرض شريط الأذونات إذا لم يتم منحها
                         if (!_hasPermissions)
                           _buildPermissionBanner(),
                         
-                        // Tarjeta de activación de notificaciones
+                        // بطاقة تفعيل الإشعارات
                         _buildMasterSwitchCard(),
                         
                         const SizedBox(height: 24),
                         
-                        // Título de configuraciones de oraciones
+                        // عنوان إعدادات الصلوات
                         Row(
                           children: [
                             Icon(
@@ -251,33 +253,18 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                         
                         const SizedBox(height: 16),
                         
-                        // Configuraciones individuales de oraciones 
+                        // إعدادات كل صلاة على حدة 
                         _buildPrayerSettingsCard(),
                         
                         const SizedBox(height: 24),
                         
-                        // Información explicativa
+                        // معلومات توضيحية
                         _buildInfoCard(),
                         
                         const SizedBox(height: 24),
                         
-                        // Botón de actualización de notificaciones
-                        Center(
-                          child: ElevatedButton.icon(
-                            onPressed: _hasPermissions ? _updateNotifications : _requestNotificationPermission,
-                            icon: Icon(_hasPermissions ? Icons.refresh : Icons.notifications_active),
-                            label: Text(_hasPermissions ? 'تحديث الإشعارات' : 'منح إذن الإشعارات'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimary,
-                              foregroundColor: Colors.white,
-                              elevation: 4,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
+                        // تم حذف زر تحديث الإشعارات كما طلبتم
+                        
                       ],
                     ),
                   ),
@@ -288,7 +275,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Banner de permisos
+  // شريط الأذونات
   Widget _buildPermissionBanner() {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -365,7 +352,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Tarjeta de activación/desactivación de notificaciones
+  // بطاقة تفعيل/تعطيل الإشعارات
   Widget _buildMasterSwitchCard() {
     return Card(
       elevation: 8,
@@ -437,13 +424,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             ),
             Transform.scale(
               scale: 1.2,
-              child: Switch(
+              child: Switch.adaptive(
                 value: _notificationsEnabled,
                 onChanged: _hasPermissions ? _toggleMasterSwitch : null,
                 activeColor: Colors.white,
-                activeTrackColor: Colors.white.withOpacity(0.4),
-                inactiveThumbColor: Colors.white.withOpacity(0.8),
-                inactiveTrackColor: Colors.white.withOpacity(0.2),
+                activeTrackColor: kPrimary,
+                inactiveThumbColor: Colors.grey,
+                inactiveTrackColor: Colors.grey.withOpacity(0.3),
               ),
             ),
           ],
@@ -452,7 +439,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Método para manejar activación/desactivación principal
+  // طريقة التعامل مع تفعيل/تعطيل الرئيسي
   Future<void> _toggleMasterSwitch(bool value) async {
     setState(() {
       _notificationsEnabled = value;
@@ -462,19 +449,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       _notificationService.isNotificationEnabled = value;
       
       if (value) {
-        // Reprogramar notificaciones al activarlas
+        // إعادة جدولة الإشعارات عند تفعيلها
         await _prayerService.schedulePrayerNotifications();
       } else {
-        // Cancelar todas las notificaciones al desactivarlas
+        // إلغاء جميع الإشعارات عند تعطيلها
         await _notificationService.cancelAllNotifications();
       }
     } catch (e) {
-      debugPrint('Error al cambiar estado de notificaciones: $e');
+      debugPrint('خطأ أثناء تغيير حالة الإشعارات: $e');
       _showErrorSnackBar('حدث خطأ أثناء تغيير إعدادات الإشعارات');
     }
   }
   
-  // Tarjeta de configuraciones individuales de oraciones
+  // بطاقة إعدادات الصلوات الفردية
   Widget _buildPrayerSettingsCard() {
     return Card(
       elevation: 4,
@@ -491,10 +478,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: entry.value ? kPrimary.withOpacity(0.07) : null,
-                  border: entry.value 
-                      ? Border.all(color: kPrimary.withOpacity(0.3), width: 1) 
-                      : null,
+                  color: entry.value ? kPrimary.withOpacity(0.07) : kPrimary.withOpacity(0.02),
+                  border: Border.all(
+                    color: entry.value 
+                        ? kPrimary.withOpacity(0.3) 
+                        : kPrimary.withOpacity(0.1),
+                    width: 1
+                  ),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
@@ -549,7 +539,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Método para manejar activación/desactivación individual
+  // طريقة التعامل مع تفعيل/تعطيل فردي
   Future<void> _togglePrayerSetting(String prayer, bool value) async {
     setState(() {
       _prayerSettings[prayer] = value;
@@ -559,12 +549,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       await _notificationService.setPrayerNotificationEnabled(prayer, value);
       await _prayerService.schedulePrayerNotifications();
     } catch (e) {
-      debugPrint('Error al cambiar configuración de $prayer: $e');
+      debugPrint('خطأ أثناء تغيير إعدادات $prayer: $e');
       _showErrorSnackBar('حدث خطأ أثناء تغيير إعدادات الإشعار');
     }
   }
   
-  // Iconos para cada oración
+  // أيقونات لكل صلاة
   IconData _getPrayerIcon(String prayer) {
     switch (prayer) {
       case 'الفجر':
@@ -584,7 +574,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
   
-  // Descripción para cada oración
+  // وصف لكل صلاة
   String _getPrayerDescription(String prayer) {
     switch (prayer) {
       case 'الفجر':
@@ -604,11 +594,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
   
-  // Tarjeta de información
+  // بطاقة المعلومات
   Widget _buildInfoCard() {
     return Card(
       elevation: 4,
-      shadowColor: Colors.orange.withOpacity(0.3),
+      shadowColor: kPrimary.withOpacity(0.3),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
@@ -617,15 +607,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.orange.withOpacity(0.1),
-              Colors.amber.withOpacity(0.05),
+              kPrimary.withOpacity(0.1),
+              kPrimary.withOpacity(0.05),
             ],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.orange.withOpacity(0.3),
+            color: kPrimary.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -637,12 +627,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
+                    color: kPrimary.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.info_outline,
-                    color: Colors.orange.shade800,
+                    color: kPrimary,
                     size: 24,
                   ),
                 ),
@@ -652,7 +642,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange.shade800,
+                    color: kPrimary,
                   ),
                 ),
               ],
@@ -664,7 +654,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 color: Colors.white.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.orange.withOpacity(0.2),
+                  color: kPrimary.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -677,7 +667,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   const SizedBox(height: 8),
                   _buildInfoItem(
                     Icons.update,
-                    'يمكنك تحديث الإشعارات عند تغيير الموقع الجغرافي أو تغيير إعدادات حساب مواقيت الصلاة.'
+                    'يتم تحديث الإشعارات تلقائياً عند تغيير الموقع الجغرافي أو تغيير إعدادات حساب مواقيت الصلاة.'
                   ),
                 ],
               ),
@@ -688,14 +678,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // Elemento de información
+  // عنصر معلومات
   Widget _buildInfoItem(IconData icon, String content) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
-          color: Colors.orange.shade700,
+          color: kPrimary,
           size: 18,
         ),
         const SizedBox(width: 8),
@@ -711,48 +701,5 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         ),
       ],
     );
-  }
-  
-  // Actualizar notificaciones de oración
-  Future<void> _updateNotifications() async {
-    try {
-      // Mostrar indicador de carga
-      setState(() {
-        _isLoading = true;
-      });
-      
-      // Verificar permisos de notificación
-      if (!_hasPermissions) {
-        _hasPermissions = await _notificationService.requestNotificationPermission();
-        if (!_hasPermissions) {
-          setState(() {
-            _isLoading = false;
-          });
-          _showPermissionsGuideDialog();
-          return;
-        }
-      }
-      
-      // Reprogramar todas las notificaciones
-      await _prayerService.schedulePrayerNotifications();
-      
-      if (mounted) {
-        // Mostrar mensaje de confirmación
-        _showSuccessSnackBar('تم تحديث إشعارات الصلاة بنجاح');
-      }
-    } catch (e) {
-      debugPrint('Error al actualizar notificaciones: $e');
-      
-      if (mounted) {
-        // Mostrar mensaje de error
-        _showErrorSnackBar('حدث خطأ أثناء تحديث الإشعارات');
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
   }
 }
