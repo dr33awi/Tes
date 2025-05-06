@@ -1,4 +1,4 @@
-// lib/prayer/screens/prayer_settings_screen.dart
+// lib/adhan/screens/prayer_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
@@ -19,7 +19,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   bool _isLoading = true;
   bool _hasChanges = false;
   
-  // Lista de nombres de oración para ajustes
+  // List of prayer names for adjustments
   final List<String> _prayerNames = [
     'الفجر',
     'الشروق',
@@ -28,6 +28,26 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     'المغرب',
     'العشاء',
   ];
+  
+  // Prayer colors for visual appeal
+  final Map<String, Color> _prayerColors = {
+    'الفجر': const Color(0xFF5B68D9),    // Blue-ish for dawn
+    'الشروق': const Color(0xFFFF9E0D),   // Orange for sunrise
+    'الظهر': const Color(0xFFFFB746),    // Yellow for noon
+    'العصر': const Color(0xFFFF8A65),    // Orange-ish for afternoon
+    'المغرب': const Color(0xFF5C6BC0),   // Dark blue for sunset
+    'العشاء': const Color(0xFF1A237E),   // Deep blue for night
+  };
+  
+  // Prayer icons
+  final Map<String, IconData> _prayerIcons = {
+    'الفجر': Icons.brightness_2,
+    'الشروق': Icons.wb_sunny_outlined,
+    'الظهر': Icons.wb_sunny,
+    'العصر': Icons.wb_twighlight,
+    'المغرب': Icons.nights_stay_outlined,
+    'العشاء': Icons.nightlight_round,
+  };
   
   // Theme colors
   late final Color kPrimary;
@@ -123,53 +143,25 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                         ),
                       ),
                       children: [
-                        _buildSectionTitle('طريقة حساب المواقيت'),
+                        // Intro card
+                        _buildIntroCard(),
+                        
+                        const SizedBox(height: 24),
+                        
+                        _buildSectionTitle('طريقة حساب المواقيت', Icons.calculate_rounded),
                         _buildCalculationMethodSelector(),
                         const SizedBox(height: 24),
                         
-                        _buildSectionTitle('المذهب الفقهي'),
+                        _buildSectionTitle('المذهب الفقهي', Icons.school_rounded),
                         _buildMadhabSelector(),
                         const SizedBox(height: 24),
                         
-                        _buildSectionTitle('تعديلات المواقيت (بالدقائق)'),
+                        _buildSectionTitle('تعديلات المواقيت (بالدقائق)', Icons.timer_outlined),
                         _buildAdjustmentsSection(),
                         const SizedBox(height: 24),
                         
                         // Action buttons
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _saveSettings,
-                                icon: const Icon(Icons.save),
-                                label: const Text('حفظ الإعدادات'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kPrimary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            OutlinedButton.icon(
-                              onPressed: _resetSettings,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('إعادة ضبط'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: kPrimary,
-                                side: BorderSide(color: kPrimary),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildActionButtons(),
                         
                         const SizedBox(height: 24),
                         
@@ -181,6 +173,89 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
                 ),
               ),
             ),
+      ),
+    );
+  }
+  
+  // Intro card explaining the settings
+  Widget _buildIntroCard() {
+    return Card(
+      elevation: 8,
+      shadowColor: kPrimary.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [kPrimary, kPrimaryLight],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            stops: const [0.3, 1.0],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.settings,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Text(
+                    'إعدادات مواقيت الصلاة',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: const Text(
+                'يمكنك تعديل طريقة حساب المواقيت والمذهب الفقهي وضبط تعديلات خاصة لكل وقت صلاة حسب المنطقة التي تتواجد فيها.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -267,16 +342,26 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   }
   
   // Section title
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, IconData icon) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: kPrimary,
-        ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: kPrimary,
+            size: 22,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: kPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -284,10 +369,11 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   // Calculation method selector
   Widget _buildCalculationMethodSelector() {
     return Card(
+      elevation: 4,
+      shadowColor: kPrimary.withOpacity(0.2),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
-      elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -307,18 +393,19 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
               _prayerService.getAvailableCalculationMethods().length,
               (index) {
                 final method = _prayerService.getAvailableCalculationMethods()[index];
-                return RadioListTile<String>(
-                  title: Text(method),
+                final bool isSelected = method == _selectedMethod;
+                
+                return _buildRadioOption(
+                  title: method,
                   value: method,
                   groupValue: _selectedMethod,
-                  activeColor: kPrimary,
-                  dense: true,
                   onChanged: (value) {
                     setState(() {
                       _selectedMethod = value!;
                       _hasChanges = true;
                     });
                   },
+                  isSelected: isSelected,
                 );
               },
             ),
@@ -331,10 +418,11 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   // Madhab selector
   Widget _buildMadhabSelector() {
     return Card(
+      elevation: 4,
+      shadowColor: kPrimary.withOpacity(0.2),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
-      elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -354,18 +442,19 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
               _prayerService.getAvailableMadhabs().length,
               (index) {
                 final madhab = _prayerService.getAvailableMadhabs()[index];
-                return RadioListTile<String>(
-                  title: Text(madhab == 'Shafi' ? 'الشافعي' : 'الحنفي'),
+                final bool isSelected = madhab == _selectedMadhab;
+                
+                return _buildRadioOption(
+                  title: madhab == 'Shafi' ? 'الشافعي' : 'الحنفي',
                   value: madhab,
                   groupValue: _selectedMadhab,
-                  activeColor: kPrimary,
-                  dense: true,
                   onChanged: (value) {
                     setState(() {
                       _selectedMadhab = value!;
                       _hasChanges = true;
                     });
                   },
+                  isSelected: isSelected,
                 );
               },
             ),
@@ -375,13 +464,54 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
+  // Custom radio option
+  Widget _buildRadioOption({
+    required String title, 
+    required String value, 
+    required String groupValue, 
+    required Function(String?) onChanged,
+    bool isSelected = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? kPrimary.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? kPrimary : Colors.grey.shade300,
+          width: isSelected ? 1.5 : 1,
+        ),
+      ),
+      child: RadioListTile<String>(
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? kPrimary : Colors.black87,
+          ),
+        ),
+        value: value,
+        groupValue: groupValue,
+        activeColor: kPrimary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        dense: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+  
   // Time adjustments section
   Widget _buildAdjustmentsSection() {
     return Card(
+      elevation: 4,
+      shadowColor: kPrimary.withOpacity(0.2),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
-      elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -401,53 +531,12 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
               _prayerNames.length,
               (index) {
                 final prayerName = _prayerNames[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          prayerName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 5,
-                        child: Slider(
-                          value: (_adjustments[prayerName] ?? 0).toDouble(),
-                          min: -15, // Max 15 minutes earlier
-                          max: 15, // Max 15 minutes later
-                          divisions: 30,
-                          activeColor: kPrimary,
-                          inactiveColor: kPrimary.withOpacity(0.2),
-                          label: '${_adjustments[prayerName] ?? 0} دقيقة',
-                          onChanged: (double value) {
-                            setState(() {
-                              _adjustments[prayerName] = value.round();
-                              _hasChanges = true;
-                            });
-                          },
-                        ),
-                      ),
-                      SizedBox(
-                        width: 50,
-                        child: Text(
-                          '${_adjustments[prayerName] ?? 0} دقيقة',
-                          style: const TextStyle(
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                return _buildPrayerAdjustment(prayerName);
               },
             ),
             
             // Reset adjustments button
+            const SizedBox(height: 8),
             Center(
               child: TextButton.icon(
                 onPressed: () {
@@ -469,13 +558,156 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
+  // Individual prayer adjustment slider
+  Widget _buildPrayerAdjustment(String prayerName) {
+    final Color prayerColor = _prayerColors[prayerName] ?? kPrimary;
+    final IconData prayerIcon = _prayerIcons[prayerName] ?? Icons.access_time;
+    final int adjustmentValue = _adjustments[prayerName] ?? 0;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: prayerColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: prayerColor.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Prayer name and current value
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: prayerColor.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    prayerIcon,
+                    size: 18,
+                    color: prayerColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                prayerName,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: prayerColor,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: prayerColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: prayerColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  '${adjustmentValue} دقيقة',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: prayerColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          // Slider
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: prayerColor,
+              inactiveTrackColor: prayerColor.withOpacity(0.2),
+              thumbColor: prayerColor,
+              overlayColor: prayerColor.withOpacity(0.2),
+              valueIndicatorColor: prayerColor,
+              valueIndicatorTextStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
+            child: Slider(
+              value: (_adjustments[prayerName] ?? 0).toDouble(),
+              min: -15, // Max 15 minutes earlier
+              max: 15, // Max 15 minutes later
+              divisions: 30,
+              label: '${_adjustments[prayerName] ?? 0} دقيقة',
+              onChanged: (double value) {
+                setState(() {
+                  _adjustments[prayerName] = value.round();
+                  _hasChanges = true;
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Action buttons
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        // Save button
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _saveSettings,
+            icon: const Icon(Icons.save),
+            label: const Text('حفظ الإعدادات'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 3,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        
+        // Reset button
+        OutlinedButton.icon(
+          onPressed: _resetSettings,
+          icon: const Icon(Icons.refresh),
+          label: const Text('إعادة ضبط'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: kPrimary,
+            side: BorderSide(color: kPrimary),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
   // Info card
   Widget _buildInfoCard() {
     return Card(
+      elevation: 4,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
-      elevation: 3,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -484,7 +716,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: kPrimary.withOpacity(0.2)),
         ),
         child: Column(
@@ -492,7 +724,14 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.info_outline, color: kPrimary),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kPrimary.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.info_outline, color: kPrimary, size: 20),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'معلومات إضافية',
@@ -505,19 +744,26 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
               ],
             ),
             const SizedBox(height: 12),
+            
+            // Info items
             _buildInfoItem(
-              'طريقة الحساب',
-              'اختر طريقة الحساب الأكثر استخداماً في منطقتك. على سبيل المثال، طريقة أم القرى هي الطريقة الرسمية في المملكة العربية السعودية.'
+              title: 'طريقة الحساب',
+              content: 'اختر طريقة الحساب الأكثر استخداماً في منطقتك. على سبيل المثال، طريقة أم القرى هي الطريقة الرسمية في المملكة العربية السعودية.',
+              icon: Icons.calculate,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            
             _buildInfoItem(
-              'المذهب الفقهي',
-              'يؤثر اختيار المذهب على وقت صلاة العصر فقط. المذهب الحنفي يبدأ وقت العصر متأخراً قليلاً مقارنة بالمذهب الشافعي.'
+              title: 'المذهب الفقهي',
+              content: 'يؤثر اختيار المذهب على وقت صلاة العصر فقط. المذهب الحنفي يبدأ وقت العصر متأخراً قليلاً مقارنة بالمذهب الشافعي.',
+              icon: Icons.school,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            
             _buildInfoItem(
-              'التعديلات',
-              'يمكنك تعديل المواقيت يدوياً لمطابقة المواقيت المحلية في منطقتك. استخدم قيم سالبة للتقديم وقيم موجبة للتأخير.'
+              title: 'التعديلات',
+              content: 'يمكنك تعديل المواقيت يدوياً لمطابقة المواقيت المحلية في منطقتك. استخدم قيم سالبة للتقديم وقيم موجبة للتأخير.',
+              icon: Icons.tune,
             ),
           ],
         ),
@@ -526,27 +772,63 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
   }
   
   // Info item
-  Widget _buildInfoItem(String title, String content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
+  Widget _buildInfoItem({
+    required String title, 
+    required String content, 
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: kPrimary.withOpacity(0.2),
+          width: 1,
         ),
-        const SizedBox(height: 4),
-        Text(
-          content,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Colors.black87,
-            height: 1.4,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: kPrimary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: kPrimary,
+              size: 16,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: kPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  content,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
   
