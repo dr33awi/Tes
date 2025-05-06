@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class PrayerSettingsScreen extends StatefulWidget {
   const PrayerSettingsScreen({Key? key}) : super(key: key);
@@ -131,7 +132,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
           ),
         ),
         body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: kPrimary))
+          ? _buildLoader()
           : Directionality(
               textDirection: TextDirection.rtl,
               child: AnimationLimiter(
@@ -229,8 +230,32 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
       ),
     );
   }
+
+  // مؤشر التحميل المحسن
+  Widget _buildLoader() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          LoadingAnimationWidget.staggeredDotsWave(
+            color: kPrimary,
+            size: 50,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'جاري تحميل إعدادات مواقيت الصلاة...',
+            style: TextStyle(
+              fontSize: 16,
+              color: kPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          )
+        ],
+      ),
+    );
+  }
   
-  // بطاقة المقدمة
+  // بطاقة المقدمة - تحسين التصميم
   Widget _buildIntroCard() {
     return Card(
       elevation: 8,
@@ -313,7 +338,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // قسم قابل للتوسيع
+  // قسم قابل للتوسيع - تحسين التصميم
   Widget _buildExpandableSection({
     required String title,
     required IconData icon,
@@ -491,7 +516,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // طرق الحساب المتاحة
+  // طرق الحساب المتاحة - تحسين التصميم
   Widget _buildCalculationMethodSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,7 +598,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // خيار الراديو المخصص
+  // خيار الراديو المخصص - تحسين التصميم
   Widget _buildRadioOption({
     required String title, 
     required String value, 
@@ -659,7 +684,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // شريط تمرير تعديل الصلاة الفردية
+  // شريط تمرير تعديل الصلاة الفردية - تحسين التصميم
   Widget _buildPrayerAdjustment(String prayerName) {
     final Color prayerColor = _prayerColors[prayerName] ?? kPrimary;
     final IconData prayerIcon = _prayerIcons[prayerName] ?? Icons.access_time;
@@ -761,7 +786,7 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
     );
   }
   
-  // أزرار الإجراءات
+  // أزرار الإجراءات - تحسين التصميم
   Widget _buildActionButtons() {
     return Row(
       children: [
@@ -828,6 +853,9 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('حفظ التغييرات؟'),
         content: const Text('لديك تغييرات غير محفوظة. هل ترغب في المتابعة بدون حفظ؟'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -837,6 +865,9 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('متابعة بدون حفظ'),
           ),
@@ -933,6 +964,9 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('إعادة ضبط الإعدادات'),
         content: const Text('هل أنت متأكد من إعادة ضبط جميع إعدادات مواقيت الصلاة؟'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -950,6 +984,9 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('إعادة الضبط'),
           ),

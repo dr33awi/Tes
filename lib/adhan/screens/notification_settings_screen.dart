@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -106,6 +107,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         content: const Text(
           'لم يتم منح إذن الإشعارات. يرجى فتح إعدادات التطبيق وتمكين الإشعارات يدويًا.',
         ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -118,6 +122,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('فتح الإعدادات'),
           ),
@@ -201,7 +208,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         ),
       ),
       body: _isLoading 
-        ? Center(child: CircularProgressIndicator(color: kPrimary))
+        ? _buildLoader()
         : Directionality(
             textDirection: TextDirection.rtl,
             child: RefreshIndicator(
@@ -262,9 +269,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                         _buildInfoCard(),
                         
                         const SizedBox(height: 24),
-                        
-                        // تم حذف زر تحديث الإشعارات كما طلبتم
-                        
                       ],
                     ),
                   ),
@@ -272,6 +276,30 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               ),
             ),
           ),
+    );
+  }
+
+  // مؤشر التحميل المحسن مشابه للشاشة الرئيسية
+  Widget _buildLoader() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          LoadingAnimationWidget.staggeredDotsWave(
+            color: kPrimary,
+            size: 50,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'جاري تحميل إعدادات الإشعارات...',
+            style: TextStyle(
+              fontSize: 16,
+              color: kPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          )
+        ],
+      ),
     );
   }
   
@@ -461,7 +489,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
   
-  // بطاقة إعدادات الصلوات الفردية
+  // بطاقة إعدادات الصلوات الفردية - مع تحسينات
   Widget _buildPrayerSettingsCard() {
     return Card(
       elevation: 4,
@@ -594,7 +622,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
   
-  // بطاقة المعلومات
+  // بطاقة المعلومات - تحسين التصميم
   Widget _buildInfoCard() {
     return Card(
       elevation: 4,
@@ -694,7 +722,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             content,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.orange.shade900,
+              color: Colors.grey.shade800,
               height: 1.3,
             ),
           ),

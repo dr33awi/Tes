@@ -1,4 +1,4 @@
-// lib/prayer/services/prayer_notification_service.dart
+// lib/adhan/services/prayer_notification_service.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -23,6 +23,16 @@ class PrayerNotificationService {
     'العصر': true,
     'المغرب': true,
     'العشاء': true,
+  };
+  
+  // أوقات مسبقة للتذكير (بالدقائق)
+  final Map<String, int> _prayerReminderTimes = {
+    'الفجر': 15,    // تذكير قبل 15 دقيقة من الفجر
+    'الشروق': 5,    
+    'الظهر': 10,
+    'العصر': 10,
+    'المغرب': 5,     // تذكير قبل 5 دقائق من المغرب
+    'العشاء': 10,
   };
   
   bool _isInitialized = false;
@@ -80,6 +90,7 @@ class PrayerNotificationService {
           _notificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
           
       if (androidPlugin != null) {
+        // تعديل: إنشاء قناة إشعارات بصوت للتنبيه
         const AndroidNotificationChannel channel = AndroidNotificationChannel(
           'prayer_channel',
           'Prayer Times',
@@ -87,6 +98,8 @@ class PrayerNotificationService {
           importance: Importance.high,
           enableVibration: true,
           enableLights: true,
+          playSound: true, // تفعيل الصوت
+          sound: RawResourceAndroidNotificationSound('adhan'), // اسم ملف الصوت في مجلد الموارد
         );
         
         await androidPlugin.createNotificationChannel(channel);
@@ -109,7 +122,7 @@ class PrayerNotificationService {
         bool? iosPermission = await iosPlugin.requestPermissions(
           alert: true,
           badge: true,
-          sound: true,
+          sound: true, // طلب إذن الصوت
         );
         
         permissionGranted = permissionGranted && (iosPermission ?? false);
@@ -138,6 +151,8 @@ class PrayerNotificationService {
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('Notification tapped: ${response.id}');
     debugPrint('Notification payload: ${response.payload}');
+    
+    // هنا يمكن إضافة المزيد من المنطق للانتقال إلى شاشة الصلاة أو عرض معلومات إضافية
   }
   
   Future<void> _loadNotificationSettings() async {
@@ -152,6 +167,13 @@ class PrayerNotificationService {
         final enabled = prefs.getBool('prayer_notification_$prayer') ?? 
             _prayerNotificationSettings[prayer]!;
         _prayerNotificationSettings[prayer] = enabled;
+      }
+      
+      // تحميل أوقات التذكير المسبق (إذا تم تخزينها)
+      for (final prayer in _prayerReminderTimes.keys) {
+        final reminderMinutes = prefs.getInt('prayer_reminder_$prayer') ?? 
+            _prayerReminderTimes[prayer]!;
+        _prayerReminderTimes[prayer] = reminderMinutes;
       }
     } catch (e) {
       debugPrint('Error loading notification settings: $e');
@@ -172,6 +194,14 @@ class PrayerNotificationService {
           _prayerNotificationSettings[prayer]!
         );
       }
+      
+      // تخزين أوقات التذكير المسبق
+      for (final prayer in _prayerReminderTimes.keys) {
+        await prefs.setInt(
+          'prayer_reminder_$prayer', 
+          _prayerReminderTimes[prayer]!
+        );
+      }
     } catch (e) {
       debugPrint('Error saving notification settings: $e');
     }
@@ -181,6 +211,7 @@ class PrayerNotificationService {
     required String prayerName,
     required DateTime prayerTime,
     required int notificationId,
+    bool isReminder = false,
   }) async {
     // Check if notifications are enabled for this prayer
     if (!_isNotificationEnabled || !(_prayerNotificationSettings[prayerName] ?? false)) {
@@ -202,7 +233,8 @@ class PrayerNotificationService {
         importance: Importance.high,
         priority: Priority.high,
         styleInformation: const BigTextStyleInformation(''),
-        playSound: false, // No sound
+        playSound: true, // تفعيل الصوت
+        sound: const RawResourceAndroidNotificationSound('adhan'), // اسم ملف الصوت
         enableVibration: true,
         category: AndroidNotificationCategory.reminder,
       );
@@ -210,14 +242,25 @@ class PrayerNotificationService {
       final iosDetails = const DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: false, // No sound
+        presentSound: true, // تفعيل الصوت
+        sound: 'adhan.aiff', // اسم ملف الصوت في مجلد الموارد
       );
       
       final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
       
       // Notification content
-      final title = 'حان وقت صلاة $prayerName';
-      final body = 'حان الآن وقت صلاة $prayerName';
+      String title, body;
+      
+      if (isReminder) {
+        // إذا كانت تذكيراً قبل الصلاة
+        final reminderMinutes = _prayerReminderTimes[prayerName] ?? 10;
+        title = 'تذكير بصلاة $prayerName';
+        body = 'سيحين وقت صلاة $prayerName بعد $reminderMinutes دقيقة';
+      } else {
+        // إذا كانت إشعاراً بدخول وقت الصلاة
+        title = 'حان وقت صلاة $prayerName';
+        body = 'حان الآن وقت صلاة $prayerName';
+      }
       
       // Schedule notification
       await _notificationsPlugin.zonedSchedule(
@@ -254,14 +297,38 @@ class PrayerNotificationService {
     }
     
     int scheduledCount = 0;
+    int notificationId = 0;
     
-    // Schedule new notifications
-    for (int i = 0; i < prayerTimes.length; i++) {
-      final prayer = prayerTimes[i];
+    // Schedule new notifications for each prayer
+    for (final prayer in prayerTimes) {
+      final prayerName = prayer['name'] as String;
+      final prayerTime = prayer['time'] as DateTime;
+      
+      // جدولة التذكير المسبق (قبل وقت الصلاة)
+      if (_prayerNotificationSettings[prayerName] == true) {
+        final reminderMinutes = _prayerReminderTimes[prayerName] ?? 10;
+        final reminderTime = prayerTime.subtract(Duration(minutes: reminderMinutes));
+        
+        // تأكد من أن وقت التذكير لم يمر بعد
+        if (reminderTime.isAfter(DateTime.now())) {
+          final success = await schedulePrayerNotification(
+            prayerName: prayerName,
+            prayerTime: reminderTime,
+            notificationId: notificationId++,
+            isReminder: true,
+          );
+          
+          if (success) {
+            scheduledCount++;
+          }
+        }
+      }
+      
+      // جدولة إشعار دخول وقت الصلاة
       final success = await schedulePrayerNotification(
-        prayerName: prayer['name'],
-        prayerTime: prayer['time'],
-        notificationId: i,
+        prayerName: prayerName,
+        prayerTime: prayerTime,
+        notificationId: notificationId++,
       );
       
       if (success) {
@@ -289,9 +356,19 @@ class PrayerNotificationService {
   
   Map<String, bool> get prayerNotificationSettings => Map.unmodifiable(_prayerNotificationSettings);
   
+  Map<String, int> get prayerReminderTimes => Map.unmodifiable(_prayerReminderTimes);
+  
   Future<void> setPrayerNotificationEnabled(String prayer, bool enabled) async {
     if (_prayerNotificationSettings.containsKey(prayer)) {
       _prayerNotificationSettings[prayer] = enabled;
+      await saveNotificationSettings();
+    }
+  }
+  
+  // إضافة طريقة لتعديل وقت التذكير المسبق
+  Future<void> setPrayerReminderTime(String prayer, int minutes) async {
+    if (_prayerReminderTimes.containsKey(prayer)) {
+      _prayerReminderTimes[prayer] = minutes;
       await saveNotificationSettings();
     }
   }
