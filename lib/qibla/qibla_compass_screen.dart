@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
-import 'package:test_athkar_app/qibla/services/prayer_times_service_extension.dart';
+import 'package:test_athkar_app/qibla/services/qibla_compass_service_extension.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -784,7 +784,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> with TickerProv
                             for (int i = 0; i < 360; i += 15)
                               i % 90 == 0
                                   ? Container() // الاتجاهات الرئيسية مضافة بالفعل
-                                  : _buildDegreeMarker(i, i % 45 == 0),
+                                  : _buildDegreeMarker(i.toDouble(), i % 45 == 0),
                             
                             // سهم الشمال
                             Positioned(

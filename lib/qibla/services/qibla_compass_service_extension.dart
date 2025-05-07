@@ -40,12 +40,9 @@ extension PrayerTimesServiceExtension on PrayerTimesService {
   }
   
   /// البحث عن اسم الموقع باستخدام الإحداثيات (متاح للاستخدام العام)
-  Future<String?> getLocationNameByCoordinates(double latitude, double longitude) async {
-    try {
-      return await _getLocationName(latitude, longitude);
-    } catch (e) {
-      debugPrint('خطأ في البحث عن اسم الموقع: $e');
-      return null;
-    }
+Future<String?> _getLocationName(double latitude, double longitude) async {
+  // Simple placeholder implementation
+  return 'Location at $latitude, $longitude';
+  
   }
 }
