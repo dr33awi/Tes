@@ -1,11 +1,11 @@
-// lib/screens/athkar_details_screen/athkar_details_screen.dart
+// lib/screens/athkarscreen/athkar_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
-    show kPrimary, kPrimaryLight, kSurface;
+    show kPrimary,kSurface;
 import 'package:test_athkar_app/screens/athkarscreen/athkar_service.dart';
 
 class AthkarDetailsScreen extends StatefulWidget {
@@ -207,199 +207,239 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen> {
               
               // قائمة الأذكار
               Expanded(
-                child: AnimationLimiter(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: widget.category.athkar.length,
-                    itemBuilder: (context, index) {
-                      final thikr = widget.category.athkar[index];
-                      final isFavorite = _favorites[index] ?? false;
-                      final counter = _counters[index] ?? 0;
-                      final isCompleted = counter >= thikr.count;
-                      
-                      return AnimationConfiguration.staggeredList(
-                        position: index,
-                        duration: const Duration(milliseconds: 500),
-                        child: SlideAnimation(
-                          verticalOffset: 50.0,
-                          child: FadeInAnimation(
-                            child: Card(
-                              elevation: 2,
-                              margin: const EdgeInsets.only(bottom: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                side: isCompleted 
-                                    ? BorderSide(color: kPrimary.withOpacity(0.3), width: 2)
-                                    : BorderSide.none,
-                              ),
-                              child: InkWell(
-                                onTap: () => _incrementCounter(index),
-                                borderRadius: BorderRadius.circular(20),
-                                child: Column(
-                                  children: [
-                                    // رأس البطاقة
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            widget.category.color,
-                                            widget.category.color.withOpacity(0.8),
-                                          ],
-                                          begin: Alignment.topRight,
-                                          end: Alignment.bottomLeft,
-                                        ),
-                                        borderRadius: const BorderRadius.only(
-                                          topRight: Radius.circular(20),
-                                          topLeft: Radius.circular(20),
-                                        ),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 12,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          if (thikr.source != null)
-                                            Expanded(
-                                              child: Text(
-                                                'المصدر: ${thikr.source}',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 6,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white.withOpacity(0.3),
-                                                  borderRadius: BorderRadius.circular(30),
-                                                ),
-                                                child: Text(
-                                                  '$counter / ${thikr.count}',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    
-                                    // محتوى الذكر
-                                    Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Text(
-                                        thikr.text,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          height: 1.8,
-                                          color: isCompleted
-                                              ? kPrimary
-                                              : Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                    
-                                    // فضل الذكر (إذا كان موجودًا)
-                                    if (thikr.fadl != null)
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
-                                        ),
-                                        child: Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: widget.category.color.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: widget.category.color.withOpacity(0.3),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            thikr.fadl!,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontStyle: FontStyle.italic,
-                                              color: widget.category.color.withOpacity(0.8),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    
-                                    // شريط الأدوات
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                        children: [
-                                          IconButton(
-                                            icon: Icon(
-                                              isFavorite
-                                                  ? Icons.favorite
-                                                  : Icons.favorite_border,
-                                              color: isFavorite
-                                                  ? Colors.red
-                                                  : Colors.grey,
-                                            ),
-                                            onPressed: () => _toggleFavorite(index),
-                                            tooltip: 'إضافة للمفضلة',
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.refresh,
-                                              color: Colors.blue,
-                                            ),
-                                            onPressed: () => _resetCounter(index),
-                                            tooltip: 'إعادة ضبط العداد',
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.copy,
-                                              color: Colors.green,
-                                            ),
-                                            onPressed: () => _copyThikr(thikr),
-                                            tooltip: 'نسخ الذكر',
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.share,
-                                              color: Colors.orange,
-                                            ),
-                                            onPressed: () => _shareThikr(thikr),
-                                            tooltip: 'مشاركة الذكر',
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                child: widget.category.athkar.isEmpty
+                    ? _buildEmptyState()
+                    : _buildAthkarList(),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // بناء حالة عدم وجود أذكار
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.format_quote,
+            size: 80,
+            color: kPrimary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'لا توجد أذكار في هذه الفئة',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: kPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'قد يكون هناك خطأ في تحميل البيانات',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // بناء قائمة الأذكار
+  Widget _buildAthkarList() {
+    return AnimationLimiter(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: widget.category.athkar.length,
+        itemBuilder: (context, index) {
+          final thikr = widget.category.athkar[index];
+          final isFavorite = _favorites[index] ?? false;
+          final counter = _counters[index] ?? 0;
+          final isCompleted = counter >= thikr.count;
+          
+          return AnimationConfiguration.staggeredList(
+            position: index,
+            duration: const Duration(milliseconds: 500),
+            child: SlideAnimation(
+              verticalOffset: 50.0,
+              child: FadeInAnimation(
+                child: Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: isCompleted 
+                        ? BorderSide(color: kPrimary.withOpacity(0.3), width: 2)
+                        : BorderSide.none,
+                  ),
+                  child: InkWell(
+                    onTap: () => _incrementCounter(index),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Column(
+                      children: [
+                        // رأس البطاقة
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                widget.category.color,
+                                widget.category.color.withOpacity(0.8),
+                              ],
+                              begin: Alignment.topRight,
+                              end: Alignment.bottomLeft,
+                            ),
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(20),
+                              topLeft: Radius.circular(20),
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              if (thikr.source != null)
+                                Expanded(
+                                  child: Text(
+                                    'المصدر: ${thikr.source}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: Text(
+                                      '$counter / ${thikr.count}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // محتوى الذكر
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            thikr.text,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              height: 1.8,
+                              color: isCompleted
+                                  ? kPrimary
+                                  : Colors.black87,
+                            ),
+                          ),
+                        ),
+                        
+                        // فضل الذكر (إذا كان موجودًا)
+                        if (thikr.fadl != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: widget.category.color.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: widget.category.color.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                thikr.fadl!,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontStyle: FontStyle.italic,
+                                  color: widget.category.color.withOpacity(0.8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        
+                        // شريط الأدوات
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  isFavorite
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: isFavorite
+                                      ? Colors.red
+                                      : Colors.grey,
+                                ),
+                                onPressed: () => _toggleFavorite(index),
+                                tooltip: 'إضافة للمفضلة',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.refresh,
+                                  color: Colors.blue,
+                                ),
+                                onPressed: () => _resetCounter(index),
+                                tooltip: 'إعادة ضبط العداد',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.copy,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () => _copyThikr(thikr),
+                                tooltip: 'نسخ الذكر',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.share,
+                                  color: Colors.orange,
+                                ),
+                                onPressed: () => _shareThikr(thikr),
+                                tooltip: 'مشاركة الذكر',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

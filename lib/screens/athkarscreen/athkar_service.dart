@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
@@ -58,11 +59,11 @@ class AthkarService {
   AthkarCategory _parseAthkarCategory(Map<String, dynamic> data) {
     // Parse icon string to IconData
     final iconString = data['icon'] as String;
-    final iconData = _getIconFromString(iconString);
+    final IconData iconData = _getIconFromString(iconString);
     
     // Parse color string to Color
     final colorString = data['color'] as String;
-    final color = _getColorFromHex(colorString);
+    final Color color = Color(_getColorFromHex(colorString));
     
     // Parse athkar list
     List<Thikr> athkarList = [];
@@ -88,8 +89,8 @@ class AthkarService {
     );
   }
   
-  // Convert hex color string to Color
-  dynamic _getColorFromHex(String hexColor) {
+  // Convert hex color string to int color value
+  int _getColorFromHex(String hexColor) {
     hexColor = hexColor.replaceAll('#', '');
     if (hexColor.length == 6) {
       hexColor = 'FF' + hexColor;
@@ -98,18 +99,27 @@ class AthkarService {
   }
   
   // Convert icon string to IconData
-  dynamic _getIconFromString(String iconString) {
-    // This is a simplified approach - in a real app, you might want a more robust mapping
+  IconData _getIconFromString(String iconString) {
+    // Map icon strings to IconData objects
     switch (iconString) {
-      case 'Icons.wb_sunny': return 0xe430; // Material icon code for wb_sunny
-      case 'Icons.nightlight_round': return 0xe3a9; // Material icon code for nightlight_round
-      case 'Icons.bedtime': return 0xe576; // Material icon code for bedtime
-      case 'Icons.alarm': return 0xe318; // Material icon code for alarm
-      case 'Icons.mosque': return 0xe37c; // Material icon code for mosque
-      case 'Icons.home': return 0xe318; // Material icon code for home
-      case 'Icons.restaurant': return 0xe56c; // Material icon code for restaurant
-      case 'Icons.menu_book': return 0xe368; // Material icon code for menu_book
-      default: return 0xe318; // Default icon code
+      case 'Icons.wb_sunny': 
+        return Icons.wb_sunny;
+      case 'Icons.nightlight_round': 
+        return Icons.nightlight_round;
+      case 'Icons.bedtime': 
+        return Icons.bedtime;
+      case 'Icons.alarm': 
+        return Icons.alarm;
+      case 'Icons.mosque': 
+        return Icons.mosque;
+      case 'Icons.home': 
+        return Icons.home;
+      case 'Icons.restaurant': 
+        return Icons.restaurant;
+      case 'Icons.menu_book': 
+        return Icons.menu_book;
+      default: 
+        return Icons.label_important;
     }
   }
   
