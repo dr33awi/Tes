@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
 import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -17,20 +19,41 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
+  // تهيئة نظام الإنذار للأندرويد
+  await AndroidAlarmManager.initialize();
+  
   // Initialize services
   try {
+    debugPrint('Initializing prayer services...');
+    
     // Initialize prayer notification service
     final notificationService = PrayerNotificationService();
-    await notificationService.initialize();
+    final notificationInitialized = await notificationService.initialize();
+    debugPrint('Notification service initialized: $notificationInitialized');
+    
+    // اختبار الإشعارات الفورية
+    if (notificationInitialized) {
+      await notificationService.testImmediateNotification();
+      // اختبار الإشعارات المجدولة بعد 30 ثانية
+      await notificationService.testScheduledNotification();
+    }
     
     // Initialize prayer times service
     final prayerTimesService = PrayerTimesService();
-    await prayerTimesService.initialize();
+    final prayerServiceInitialized = await prayerTimesService.initialize();
+    debugPrint('Prayer times service initialized: $prayerServiceInitialized');
     
     // Schedule notifications for today's prayers
-    await prayerTimesService.schedulePrayerNotifications();
+    if (notificationInitialized && prayerServiceInitialized) {
+      final scheduled = await prayerTimesService.schedulePrayerNotifications();
+      debugPrint('Prayer notifications scheduled: $scheduled');
+      
+      // التحقق من الإشعارات المجدولة
+      final pendingNotifications = await notificationService.getPendingNotifications();
+      debugPrint('Total pending notifications: ${pendingNotifications.length}');
+    }
     
-    debugPrint('Prayer services initialized successfully');
+    debugPrint('Prayer services initialization complete');
   } catch (e) {
     debugPrint('Error initializing services: $e');
     // Continue despite error
@@ -40,8 +63,56 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // عند استئناف التطبيق، تحقق مما إذا كان يجب تحديث الإشعارات
+      _checkAndUpdateNotifications();
+    }
+  }
+
+  Future<void> _checkAndUpdateNotifications() async {
+    try {
+      debugPrint('Checking if prayer notifications need to be updated...');
+      
+      final notificationService = PrayerNotificationService();
+      final shouldUpdate = await notificationService.shouldUpdateNotifications();
+      
+      if (shouldUpdate) {
+        debugPrint('Notifications need to be updated. Scheduling new notifications...');
+        
+        // جدولة الإشعارات لليوم الجديد
+        final prayerTimesService = PrayerTimesService();
+        final scheduled = await prayerTimesService.schedulePrayerNotifications();
+        
+        debugPrint('Prayer notifications updated: $scheduled scheduled');
+      } else {
+        debugPrint('Notifications already up-to-date');
+      }
+    } catch (e) {
+      debugPrint('Error checking/updating notifications: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

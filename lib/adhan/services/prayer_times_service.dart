@@ -757,22 +757,34 @@ class PrayerTimesService {
     return defaultPrayers;
   }
   
-  /// Schedule prayer notifications
+  /// Schedule prayer notifications - طريقة محسنة لجدولة إشعارات الصلاة
   Future<bool> schedulePrayerNotifications() async {
     try {
+      debugPrint('Starting to schedule prayer notifications');
+      
+      // التحقق مما إذا كان يجب تحديث الإشعارات
+      final shouldUpdate = await _notificationService.shouldUpdateNotifications();
+      if (!shouldUpdate) {
+        debugPrint('Notifications already up-to-date for today');
+        return true;
+      }
+      
       // Get prayer times
       List<PrayerTimeModel> prayerTimes;
       try {
         // Try to get updated times
         prayerTimes = await getPrayerTimesFromAPI(useDefaultLocationIfNeeded: true);
+        debugPrint('Got prayer times from API, count: ${prayerTimes.length}');
       } catch (e) {
         debugPrint('Error getting prayer times for notifications: $e');
         
         // Use cache if available
         if (_cachedPrayerTimes != null) {
+          debugPrint('Using cached prayer times as fallback');
           prayerTimes = _cachedPrayerTimes!;
         } else {
           // Use default times in case of error
+          debugPrint('Using default prayer times as fallback');
           prayerTimes = _createDefaultPrayerTimes();
         }
       }
@@ -780,26 +792,28 @@ class PrayerTimesService {
       // Prepare list of prayer times for scheduling notifications
       final List<Map<String, dynamic>> notificationTimes = [];
       
-      final now = DateTime.now();
-      
+      // أضف جميع أوقات الصلاة للجدولة
       for (final prayer in prayerTimes) {
-        // Ignore Sunrise since it's not a real prayer time
-        // and times that have already passed
-        if (prayer.name != 'الشروق' && prayer.time.isAfter(now)) {
-          notificationTimes.add({
-            'name': prayer.name,
-            'time': prayer.time,
-          });
-        }
+        notificationTimes.add({
+          'name': prayer.name,
+          'time': prayer.time,
+        });
       }
       
-      // Schedule notifications for all future prayer times today
+      debugPrint('Preparing to schedule notifications for ${notificationTimes.length} prayer times');
+      
+      // Schedule notifications for all prayer times
       if (notificationTimes.isNotEmpty) {
         final scheduledCount = await _notificationService.scheduleAllPrayerNotifications(notificationTimes);
-        debugPrint('Scheduled $scheduledCount prayer notifications');
+        debugPrint('Successfully scheduled $scheduledCount prayer notifications');
+        
+        // التحقق من الإشعارات المجدولة
+        final pendingNotifications = await _notificationService.getPendingNotifications();
+        debugPrint('Total pending notifications after scheduling: ${pendingNotifications.length}');
+        
         return scheduledCount > 0;
       } else {
-        debugPrint('No future prayer times today to schedule notifications for');
+        debugPrint('No prayer times to schedule notifications for');
         return false;
       }
     } catch (e) {

@@ -9,6 +9,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0+1"
+  android_alarm_manager_plus:
+    dependency: "direct main"
+    description:
+      name: android_alarm_manager_plus
+      sha256: "3aaf2bd35177e60a7e90accd9d615d35408b556339becec22cc1284babbba8b7"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.7"
   animated_flip_counter:
     dependency: "direct main"
     description:
@@ -198,6 +206,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_compass:
+    dependency: "direct main"
+    description:
+      name: flutter_compass
+      sha256: "1b4d7e6c95a675ec8482b5c9c9ccf1ebf0ced3dbec59dce28ad609da953de850"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.1"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -234,10 +250,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_localization
-      sha256: a65ae241b865f2780f2ef624a4cdd019ca894d0b7df0a0b77190746ef0b9c8fa
+      sha256: "987faf0a6c13a267202b28d3ed680647e234245ead1a1c1f95f87e86c6f12490"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.14"
+    version: "0.3.2"
   flutter_localizations:
     dependency: "direct main"
     description: flutter
@@ -899,7 +915,7 @@ packages:
     source: hosted
     version: "1.1.10+1"
   vector_math:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: vector_math
       sha256: "80b3257d1492ce4d091729e3a67a60407d227c27241d6927be0130c98e741803"

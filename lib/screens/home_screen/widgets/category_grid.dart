@@ -1,4 +1,4 @@
-// lib/screens/home_screen/widgets/category_grid.dart - تحديث بإضافة مواقيت الصلاة
+// Updated category_grid.dart file with Qibla compass feature
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/favorites_screen/favorites_screen.dart';
@@ -7,6 +7,7 @@ import '../../hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary; // للحصول على الألوان الأساسية
 import 'package:test_athkar_app/screens/athkarscreen/athkar_screen.dart';
 import 'package:test_athkar_app/adhan/screens/prayer_times_screen.dart';
+import 'package:test_athkar_app/qibla/qibla_compass_screen.dart';
 
 class CategoryGrid extends StatefulWidget {
   const CategoryGrid({Key? key}) : super(key: key);
@@ -56,7 +57,7 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
     super.dispose();
   }
 
-  // قائمة الفئات بإضافة مواقيت الصلاة
+  // Updated category list with Qibla compass
   final List<Category> _categories = const [
     Category(
       title: 'الأذكار',
@@ -72,14 +73,21 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       gradientColors: [Color(0xFFFF8F00), Color(0xFFFFB74D)],
       screen: TasbihScreen(),
     ),
-    // إضافة مواقيت الصلاة
-Category(
-  title: 'مواقيت الصلاة',
-  icon: Icons.access_time,
-  color: Color(0xFF388E3C),
-  gradientColors: [Color(0xFF388E3C), Color(0xFF4CAF50)],
-  screen: PrayerTimesScreen(),
-),
+    Category(
+      title: 'مواقيت الصلاة',
+      icon: Icons.access_time,
+      color: Color(0xFF388E3C),
+      gradientColors: [Color(0xFF388E3C), Color(0xFF4CAF50)],
+      screen: PrayerTimesScreen(),
+    ),
+    // Add the new Qibla compass category
+    Category(
+      title: 'بوصلة القبلة',
+      icon: Icons.explore,
+      color: Color(0xFF0288D1),
+      gradientColors: [Color(0xFF0288D1), Color(0xFF29B6F6)],
+      screen: QiblaCompassScreen(),
+    ),
     Category(
       title: 'القرآن',
       icon: Icons.menu_book_rounded,
