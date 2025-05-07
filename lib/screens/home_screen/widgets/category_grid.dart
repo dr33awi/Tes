@@ -7,7 +7,7 @@ import '../../hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary; // للحصول على الألوان الأساسية
 import 'package:test_athkar_app/screens/athkarscreen/athkar_screen.dart';
 import 'package:test_athkar_app/adhan/screens/prayer_times_screen.dart';
-import 'package:test_athkar_app/qibla/qibla_compass_screen.dart';
+
 
 class CategoryGrid extends StatefulWidget {
   const CategoryGrid({Key? key}) : super(key: key);
@@ -81,13 +81,6 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       screen: PrayerTimesScreen(),
     ),
     // Add the new Qibla compass category
-    Category(
-      title: 'بوصلة القبلة',
-      icon: Icons.explore,
-      color: Color(0xFF0288D1),
-      gradientColors: [Color(0xFF0288D1), Color(0xFF29B6F6)],
-      screen: QiblaCompassScreen(),
-    ),
     Category(
       title: 'القرآن',
       icon: Icons.menu_book_rounded,
