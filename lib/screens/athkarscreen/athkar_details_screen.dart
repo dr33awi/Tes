@@ -46,6 +46,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   bool _isSharePressed = false;
   bool _isFavoritePressed = false;
   bool _isReadAgainPressed = false; // إضافة متغير لزر القراءة مرة أخرى
+  bool _isFadlPressed = false; // إضافة متغير لزر فضل الذكر
   
   @override
   void initState() {
@@ -90,8 +91,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
           });
         }
         
-        // تحميل حالة المفضلة والعدادات
-        _loadThikrState();
+        // تصفير جميع التكرارات وتحميل حالة المفضلة
+        _resetAllCounters();
       } else {
         if (mounted) {
           setState(() {
@@ -111,24 +112,25 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     }
   }
   
-  // تحميل حالة كل ذكر (المفضلة والعدادات)
-  Future<void> _loadThikrState() async {
+  // تصفير جميع التكرارات وتحميل حالة المفضلة
+  Future<void> _resetAllCounters() async {
     for (int i = 0; i < _loadedCategory.athkar.length; i++) {
+      // تصفير العدادات
+      await _athkarService.updateThikrCount(_loadedCategory.id, i, 0);
+      
+      // تحميل حالة المفضلة
       final isFav = await _athkarService.isFavorite(_loadedCategory.id, i);
-      final count = await _athkarService.getThikrCount(_loadedCategory.id, i);
       
       if (mounted) {
         setState(() {
+          _counters[i] = 0; // تصفير العدادات في واجهة المستخدم
           _favorites[i] = isFav;
-          _counters[i] = count;
-          _hiddenThikrs[i] = false; // تهيئة كل الأذكار لتكون ظاهرة عند الدخول
+          _hiddenThikrs[i] = false; // جعل جميع الأذكار ظاهرة
         });
       }
     }
     
-    // نقوم بتحديث حالة الأذكار المخفية بناءً على القيم المخزنة، ولكن نضمن ظهورها عند الدخول مرة أخرى
     setState(() {
-      // نضمن أن جميع الأذكار ظاهرة عند بداية التشغيل
       _showCompletionMessage = false;
     });
   }
@@ -237,30 +239,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     });
   }
   
-  // البحث عن الذكر التالي غير المخفي
-  int? _findNextVisibleThikr(int currentIndex) {
-    for (int i = currentIndex + 1; i < _loadedCategory.athkar.length; i++) {
-      if (!(_hiddenThikrs[i] ?? false)) {
-        return i;
-      }
-    }
-    
-    // إذا لم يتم العثور على ذكر ظاهر، ابحث من البداية
-    for (int i = 0; i < currentIndex; i++) {
-      if (!(_hiddenThikrs[i] ?? false)) {
-        return i;
-      }
-    }
-    
-    return null; // لم يتم العثور على أي ذكر ظاهر
-  }
-  
   // التحقق من إكمال جميع الأذكار
   void _checkAllAthkarCompleted() {
-    // فقط الأذكار التي تم إكمالها في هذه الجلسة (المخفية) هي التي نتحقق منها
+    // التحقق إذا كانت جميع الأذكار مخفية بالفعل (تم إكمالها في هذه الجلسة)
     bool allHidden = true;
     
-    // التحقق إذا كانت كل الأذكار مخفية بالفعل (تم إكمالها في هذه الجلسة)
     for (int i = 0; i < _loadedCategory.athkar.length; i++) {
       if (!(_hiddenThikrs[i] ?? false)) {
         allHidden = false;
@@ -273,29 +256,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
       setState(() {
         _showCompletionMessage = true;
       });
-    }
-  }
-  
-  // التمرير إلى الذكر التالي
-  void _scrollToNextThikr(int? nextIndex) {
-    if (nextIndex != null) {
-      // حساب المسافة التقريبية للذكر التالي
-      double scrollPosition = nextIndex * 400.0; // قيمة تقريبية، قد تحتاج للتعديل
-      
-      // التأكد من أن المسافة ضمن حدود المحتوى
-      if (_scrollController.hasClients) {
-        scrollPosition = scrollPosition.clamp(
-          0.0, 
-          _scrollController.position.maxScrollExtent
-        );
-        
-        // التمرير بانيميشن
-        _scrollController.animateTo(
-          scrollPosition,
-          duration: Duration(milliseconds: 800),
-          curve: Curves.easeInOut,
-        );
-      }
     }
   }
   
@@ -329,23 +289,31 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         // اهتزاز خفيف (للإشعار)
         HapticFeedback.mediumImpact();
         
-        // البحث عن الذكر التالي غير المخفي
-        final nextThikrIndex = _findNextVisibleThikr(index);
-        
-        // إخفاء الذكر الحالي
+        // إخفاء الذكر بعد إكماله
         setState(() {
           _hiddenThikrs[index] = true;
         });
         
-        // التمرير إلى الذكر التالي (إن وجد)
-        if (nextThikrIndex != null) {
-          Future.delayed(Duration(milliseconds: 300), () {
-            _scrollToNextThikr(nextThikrIndex);
-          });
-        } else {
-          // التحقق إذا كانت جميع الأذكار مكتملة (مخفية)
-          _checkAllAthkarCompleted();
-        }
+        // عرض رسالة للمستخدم
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 10),
+                Text('تم إكمال هذا الذكر'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: _getCategoryColor(),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // التحقق إذا كانت جميع الأذكار مكتملة
+        _checkAllAthkarCompleted();
       }
     }
     
@@ -361,7 +329,15 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   }
   
   // عرض فضل الذكر في حوار
-  void _showFadlDialog(Thikr thikr) {
+  void _showFadlDialog(Thikr thikr, int index) {
+    setState(() {
+      _isFadlPressed = true;
+      _pressedIndex = index;
+    });
+    
+    // تأثير اهتزاز خفيف
+    HapticFeedback.lightImpact();
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -415,6 +391,15 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         ],
       ),
     );
+    
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          _isFadlPressed = false;
+          _pressedIndex = null;
+        });
+      }
+    });
   }
   
   // مشاركة الذكر
@@ -804,143 +789,65 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     
     return Scaffold(
       backgroundColor: kSurface,
+      // إضافة أبار جديد لعرض العنوان والأزرار
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          _loadedCategory.title,
+          style: TextStyle(
+            color: kPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: kPrimary,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          // زر إعادة تعيين الأذكار
+          IconButton(
+            icon: Icon(
+              Icons.refresh_rounded,
+              color: kPrimary,
+            ),
+            tooltip: 'إعادة تهيئة جميع الأذكار',
+            onPressed: _resetAllAthkar,
+          ),
+        ],
+      ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
-          child: Stack(
-            children: [
-              // المحتوى الرئيسي
-              _showCompletionMessage
-                  ? Center(child: _buildCompletionMessage())
-                  : SingleChildScrollView(
-                      controller: _scrollController,
-                      physics: const ClampingScrollPhysics(),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // مساحة لزر العودة
-                            const SizedBox(height: 60),
+          child: _showCompletionMessage
+              ? Center(child: _buildCompletionMessage())
+              : SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const ClampingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // مساحة في الأعلى
+                        const SizedBox(height: 16),
+                        
+                        // قائمة الأذكار المحسنة
+                        _loadedCategory.athkar.isEmpty
+                            ? _buildEmptyState()
+                            : _buildAthkarList(),
                             
-                            // عنوان الفئة (في المنتصف)
-                            AnimationConfiguration.synchronized(
-                              duration: const Duration(milliseconds: 300),
-                              child: FadeInAnimation(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: Center(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(30),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 20,
-                                        vertical: 8,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _loadedCategory.icon,
-                                            color: Colors.white,
-                                            size: 18,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            _loadedCategory.title,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            
-                            // قائمة الأذكار المحسنة
-                            _loadedCategory.athkar.isEmpty
-                                ? _buildEmptyState()
-                                : _buildAthkarList(),
-                                
-                            // مساحة إضافية في النهاية
-                            const SizedBox(height: 30),
-                          ],
-                        ),
-                      ),
-                    ),
-              
-              // زر الرجوع
-              Positioned(
-                top: 16,
-                right: 16,
-                child: AnimationConfiguration.synchronized(
-                  duration: const Duration(milliseconds: 300),
-                  child: FadeInAnimation(
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        onTap: () => Navigator.of(context).pop(),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(10.0),
-                          child: Icon(
-                            Icons.arrow_back,
-                            color: _getCategoryColor(),
-                            size: 24,
-                          ),
-                        ),
-                      ),
+                        // مساحة إضافية في النهاية
+                        const SizedBox(height: 30),
+                      ],
                     ),
                   ),
                 ),
-              ),
-              
-              // زر إعادة تعيين الأذكار في الزاوية اليسرى العليا (اختياري)
-              Positioned(
-                top: 16,
-                left: 16,
-                child: AnimationConfiguration.synchronized(
-                  duration: const Duration(milliseconds: 300),
-                  child: FadeInAnimation(
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Tooltip(
-                        message: 'إعادة تعيين جميع الأذكار',
-                        child: InkWell(
-                          onTap: () => _resetAllAthkar(),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(10.0),
-                            child: Icon(
-                              Icons.refresh_rounded,
-                              color: _getCategoryColor(),
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -1262,7 +1169,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                             onPressed: () => _copyThikr(thikr, index),
                             isPressed: _isCopyPressed && _pressedIndex == index,
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           
                           // زر المشاركة
                           _buildActionButton(
@@ -1271,36 +1178,21 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                             onPressed: () => _shareThikr(thikr, index),
                             isPressed: _isSharePressed && _pressedIndex == index,
                           ),
+                          
+                          // زر فضل الذكر (إضافة فاصل صغير إذا كان موجودًا)
+                          if (thikr.fadl != null)
+                            const SizedBox(width: 12),
+                          
+                          // زر فضل الذكر (إظهاره لجميع الأذكار التي لديها فضل)
+                          if (thikr.fadl != null)
+                            _buildActionButton(
+                              icon: Icons.info_outline,
+                              label: 'فضل الذكر',
+                              onPressed: () => _showFadlDialog(thikr, index),
+                              isPressed: _isFadlPressed && _pressedIndex == index,
+                            ),
                         ],
                       ),
-                      
-                      // زر عرض فضل الذكر
-                      if (thikr.fadl != null && isCompleted)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: TextButton.icon(
-                            onPressed: () => _showFadlDialog(thikr),
-                            icon: Icon(
-                              Icons.info_outline,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            label: Text(
-                              'عرض فضل الذكر',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.1),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
