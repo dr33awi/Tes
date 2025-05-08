@@ -45,6 +45,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   bool _isCopyPressed = false;
   bool _isSharePressed = false;
   bool _isFavoritePressed = false;
+  bool _isReadAgainPressed = false; // إضافة متغير لزر القراءة مرة أخرى
   
   @override
   void initState() {
@@ -120,13 +121,75 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         setState(() {
           _favorites[i] = isFav;
           _counters[i] = count;
-          _hiddenThikrs[i] = false; // تهيئة كل الأذكار لتكون ظاهرة
+          _hiddenThikrs[i] = false; // تهيئة كل الأذكار لتكون ظاهرة عند الدخول
         });
       }
     }
     
-    // نقوم بإعادة تعيين قيمة الأذكار المخفية بناءً على حالة العداد
-    // لكن لا نعرض رسالة الإتمام عند تحميل الصفحة
+    // نقوم بتحديث حالة الأذكار المخفية بناءً على القيم المخزنة، ولكن نضمن ظهورها عند الدخول مرة أخرى
+    setState(() {
+      // نضمن أن جميع الأذكار ظاهرة عند بداية التشغيل
+      _showCompletionMessage = false;
+    });
+  }
+  
+  // إعادة تعيين جميع الأذكار (تصفير العدادات وإظهار جميع الأذكار)
+  Future<void> _resetAllAthkar() async {
+    setState(() {
+      _isReadAgainPressed = true; // تفعيل حالة الضغط
+    });
+    
+    // تأثير اهتزاز خفيف
+    HapticFeedback.mediumImpact();
+    
+    // إعادة ضبط العدادات وإظهار جميع الأذكار
+    for (int i = 0; i < _loadedCategory.athkar.length; i++) {
+      await _athkarService.updateThikrCount(_loadedCategory.id, i, 0);
+      
+      setState(() {
+        _counters[i] = 0;
+        _hiddenThikrs[i] = false;
+      });
+    }
+    
+    // إخفاء رسالة الإتمام والعودة إلى قائمة الأذكار
+    setState(() {
+      _showCompletionMessage = false;
+    });
+    
+    // إعادة التمرير إلى الأعلى بشكل سلس
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0.0,
+        duration: Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+    
+    // إظهار رسالة للمستخدم
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.refresh, color: Colors.white),
+            SizedBox(width: 10),
+            Text('تمت إعادة تهيئة جميع الأذكار'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _getCategoryColor(),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: EdgeInsets.all(16),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    
+    // إعادة تعيين حالة الضغط بعد فترة وجيزة
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        setState(() => _isReadAgainPressed = false);
+      }
+    });
   }
   
   // تبديل حالة المفضلة
@@ -194,7 +257,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   
   // التحقق من إكمال جميع الأذكار
   void _checkAllAthkarCompleted() {
-    // لا نعتبر العدادات المخزنة مسبقاً كإكمال للأذكار
     // فقط الأذكار التي تم إكمالها في هذه الجلسة (المخفية) هي التي نتحقق منها
     bool allHidden = true;
     
@@ -217,7 +279,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   // التمرير إلى الذكر التالي
   void _scrollToNextThikr(int? nextIndex) {
     if (nextIndex != null) {
-      // حساب المسافة التقريبية للذكر التالي (تقديري)
+      // حساب المسافة التقريبية للذكر التالي
       double scrollPosition = nextIndex * 400.0; // قيمة تقريبية، قد تحتاج للتعديل
       
       // التأكد من أن المسافة ضمن حدود المحتوى
@@ -428,7 +490,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     });
   }
   
-  // رسالة إتمام الأذكار
+  // رسالة إتمام الأذكار مع زر "قراءتها مرة أخرى"
   Widget _buildCompletionMessage() {
     return AnimationConfiguration.synchronized(
       duration: const Duration(milliseconds: 800),
@@ -502,6 +564,38 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                   ),
                 ),
                 SizedBox(height: 24),
+                
+                // زر قراءة الأذكار مرة أخرى
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  transform: Matrix4.identity()..scale(_isReadAgainPressed ? 0.95 : 1.0),
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.replay_rounded),
+                    label: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Text(
+                        'قراءتها مرة أخرى',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.3),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: _resetAllAthkar,
+                  ),
+                ),
+                
+                SizedBox(height: 16),
+                
+                // زر العودة إلى أقسام الأذكار
                 ElevatedButton.icon(
                   icon: Icon(Icons.home_rounded),
                   label: Padding(
@@ -808,6 +902,36 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                             Icons.arrow_back,
                             color: _getCategoryColor(),
                             size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              
+              // زر إعادة تعيين الأذكار في الزاوية اليسرى العليا (اختياري)
+              Positioned(
+                top: 16,
+                left: 16,
+                child: AnimationConfiguration.synchronized(
+                  duration: const Duration(milliseconds: 300),
+                  child: FadeInAnimation(
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Tooltip(
+                        message: 'إعادة تعيين جميع الأذكار',
+                        child: InkWell(
+                          onTap: () => _resetAllAthkar(),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(10.0),
+                            child: Icon(
+                              Icons.refresh_rounded,
+                              color: _getCategoryColor(),
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
