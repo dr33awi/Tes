@@ -28,8 +28,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   // حالة المفضلة وعدادات الأذكار
   final Map<int, bool> _favorites = {};
   final Map<int, int> _counters = {};
+  final Map<int, bool> _hiddenThikrs = {}; // لتتبع الأذكار المخفية مؤقتًا
   bool _isLoading = true;
+  bool _showCompletionMessage = false; // لإظهار رسالة الإتمام
   late AthkarCategory _loadedCategory;
+  ScrollController _scrollController = ScrollController();
   
   // متغيرات للتأثيرات البصرية
   late AnimationController _animationController;
@@ -68,6 +71,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
   
@@ -116,9 +120,13 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         setState(() {
           _favorites[i] = isFav;
           _counters[i] = count;
+          _hiddenThikrs[i] = false; // تهيئة كل الأذكار لتكون ظاهرة
         });
       }
     }
+    
+    // نقوم بإعادة تعيين قيمة الأذكار المخفية بناءً على حالة العداد
+    // لكن لا نعرض رسالة الإتمام عند تحميل الصفحة
   }
   
   // تبديل حالة المفضلة
@@ -166,6 +174,69 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     });
   }
   
+  // البحث عن الذكر التالي غير المخفي
+  int? _findNextVisibleThikr(int currentIndex) {
+    for (int i = currentIndex + 1; i < _loadedCategory.athkar.length; i++) {
+      if (!(_hiddenThikrs[i] ?? false)) {
+        return i;
+      }
+    }
+    
+    // إذا لم يتم العثور على ذكر ظاهر، ابحث من البداية
+    for (int i = 0; i < currentIndex; i++) {
+      if (!(_hiddenThikrs[i] ?? false)) {
+        return i;
+      }
+    }
+    
+    return null; // لم يتم العثور على أي ذكر ظاهر
+  }
+  
+  // التحقق من إكمال جميع الأذكار
+  void _checkAllAthkarCompleted() {
+    // لا نعتبر العدادات المخزنة مسبقاً كإكمال للأذكار
+    // فقط الأذكار التي تم إكمالها في هذه الجلسة (المخفية) هي التي نتحقق منها
+    bool allHidden = true;
+    
+    // التحقق إذا كانت كل الأذكار مخفية بالفعل (تم إكمالها في هذه الجلسة)
+    for (int i = 0; i < _loadedCategory.athkar.length; i++) {
+      if (!(_hiddenThikrs[i] ?? false)) {
+        allHidden = false;
+        break;
+      }
+    }
+    
+    // إذا لم يكن هناك أي ذكر ظاهر، عرض رسالة الإكمال
+    if (allHidden && _loadedCategory.athkar.isNotEmpty && !_showCompletionMessage) {
+      setState(() {
+        _showCompletionMessage = true;
+      });
+    }
+  }
+  
+  // التمرير إلى الذكر التالي
+  void _scrollToNextThikr(int? nextIndex) {
+    if (nextIndex != null) {
+      // حساب المسافة التقريبية للذكر التالي (تقديري)
+      double scrollPosition = nextIndex * 400.0; // قيمة تقريبية، قد تحتاج للتعديل
+      
+      // التأكد من أن المسافة ضمن حدود المحتوى
+      if (_scrollController.hasClients) {
+        scrollPosition = scrollPosition.clamp(
+          0.0, 
+          _scrollController.position.maxScrollExtent
+        );
+        
+        // التمرير بانيميشن
+        _scrollController.animateTo(
+          scrollPosition,
+          duration: Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
+  }
+  
   // زيادة عداد الذكر
   Future<void> _incrementCounter(int index) async {
     // تفعيل تأثير الضغط
@@ -190,6 +261,30 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         _counters[index] = currentCount;
       });
       await _athkarService.updateThikrCount(_loadedCategory.id, index, currentCount);
+      
+      // إذا اكتمل العدد المطلوب
+      if (currentCount >= thikr.count) {
+        // اهتزاز خفيف (للإشعار)
+        HapticFeedback.mediumImpact();
+        
+        // البحث عن الذكر التالي غير المخفي
+        final nextThikrIndex = _findNextVisibleThikr(index);
+        
+        // إخفاء الذكر الحالي
+        setState(() {
+          _hiddenThikrs[index] = true;
+        });
+        
+        // التمرير إلى الذكر التالي (إن وجد)
+        if (nextThikrIndex != null) {
+          Future.delayed(Duration(milliseconds: 300), () {
+            _scrollToNextThikr(nextThikrIndex);
+          });
+        } else {
+          // التحقق إذا كانت جميع الأذكار مكتملة (مخفية)
+          _checkAllAthkarCompleted();
+        }
+      }
     }
     
     // إعادة تعيين حالة الضغط بعد فترة وجيزة
@@ -201,39 +296,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         });
       }
     });
-    
-    // إذا اكتمل العدد المطلوب
-    if (currentCount >= thikr.count) {
-      // إظهار رسالة التهنئة
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.done_all, color: Colors.white),
-              SizedBox(width: 10),
-              Text('أحسنت! اكتمل عدد مرات الذكر'),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _getCategoryColor(),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-          action: SnackBarAction(
-            label: 'عرض الفضل',
-            textColor: Colors.white,
-            onPressed: () {
-              if (thikr.fadl != null) {
-                _showFadlDialog(thikr);
-              }
-            },
-          ),
-        ),
-      );
-      
-      // اهتزاز خفيف (للإشعار)
-      HapticFeedback.mediumImpact();
-    }
   }
   
   // عرض فضل الذكر في حوار
@@ -289,35 +351,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-  
-  // إعادة تعيين العداد
-  Future<void> _resetCounter(int index) async {
-    setState(() {
-      _counters[index] = 0;
-    });
-    await _athkarService.updateThikrCount(_loadedCategory.id, index, 0);
-    
-    // تأثير اهتزاز خفيف
-    HapticFeedback.lightImpact();
-    
-    // إظهار رسالة للمستخدم
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.refresh, color: Colors.white),
-            SizedBox(width: 10),
-            Text('تم إعادة ضبط العداد'),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _getCategoryColor(),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.all(16),
-        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -393,6 +426,110 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         });
       }
     });
+  }
+  
+  // رسالة إتمام الأذكار
+  Widget _buildCompletionMessage() {
+    return AnimationConfiguration.synchronized(
+      duration: const Duration(milliseconds: 800),
+      child: SlideAnimation(
+        verticalOffset: 50.0,
+        child: FadeInAnimation(
+          child: Container(
+            margin: EdgeInsets.all(24),
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  _getCategoryColor(),
+                  _getCategoryColor().withOpacity(0.7),
+                ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: _getCategoryColor().withOpacity(0.4),
+                  blurRadius: 16,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 50,
+                  ),
+                ),
+                SizedBox(height: 24),
+                Text(
+                  'أحسنت!',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'لقد أتممت جميع الأذكار بحمد الله',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white,
+                    height: 1.5,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'تقبل الله منك، وجزاك الله خيراً',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white,
+                    height: 1.5,
+                  ),
+                ),
+                SizedBox(height: 24),
+                ElevatedButton.icon(
+                  icon: Icon(Icons.home_rounded),
+                  label: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Text(
+                      'العودة إلى أقسام الأذكار',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _getCategoryColor(),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
   
   // الحصول على لون الفئة حسب نوعها
@@ -579,138 +716,78 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
           child: Stack(
             children: [
               // المحتوى الرئيسي
-              SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // مساحة لزر العودة
-                      const SizedBox(height: 60),
-                      
-                      // عنوان الفئة (في المنتصف)
-                      AnimationConfiguration.synchronized(
-                        duration: const Duration(milliseconds: 300),
-                        child: FadeInAnimation(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Center(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(30),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      _loadedCategory.icon,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _loadedCategory.title,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+              _showCompletionMessage
+                  ? Center(child: _buildCompletionMessage())
+                  : SingleChildScrollView(
+                      controller: _scrollController,
+                      physics: const ClampingScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // مساحة لزر العودة
+                            const SizedBox(height: 60),
+                            
+                            // عنوان الفئة (في المنتصف)
+                            AnimationConfiguration.synchronized(
+                              duration: const Duration(milliseconds: 300),
+                              child: FadeInAnimation(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: Center(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(30),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                        vertical: 8,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _loadedCategory.icon,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _loadedCategory.title,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                            
+                            // قائمة الأذكار المحسنة
+                            _loadedCategory.athkar.isEmpty
+                                ? _buildEmptyState()
+                                : _buildAthkarList(),
+                                
+                            // مساحة إضافية في النهاية
+                            const SizedBox(height: 30),
+                          ],
                         ),
                       ),
-                      
-                      // وصف الفئة (إذا كان موجودًا)
-                      if (_loadedCategory.description != null)
-                        AnimationConfiguration.synchronized(
-                          duration: const Duration(milliseconds: 350),
-                          child: SlideAnimation(
-                            verticalOffset: 20.0,
-                            child: FadeInAnimation(
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: _getCategoryColor().withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _getCategoryColor().withOpacity(0.3),
-                                        blurRadius: 6,
-                                        offset: Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        Icons.info_outline,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'عن ${_loadedCategory.title}',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            SizedBox(height: 4),
-                                            Text(
-                                              _loadedCategory.description!,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      
-                      // قائمة الأذكار المحسنة
-                      _loadedCategory.athkar.isEmpty
-                          ? _buildEmptyState()
-                          : _buildAthkarList(),
-                          
-                      // مساحة إضافية في النهاية
-                      const SizedBox(height: 30),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
               
               // زر الرجوع
               Positioned(
@@ -799,6 +876,12 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
           final isFavorite = _favorites[index] ?? false;
           final counter = _counters[index] ?? 0;
           final isCompleted = counter >= thikr.count;
+          final isHidden = _hiddenThikrs[index] ?? false;
+          
+          // تخطي العناصر المخفية
+          if (isHidden) {
+            return SizedBox.shrink();
+          }
           
           return AnimationConfiguration.staggeredList(
             position: index,
@@ -883,7 +966,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // عنوان الذكر
+                          // عدد التكرار
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.2),
@@ -903,7 +986,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'ذكر ${index + 1}',
+                                  'عدد التكرار ${counter}/${thikr.count}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -1012,53 +1095,35 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                       
                       const SizedBox(height: 12),
                       
-                      // المصدر وعداد التكرار
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
+                      // المصدر فقط (بدون عداد التكرار)
+                      if (thikr.source != null)
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.15),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              thikr.source!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (thikr.source != null)
-                                Text(
-                                  thikr.source!,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              if (thikr.source != null)
-                                Text(
-                                  ' | ',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              Text(
-                                '$counter/${thikr.count}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
                       
                       const SizedBox(height: 16),
                       
@@ -1081,15 +1146,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                             label: 'مشاركة',
                             onPressed: () => _shareThikr(thikr, index),
                             isPressed: _isSharePressed && _pressedIndex == index,
-                          ),
-                          const SizedBox(width: 16),
-                          
-                          // زر المفضلة
-                          _buildActionButton(
-                            icon: isFavorite ? Icons.favorite : Icons.favorite_border,
-                            label: isFavorite ? 'إزالة' : 'المفضلة',
-                            onPressed: () => _toggleFavorite(index),
-                            isPressed: _isFavoritePressed && _pressedIndex == index,
                           ),
                         ],
                       ),
