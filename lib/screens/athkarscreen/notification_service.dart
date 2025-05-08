@@ -5,7 +5,7 @@ import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 
 class NotificationService {

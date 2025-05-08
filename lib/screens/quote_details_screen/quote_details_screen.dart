@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:test_athkar_app/models/daily_quote_model.dart';
-import 'package:test_athkar_app/screens/favorites_screen/favorites_screen.dart';
+
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary,kSurface;
 import 'package:shared_preferences/shared_preferences.dart';
