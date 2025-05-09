@@ -6,7 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
-import 'package:test_athkar_app/screens/athkarscreen/athkar_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class AthkarDetailsScreen extends StatefulWidget {

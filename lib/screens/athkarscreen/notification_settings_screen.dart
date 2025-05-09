@@ -1,13 +1,14 @@
-// lib/screens/settings/notification_settings_screen.dart
+// lib/screens/athkarscreen/notification_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
-import 'package:test_athkar_app/screens/athkarscreen/athkar_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
-    show kPrimary,kSurface;
-import 'package:test_athkar_app/screens/athkarscreen/notification_service.dart';
+    show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -22,6 +23,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   List<AthkarCategory> _categories = [];
   bool _isLoading = true;
   bool _masterSwitch = true;
+  String _currentTimeZone = 'Unknown';
   
   Map<String, bool> _notificationsEnabled = {};
   Map<String, TimeOfDay?> _notificationTimes = {};
@@ -42,12 +44,25 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
     
     _loadData();
+    _loadTimeZone();
   }
   
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  // تحميل المنطقة الزمنية
+  Future<void> _loadTimeZone() async {
+    try {
+      final String timeZone = await FlutterNativeTimezone.getLocalTimezone();
+      setState(() {
+        _currentTimeZone = timeZone;
+      });
+    } catch (e) {
+      print('خطأ في تحميل المنطقة الزمنية: $e');
+    }
   }
 
   // تحميل البيانات
@@ -157,27 +172,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         // إذا لم يتوفر وقت افتراضي، اعرض منتقي الوقت
         if (selectedTime == null) {
           // اقتراح وقت بناءً على نوع الفئة
-          TimeOfDay suggestedTime;
-          
-          switch (category.id) {
-            case 'morning':
-              suggestedTime = TimeOfDay(hour: 6, minute: 0); // 6:00 صباحاً
-              break;
-            case 'evening':
-              suggestedTime = TimeOfDay(hour: 16, minute: 0); // 4:00 مساءً
-              break;
-            case 'sleep':
-              suggestedTime = TimeOfDay(hour: 22, minute: 0); // 10:00 مساءً
-              break;
-            case 'wake':
-              suggestedTime = TimeOfDay(hour: 5, minute: 30); // 5:30 صباحاً
-              break;
-            case 'prayer':
-              suggestedTime = TimeOfDay(hour: 13, minute: 0); // 1:00 ظهراً
-              break;
-            default:
-              suggestedTime = TimeOfDay.now();
-          }
+          TimeOfDay suggestedTime = NotificationService.getSuggestedTimeForCategory(category.id);
           
           // عرض منتقي الوقت
           final pickedTime = await showTimePicker(
@@ -258,7 +253,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     
     // الحصول على الوقت الحالي
     TimeOfDay initialTime = _notificationTimes[category.id] ?? 
-                           TimeOfDay.fromDateTime(DateTime.now());
+                           NotificationService.getSuggestedTimeForCategory(category.id);
     
     // عرض منتقي الوقت
     final pickedTime = await showTimePicker(
@@ -306,555 +301,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         ),
       );
     }
-  }
-  
-  // عرض إعدادات إضافية للإشعارات
-  void _showAdditionalSettings(AthkarCategory category) {
-    // تحقق مما إذا كانت الإشعارات مفعلة
-    final isEnabled = _notificationsEnabled[category.id] ?? false;
-    if (!isEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('قم بتفعيل الإشعارات أولاً'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.orange,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  spreadRadius: 1,
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.8,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // مقبض السحب
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(top: 10, bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                
-                // العنوان
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        category.color,
-                        Color.lerp(category.color, Colors.white, 0.3)!,
-                      ],
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
-                      stops: const [0.3, 1.0],
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: category.color.withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(category.icon, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'إعدادات إشعارات ${category.title}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 12),
-                
-                // محتوى الإعدادات
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // الوقت الرئيسي
-                        Card(
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'وقت الإشعار الرئيسي',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: kPrimary,
-                                  ),
-                                ),
-                                SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Icon(Icons.access_time, color: category.color),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      _formatTimeOfDay(_notificationTimes[category.id]!),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Spacer(),
-                                    ElevatedButton(
-                                      onPressed: () async {
-                                        final pickedTime = await showTimePicker(
-                                          context: context,
-                                          initialTime: _notificationTimes[category.id]!,
-                                          builder: (context, child) {
-                                            return Theme(
-                                              data: Theme.of(context).copyWith(
-                                                colorScheme: ColorScheme.light(
-                                                  primary: category.color,
-                                                  onPrimary: Colors.white,
-                                                  onSurface: Colors.black,
-                                                ),
-                                                textButtonTheme: TextButtonThemeData(
-                                                  style: TextButton.styleFrom(
-                                                    foregroundColor: category.color,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: child!,
-                                            );
-                                          },
-                                        );
-                                        
-                                        if (pickedTime != null) {
-                                          setModalState(() {
-                                            _notificationTimes[category.id] = pickedTime;
-                                          });
-                                          
-                                          setState(() {
-                                            _notificationTimes[category.id] = pickedTime;
-                                          });
-                                          
-                                          // جدولة الإشعار بالوقت الجديد
-                                          await _notificationService.scheduleAthkarNotification(category, pickedTime);
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: category.color,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                      ),
-                                      child: Text('تغيير'),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        SizedBox(height: 16),
-                        
-                        // إعدادات الصوت
-                        Card(
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'إعدادات الصوت',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: kPrimary,
-                                  ),
-                                ),
-                                SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Icon(Icons.volume_up, color: category.color),
-                                    SizedBox(width: 8),
-                                    Expanded(
-                                      child: DropdownButton<String>(
-                                        isExpanded: true,
-                                        value: category.notifySound ?? 'default',
-                                        items: _athkarService.availableNotificationSounds.entries.map((entry) {
-                                          return DropdownMenuItem<String>(
-                                            value: entry.key,
-                                            child: Text(entry.value),
-                                          );
-                                        }).toList(),
-                                        onChanged: (value) async {
-                                          if (value != null) {
-                                            // تحديث صوت الإشعار وإعادة جدولة الإشعارات
-                                            final updatedCategory = category.copyWith(
-                                              notifySound: value,
-                                            );
-                                            
-                                            // إعادة جدولة الإشعار بالصوت الجديد
-                                            await _notificationService.scheduleAthkarNotification(
-                                              updatedCategory, 
-                                              _notificationTimes[category.id]!
-                                            );
-                                            
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('تم تغيير صوت الإشعار'),
-                                                behavior: SnackBarBehavior.floating,
-                                                backgroundColor: category.color,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                margin: EdgeInsets.all(16),
-                                                duration: Duration(seconds: 2),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        SizedBox(height: 16),
-                        
-                        // الإشعارات المتعددة
-                        Card(
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'إشعارات إضافية',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: kPrimary,
-                                  ),
-                                ),
-                                SizedBox(height: 12),
-                                SwitchListTile(
-                                  title: Text('تفعيل إشعارات متعددة'),
-                                  subtitle: Text('إمكانية تعيين أوقات إضافية للتذكير'),
-                                  value: category.hasMultipleReminders,
-                                  activeColor: category.color,
-                                  onChanged: (value) async {
-                                    // تحديث حالة الإشعارات المتعددة
-                                    final updatedCategory = category.copyWith(
-                                      hasMultipleReminders: value,
-                                    );
-                                    
-                                    // تحديث في قاعدة البيانات
-                                    // (هذا يتطلب إضافة وظيفة جديدة في AthkarService لتحديث الفئة)
-                                    
-                                    setModalState(() {
-                                      // يمكن هنا تحديث القائمة المحلية للفئات
-                                    });
-                                    
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(value ? 'تم تفعيل الإشعارات المتعددة' : 'تم إيقاف الإشعارات المتعددة'),
-                                        behavior: SnackBarBehavior.floating,
-                                        backgroundColor: category.color,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        margin: EdgeInsets.all(16),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                
-                                if (category.hasMultipleReminders) ...[
-                                  Divider(),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'الأوقات الإضافية',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  
-                                  // عرض الأوقات الإضافية
-                                  if (category.additionalNotifyTimes != null && 
-                                      category.additionalNotifyTimes!.isNotEmpty) ...[
-                                    ...category.additionalNotifyTimes!.map((timeString) {
-                                      final timeParts = timeString.split(':');
-                                      if (timeParts.length == 2) {
-                                        final hour = int.tryParse(timeParts[0]);
-                                        final minute = int.tryParse(timeParts[1]);
-                                        
-                                        if (hour != null && minute != null) {
-                                          final time = TimeOfDay(hour: hour, minute: minute);
-                                          return ListTile(
-                                            leading: Icon(Icons.access_time, color: category.color),
-                                            title: Text(_formatTimeOfDay(time)),
-                                            trailing: IconButton(
-                                              icon: Icon(Icons.delete, color: Colors.red),
-                                              onPressed: () async {
-                                                // حذف الوقت الإضافي
-                                                await _athkarService.removeAdditionalNotificationTime(category.id, timeString);
-                                                
-                                                // إعادة جدولة الإشعارات
-                                                await _notificationService.cancelAthkarNotification(category.id);
-                                                await _notificationService.scheduleAthkarNotification(
-                                                  category, 
-                                                  _notificationTimes[category.id]!
-                                                );
-                                                await _notificationService.scheduleAdditionalNotifications(category);
-                                                
-                                                setModalState(() {
-                                                  // تحديث القائمة المحلية
-                                                });
-                                              },
-                                            ),
-                                          );
-                                        }
-                                      }
-                                      return SizedBox.shrink();
-                                    }).toList(),
-                                  ] else ...[
-                                    Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text(
-                                          'لا توجد أوقات إضافية',
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                  
-                                  SizedBox(height: 12),
-                                  
-                                  // زر إضافة وقت جديد
-                                  Center(
-                                    child: ElevatedButton.icon(
-                                      icon: Icon(Icons.add),
-                                      label: Text('إضافة وقت جديد'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: category.color,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                      ),
-                                      onPressed: () async {
-                                        // عرض منتقي الوقت
-                                        final pickedTime = await showTimePicker(
-                                          context: context,
-                                          initialTime: TimeOfDay.now(),
-                                          builder: (context, child) {
-                                            return Theme(
-                                              data: Theme.of(context).copyWith(
-                                                colorScheme: ColorScheme.light(
-                                                  primary: category.color,
-                                                  onPrimary: Colors.white,
-                                                  onSurface: Colors.black,
-                                                ),
-                                                textButtonTheme: TextButtonThemeData(
-                                                  style: TextButton.styleFrom(
-                                                    foregroundColor: category.color,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: child!,
-                                            );
-                                          },
-                                        );
-                                        
-                                        if (pickedTime != null) {
-                                          // إضافة الوقت الجديد
-                                          final timeString = '${pickedTime.hour}:${pickedTime.minute}';
-                                          await _athkarService.addAdditionalNotificationTime(category.id, timeString);
-                                          
-                                          // إعادة جدولة الإشعارات
-                                          await _notificationService.cancelAthkarNotification(category.id);
-                                          await _notificationService.scheduleAthkarNotification(
-                                            category, 
-                                            _notificationTimes[category.id]!
-                                          );
-                                          await _notificationService.scheduleAdditionalNotifications(category);
-                                          
-                                          setModalState(() {
-                                            // تحديث القائمة المحلية
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        SizedBox(height: 16),
-                        
-                        // محتوى الإشعار
-                        Card(
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'محتوى الإشعار',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: kPrimary,
-                                  ),
-                                ),
-                                SizedBox(height: 12),
-                                TextFormField(
-                                  initialValue: category.notifyTitle ?? 'حان موعد ${category.title}',
-                                  decoration: InputDecoration(
-                                    labelText: 'عنوان الإشعار',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    prefixIcon: Icon(Icons.title, color: category.color),
-                                  ),
-                                  onChanged: (value) async {
-                                    // تحديث عنوان الإشعار
-                                    final updatedCategory = category.copyWith(
-                                      notifyTitle: value,
-                                    );
-                                    
-                                    // إعادة جدولة الإشعار بالعنوان الجديد
-                                    await _notificationService.scheduleAthkarNotification(
-                                      updatedCategory, 
-                                      _notificationTimes[category.id]!
-                                    );
-                                  },
-                                ),
-                                SizedBox(height: 16),
-                                TextFormField(
-                                  initialValue: category.notifyBody ?? 'اضغط هنا لقراءة الأذكار',
-                                  decoration: InputDecoration(
-                                    labelText: 'نص الإشعار',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    prefixIcon: Icon(Icons.message, color: category.color),
-                                  ),
-                                  maxLines: 2,
-                                  onChanged: (value) async {
-                                    // تحديث نص الإشعار
-                                    final updatedCategory = category.copyWith(
-                                      notifyBody: value,
-                                    );
-                                    
-                                    // إعادة جدولة الإشعار بالنص الجديد
-                                    await _notificationService.scheduleAthkarNotification(
-                                      updatedCategory, 
-                                      _notificationTimes[category.id]!
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // زر الإغلاق
-                Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: category.color,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: Text(
-                        'إغلاق',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
   }
 
   // تنسيق وقت الإشعار
@@ -989,12 +435,27 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                 ),
                                 SizedBox(width: 10),
                                 Expanded(
-                                  child: Text(
-                                    'يمكنك تفعيل وتخصيص إشعارات الأذكار ليذكرك التطبيق في الأوقات المناسبة',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      height: 1.4,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'توقيت الإشعارات يعتمد على منطقتك الزمنية',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        'منطقتك الزمنية الحالية: $_currentTimeZone',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          height: 1.4,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -1034,107 +495,101 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                     child: AnimatedContainer(
                                       duration: const Duration(milliseconds: 150),
                                       transform: Matrix4.identity()..scale(isPressed ? 0.98 : 1.0),
-                                      child: InkWell(
-                                        onTap: isNotificationEnabled 
-                                            ? () => _showAdditionalSettings(category)
-                                            : null,
-                                        borderRadius: BorderRadius.circular(20),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Row(
-                                            children: [
-                                              // أيقونة الفئة
-                                              Container(
-                                                width: 50,
-                                                height: 50,
-                                                decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: [
-                                                      _getCategoryColor(category),
-                                                      _getCategoryColor(category).withOpacity(0.7),
-                                                    ],
-                                                    begin: Alignment.topRight,
-                                                    end: Alignment.bottomLeft,
-                                                  ),
-                                                  shape: BoxShape.circle,
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: _getCategoryColor(category).withOpacity(0.3),
-                                                      blurRadius: 5,
-                                                      offset: Offset(0, 2),
-                                                    ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Row(
+                                          children: [
+                                            // أيقونة الفئة
+                                            Container(
+                                              width: 50,
+                                              height: 50,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    _getCategoryColor(category),
+                                                    _getCategoryColor(category).withOpacity(0.7),
                                                   ],
+                                                  begin: Alignment.topRight,
+                                                  end: Alignment.bottomLeft,
                                                 ),
-                                                child: Icon(
-                                                  category.icon,
-                                                  color: Colors.white,
-                                                  size: 24,
-                                                ),
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: _getCategoryColor(category).withOpacity(0.3),
+                                                    blurRadius: 5,
+                                                    offset: Offset(0, 2),
+                                                  ),
+                                                ],
                                               ),
-                                              SizedBox(width: 16),
-                                              
-                                              // تفاصيل الفئة
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      category.title,
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 16,
-                                                        color: Colors.black87,
+                                              child: Icon(
+                                                category.icon,
+                                                color: Colors.white,
+                                                size: 24,
+                                              ),
+                                            ),
+                                            SizedBox(width: 16),
+                                            
+                                            // تفاصيل الفئة
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    category.title,
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 16,
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 6),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.access_time,
+                                                        size: 14,
+                                                        color: Colors.grey[600],
                                                       ),
-                                                    ),
-                                                    SizedBox(height: 6),
-                                                    Row(
-                                                      children: [
-                                                        Icon(
-                                                          Icons.access_time,
-                                                          size: 14,
-                                                          color: Colors.grey[600],
+                                                      SizedBox(width: 4),
+                                                      Text(
+                                                        isNotificationEnabled && notificationTime != null 
+                                                            ? _formatTimeOfDay(notificationTime)
+                                                            : 'غير مفعّل',
+                                                        style: TextStyle(
+                                                          color: isNotificationEnabled 
+                                                              ? _getCategoryColor(category)
+                                                              : Colors.grey[600],
+                                                          fontWeight: isNotificationEnabled 
+                                                              ? FontWeight.bold
+                                                              : FontWeight.normal,
+                                                          fontSize: 14,
                                                         ),
-                                                        SizedBox(width: 4),
-                                                        Text(
-                                                          isNotificationEnabled && notificationTime != null 
-                                                              ? _formatTimeOfDay(notificationTime)
-                                                              : 'غير مفعّل',
-                                                          style: TextStyle(
-                                                            color: isNotificationEnabled 
-                                                                ? _getCategoryColor(category)
-                                                                : Colors.grey[600],
-                                                            fontWeight: isNotificationEnabled 
-                                                                ? FontWeight.bold
-                                                                : FontWeight.normal,
-                                                            fontSize: 14,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              
-                                              // زر تعديل الوقت
-                                              if (isNotificationEnabled) 
-                                                IconButton(
-                                                  icon: Icon(
-                                                    Icons.edit,
-                                                    color: _getCategoryColor(category),
-                                                    size: 20,
+                                                      ),
+                                                    ],
                                                   ),
-                                                  tooltip: 'تعديل الوقت',
-                                                  onPressed: () => _editNotificationTime(category),
-                                                ),
-                                              
-                                              // زر تفعيل/إيقاف الإشعارات
-                                              Switch(
-                                                value: isNotificationEnabled,
-                                                onChanged: (value) => _toggleNotification(category, value),
-                                                activeColor: _getCategoryColor(category),
+                                                ],
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                            
+                                            // زر تعديل الوقت
+                                            if (isNotificationEnabled) 
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.edit,
+                                                  color: _getCategoryColor(category),
+                                                  size: 20,
+                                                ),
+                                                tooltip: 'تعديل الوقت',
+                                                onPressed: () => _editNotificationTime(category),
+                                              ),
+                                            
+                                            // زر تفعيل/إيقاف الإشعارات
+                                            Switch(
+                                              value: isNotificationEnabled,
+                                              onChanged: (value) => _toggleNotification(category, value),
+                                              activeColor: _getCategoryColor(category),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),

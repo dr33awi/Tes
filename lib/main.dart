@@ -4,10 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test_athkar_app/screens/athkarscreen/background_task_handler.dart';
+import 'package:test_athkar_app/screens/athkarscreen/notification_navigation.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
 import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+
 
 void main() async {
   // Ensure Flutter is initialized
@@ -22,14 +26,17 @@ void main() async {
   // تهيئة نظام الإنذار للأندرويد
   await AndroidAlarmManager.initialize();
   
-  // Initialize services
+  // تهيئة الاتصال بين الخلفية والواجهة للإشعارات
+  BackgroundTaskHandler.setupBackgroundListener();
+  
+  // Initialize prayer services
   try {
     debugPrint('Initializing prayer services...');
     
     // Initialize prayer notification service
     final notificationService = PrayerNotificationService();
     final notificationInitialized = await notificationService.initialize();
-    debugPrint('Notification service initialized: $notificationInitialized');
+    debugPrint('Prayer notification service initialized: $notificationInitialized');
     
     // اختبار الإشعارات الفورية
     if (notificationInitialized) {
@@ -50,17 +57,53 @@ void main() async {
       
       // التحقق من الإشعارات المجدولة
       final pendingNotifications = await notificationService.getPendingNotifications();
-      debugPrint('Total pending notifications: ${pendingNotifications.length}');
+      debugPrint('Total pending prayer notifications: ${pendingNotifications.length}');
     }
     
     debugPrint('Prayer services initialization complete');
   } catch (e) {
-    debugPrint('Error initializing services: $e');
+    debugPrint('Error initializing prayer services: $e');
     // Continue despite error
   }
   
-  // Run the app
-  runApp(const MyApp());
+  // Initialize Athkar notification service
+  try {
+    debugPrint('Initializing Athkar notification service...');
+    
+    // Initialize Athkar notification service
+    final athkarNotificationService = NotificationService();
+    await athkarNotificationService.initialize();
+    
+    // Schedule saved Athkar notifications
+    await athkarNotificationService.scheduleAllSavedNotifications();
+    
+    debugPrint('Athkar notification service initialized successfully');
+  } catch (e) {
+    debugPrint('Error initializing Athkar notification service: $e');
+    // Continue despite error
+  }
+  
+      // Check if app was opened from a notification
+    final prefs = await SharedPreferences.getInstance();
+    final notificationOpened = prefs.getBool('opened_from_notification') ?? false;
+    
+    if (notificationOpened) {
+      // Get the notification payload
+      final notificationPayload = prefs.getString('notification_payload');
+      
+      // Reset the flag
+      await prefs.setBool('opened_from_notification', false);
+      
+      // Will handle navigation after app is built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (notificationPayload != null) {
+          NotificationNavigation.handleNotificationNavigation(notificationPayload);
+        }
+      });
+    }
+    
+    // Run the app
+    runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
@@ -93,13 +136,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Future<void> _checkAndUpdateNotifications() async {
     try {
+      // التحقق من إشعارات الصلاة
       debugPrint('Checking if prayer notifications need to be updated...');
       
       final notificationService = PrayerNotificationService();
       final shouldUpdate = await notificationService.shouldUpdateNotifications();
       
       if (shouldUpdate) {
-        debugPrint('Notifications need to be updated. Scheduling new notifications...');
+        debugPrint('Prayer notifications need to be updated. Scheduling new notifications...');
         
         // جدولة الإشعارات لليوم الجديد
         final prayerTimesService = PrayerTimesService();
@@ -107,8 +151,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         
         debugPrint('Prayer notifications updated: $scheduled scheduled');
       } else {
-        debugPrint('Notifications already up-to-date');
+        debugPrint('Prayer notifications already up-to-date');
       }
+      
+      // التحقق من إشعارات الأذكار
+      debugPrint('Checking Athkar notifications...');
+      
+      // لا حاجة لإعادة تحديث إشعارات الأذكار بشكل يومي لأنها تتكرر تلقائيًا
+      // لكن يمكننا التأكد من أنها لا تزال مجدولة
+      final athkarNotificationService = NotificationService();
+      
+      // قم بإعادة جدولة الإشعارات المحفوظة للتأكد من أنها تعمل
+      await athkarNotificationService.scheduleAllSavedNotifications();
+      
+      debugPrint('Athkar notifications checked and updated if needed');
     } catch (e) {
       debugPrint('Error checking/updating notifications: $e');
     }
@@ -125,6 +181,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return MaterialApp(
           title: 'تطبيق الأذكار',
           debugShowCheckedModeBanner: false,
+          navigatorKey: NotificationNavigation.navigatorKey, // Add navigator key for notifications
           locale: const Locale('ar'),
           supportedLocales: const [
             Locale('ar', ''),

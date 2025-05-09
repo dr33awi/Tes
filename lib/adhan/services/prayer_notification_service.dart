@@ -410,9 +410,7 @@ class PrayerNotificationService {
         tz.TZDateTime.from(prayerTime, tz.local),
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: 
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: 'prayer_$prayerName',
+        // Changes made here - removed uiLocalNotificationDateInterpretation
       );
       
       final timeString = '${prayerTime.hour}:${prayerTime.minute.toString().padLeft(2, '0')}';
@@ -744,8 +742,7 @@ class PrayerNotificationService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: 
-            UILocalNotificationDateInterpretation.absoluteTime,
+        // Changes made here - removed uiLocalNotificationDateInterpretation
       );
       
       debugPrint('Test scheduled in two ways for 30 seconds from now');
