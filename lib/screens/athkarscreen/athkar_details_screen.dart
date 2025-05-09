@@ -477,6 +477,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   
   // رسالة إتمام الأذكار مع زر "قراءتها مرة أخرى"
   Widget _buildCompletionMessage() {
+    // الحصول على لون القسم الحالي
+    Color categoryColor = _getCategoryColor();
+    
     return AnimationConfiguration.synchronized(
       duration: const Duration(milliseconds: 800),
       child: SlideAnimation(
@@ -488,8 +491,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  _getCategoryColor(),
-                  _getCategoryColor().withOpacity(0.7),
+                  categoryColor,
+                  categoryColor.withOpacity(0.7),
                 ],
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
@@ -497,7 +500,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: _getCategoryColor().withOpacity(0.4),
+                  color: categoryColor.withOpacity(0.4),
                   blurRadius: 16,
                   offset: Offset(0, 8),
                 ),
@@ -506,12 +509,17 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // أيقونة الإتمام مع تحسين المظهر
                 Container(
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.4),
+                      width: 2,
+                    ),
                   ),
                   child: Icon(
                     Icons.check_circle_outline,
@@ -555,7 +563,10 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                   duration: const Duration(milliseconds: 150),
                   transform: Matrix4.identity()..scale(_isReadAgainPressed ? 0.95 : 1.0),
                   child: ElevatedButton.icon(
-                    icon: Icon(Icons.replay_rounded),
+                    icon: Icon(
+                      Icons.replay_rounded,
+                      color: Colors.white, // لون الأيقونة أبيض على خلفية شفافة
+                    ),
                     label: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       child: Text(
@@ -563,6 +574,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: Colors.white, // لون النص أبيض
                         ),
                       ),
                     ),
@@ -582,7 +594,10 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                 
                 // زر العودة إلى أقسام الأذكار
                 ElevatedButton.icon(
-                  icon: Icon(Icons.home_rounded),
+                  icon: Icon(
+                    Icons.home_rounded,
+                    color: categoryColor, // لون الأيقونة مطابق للون القسم
+                  ),
                   label: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Text(
@@ -590,12 +605,13 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: categoryColor, // لون النص مطابق للون القسم
                       ),
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    foregroundColor: _getCategoryColor(),
+                    foregroundColor: categoryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -935,6 +951,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   // بطاقة الذكر المحسنة
   Widget _buildThikrCard(Thikr thikr, int index, bool isFavorite, int counter, bool isCompleted) {
     final bool isPressed = _isPressed && _pressedIndex == index;
+    final bool isHiding = isCompleted; // هذا المتغير يستخدم لحالات الإخفاء التدريجي
     
     return Card(
       elevation: 15,
@@ -950,253 +967,257 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
             child: child!,
           );
         },
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: _getCategoryGradient(),
-              stops: const [0.3, 1.0],
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 300),
+          opacity: isHiding ? 0.0 : 1.0,  // استخدام AnimatedOpacity بدلاً من الخاصية opacity في AnimatedContainer
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: _getCategoryGradient(),
+                stops: const [0.3, 1.0],
+              ),
             ),
-          ),
-          child: InkWell(
-            onTap: () => _incrementCounter(index),
-            borderRadius: BorderRadius.circular(24),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // نمط زخرفي في الخلفية
-                Positioned(
-                  right: -15,
-                  top: 20,
-                  child: Opacity(
-                    opacity: 0.08,
-                    child: Image.asset(
-                      'assets/images/islamic_pattern.png',
-                      width: 120,
-                      height: 120,
-                      errorBuilder: (context, error, stackTrace) {
-                        // إذا لم يتم العثور على الصورة، استخدم أيقونة بديلة
-                        return Icon(
-                          Icons.format_quote,
-                          size: 100,
-                          color: Colors.white.withOpacity(0.1),
-                        );
-                      },
+            child: InkWell(
+              onTap: () => _incrementCounter(index),
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // نمط زخرفي في الخلفية
+                  Positioned(
+                    right: -15,
+                    top: 20,
+                    child: Opacity(
+                      opacity: 0.08,
+                      child: Image.asset(
+                        'assets/images/islamic_pattern.png',
+                        width: 120,
+                        height: 120,
+                        errorBuilder: (context, error, stackTrace) {
+                          // إذا لم يتم العثور على الصورة، استخدم أيقونة بديلة
+                          return Icon(
+                            Icons.format_quote,
+                            size: 100,
+                            color: Colors.white.withOpacity(0.1),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-                
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // رأس البطاقة
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // عدد التكرار
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _loadedCategory.icon,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'عدد التكرار ${counter}/${thikr.count}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          // زر المفضلة
-                          AnimatedBuilder(
-                            animation: _pulseAnimation,
-                            builder: (context, child) {
-                              return Transform.scale(
-                                scale: isFavorite ? _pulseAnimation.value : 1.0,
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: IconButton(
-                                    icon: Icon(
-                                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                    onPressed: () => _toggleFavorite(index),
-                                    tooltip: isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
-                                    splashRadius: 20,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // محتوى الذكر
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 25,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.12),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Stack(
+                  
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // رأس البطاقة
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // علامة اقتباس في البداية
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Icon(
-                                Icons.format_quote,
-                                size: 18,
-                                color: Colors.white.withOpacity(0.5),
+                            // عدد التكرار
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _loadedCategory.icon,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'عدد التكرار ${counter}/${thikr.count}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             
-                            Column(
-                              children: [
-                                Text(
-                                  thikr.text,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    height: 2.0,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    fontFamily: 'Amiri-Bold',
-                                    letterSpacing: 0.5,
+                            // زر المفضلة
+                            AnimatedBuilder(
+                              animation: _pulseAnimation,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: isFavorite ? _pulseAnimation.value : 1.0,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: IconButton(
+                                      icon: Icon(
+                                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => _toggleFavorite(index),
+                                      tooltip: isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
+                                      splashRadius: 20,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                            
-                            // علامة اقتباس في النهاية
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              child: Transform.rotate(
-                                angle: 3.14, // 180 درجة
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 12),
+                        
+                        // محتوى الذكر
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 25,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.12),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              // علامة اقتباس في البداية
+                              Positioned(
+                                top: 0,
+                                right: 0,
                                 child: Icon(
                                   Icons.format_quote,
                                   size: 18,
                                   color: Colors.white.withOpacity(0.5),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // المصدر فقط (بدون عداد التكرار)
-                      if (thikr.source != null)
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
+                              
+                              Column(
+                                children: [
+                                  Text(
+                                    thikr.text,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      height: 2.0,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      fontFamily: 'Amiri-Bold',
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              
+                              // علامة اقتباس في النهاية
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                child: Transform.rotate(
+                                  angle: 3.14, // 180 درجة
+                                  child: Icon(
+                                    Icons.format_quote,
+                                    size: 18,
+                                    color: Colors.white.withOpacity(0.5),
+                                  ),
                                 ),
-                              ],
-                            ),
-                            child: Text(
-                              thikr.source!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 12),
+                        
+                        // المصدر فقط (بدون عداد التكرار)
+                        if (thikr.source != null)
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                thikr.source!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // أزرار الإجراءات
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // زر النسخ
-                          _buildActionButton(
-                            icon: Icons.copy,
-                            label: 'نسخ',
-                            onPressed: () => _copyThikr(thikr, index),
-                            isPressed: _isCopyPressed && _pressedIndex == index,
-                          ),
-                          const SizedBox(width: 12),
-                          
-                          // زر المشاركة
-                          _buildActionButton(
-                            icon: Icons.share,
-                            label: 'مشاركة',
-                            onPressed: () => _shareThikr(thikr, index),
-                            isPressed: _isSharePressed && _pressedIndex == index,
-                          ),
-                          
-                          // زر فضل الذكر (إضافة فاصل صغير إذا كان موجودًا)
-                          if (thikr.fadl != null)
-                            const SizedBox(width: 12),
-                          
-                          // زر فضل الذكر (إظهاره لجميع الأذكار التي لديها فضل)
-                          if (thikr.fadl != null)
+                        
+                        const SizedBox(height: 16),
+                        
+                        // أزرار الإجراءات
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // زر النسخ
                             _buildActionButton(
-                              icon: Icons.info_outline,
-                              label: 'فضل الذكر',
-                              onPressed: () => _showFadlDialog(thikr, index),
-                              isPressed: _isFadlPressed && _pressedIndex == index,
+                              icon: Icons.copy,
+                              label: 'نسخ',
+                              onPressed: () => _copyThikr(thikr, index),
+                              isPressed: _isCopyPressed && _pressedIndex == index,
                             ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 12),
+                            
+                            // زر المشاركة
+                            _buildActionButton(
+                              icon: Icons.share,
+                              label: 'مشاركة',
+                              onPressed: () => _shareThikr(thikr, index),
+                              isPressed: _isSharePressed && _pressedIndex == index,
+                            ),
+                            
+                            // زر فضل الذكر (إضافة فاصل صغير إذا كان موجودًا)
+                            if (thikr.fadl != null)
+                              const SizedBox(width: 12),
+                            
+                            // زر فضل الذكر (إظهاره لجميع الأذكار التي لديها فضل)
+                            if (thikr.fadl != null)
+                              _buildActionButton(
+                                icon: Icons.info_outline,
+                                label: 'فضل الذكر',
+                                onPressed: () => _showFadlDialog(thikr, index),
+                                isPressed: _isFadlPressed && _pressedIndex == index,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

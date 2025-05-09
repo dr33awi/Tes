@@ -12,6 +12,19 @@ class AthkarService {
 
   // Cache for loaded athkar to avoid repeated file reads
   Map<String, AthkarCategory> _athkarCache = {};
+  
+  // قائمة بمصادر صوتية مخصصة للإشعارات
+  final Map<String, String> availableNotificationSounds = {
+    'azan': 'أذان',
+    'short_azan': 'أذان قصير',
+    'dua': 'دعاء',
+    'reminder': 'تنبيه',
+    'quran': 'تلاوة قرآن',
+    'birds': 'عصافير',
+    'nature': 'أصوات طبيعة',
+    'bell': 'جرس',
+    'default': 'الصوت الافتراضي',
+  };
 
   // Load athkar from JSON file
   Future<List<AthkarCategory>> loadAllAthkarCategories() async {
@@ -38,24 +51,29 @@ class AthkarService {
     }
   }
 
-  // Get a specific category by ID
+  // Get a specific category by ID with improved caching
   Future<AthkarCategory?> getAthkarCategory(String categoryId) async {
     // Check if category is already in cache
     if (_athkarCache.containsKey(categoryId)) {
       return _athkarCache[categoryId];
     }
     
-    // If not in cache, load all categories then return the specific one
-    final categories = await loadAllAthkarCategories();
-    final category = categories.firstWhere(
-      (cat) => cat.id == categoryId,
-      orElse: () => throw Exception('Category not found: $categoryId'),
-    );
-    
-    return category;
+    try {
+      // If not in cache, load all categories then return the specific one
+      final categories = await loadAllAthkarCategories();
+      final category = categories.firstWhere(
+        (cat) => cat.id == categoryId,
+        orElse: () => throw Exception('Category not found: $categoryId'),
+      );
+      
+      return category;
+    } catch (e) {
+      print('Error getting category $categoryId: $e');
+      return null;
+    }
   }
 
-  // Parse a single category from JSON
+  // Parse a single category from JSON with enhanced icon and color handling
   AthkarCategory _parseAthkarCategory(Map<String, dynamic> data) {
     // Parse icon string to IconData
     final iconString = data['icon'] as String;
@@ -67,17 +85,23 @@ class AthkarService {
     
     // Parse athkar list
     List<Thikr> athkarList = [];
-    for (var thikrData in data['athkar']) {
-      athkarList.add(Thikr(
-        id: thikrData['id'],
-        text: thikrData['text'],
-        count: thikrData['count'],
-        fadl: thikrData['fadl'],
-        source: thikrData['source'],
-      ));
+    if (data['athkar'] != null) {
+      for (var thikrData in data['athkar']) {
+        athkarList.add(Thikr(
+          id: thikrData['id'],
+          text: thikrData['text'],
+          count: thikrData['count'],
+          fadl: thikrData['fadl'],
+          source: thikrData['source'],
+          isQuranVerse: thikrData['is_quran_verse'] ?? false,
+          surahName: thikrData['surah_name'],
+          verseNumbers: thikrData['verse_numbers'],
+          audioUrl: thikrData['audio_url'],
+        ));
+      }
     }
     
-    // Create and return category
+    // Create and return category with enhanced notification properties
     return AthkarCategory(
       id: data['id'],
       title: data['title'],
@@ -86,41 +110,55 @@ class AthkarService {
       description: data['description'],
       athkar: athkarList,
       notifyTime: data['notify_time'],
+      notifySound: data['notify_sound'],
+      notifyTitle: data['notify_title'],
+      notifyBody: data['notify_body'],
+      hasMultipleReminders: data['has_multiple_reminders'] ?? false,
+      additionalNotifyTimes: data['additional_notify_times'] != null 
+        ? List<String>.from(data['additional_notify_times']) 
+        : null,
     );
   }
   
-  // Convert hex color string to int color value
+  // Convert hex color string to int color value with better error handling
   int _getColorFromHex(String hexColor) {
-    hexColor = hexColor.replaceAll('#', '');
-    if (hexColor.length == 6) {
-      hexColor = 'FF' + hexColor;
+    try {
+      hexColor = hexColor.replaceAll('#', '');
+      if (hexColor.length == 6) {
+        hexColor = 'FF' + hexColor;
+      }
+      return int.parse('0x$hexColor');
+    } catch (e) {
+      print('Error parsing color: $e');
+      return 0xFF447055; // Default to app primary color if there's an error
     }
-    return int.parse('0x$hexColor');
   }
   
-  // Convert icon string to IconData
+  // Enhanced icon mapping with more options
   IconData _getIconFromString(String iconString) {
     // Map icon strings to IconData objects
-    switch (iconString) {
-      case 'Icons.wb_sunny': 
-        return Icons.wb_sunny;
-      case 'Icons.nightlight_round': 
-        return Icons.nightlight_round;
-      case 'Icons.bedtime': 
-        return Icons.bedtime;
-      case 'Icons.alarm': 
-        return Icons.alarm;
-      case 'Icons.mosque': 
-        return Icons.mosque;
-      case 'Icons.home': 
-        return Icons.home;
-      case 'Icons.restaurant': 
-        return Icons.restaurant;
-      case 'Icons.menu_book': 
-        return Icons.menu_book;
-      default: 
-        return Icons.label_important;
-    }
+    Map<String, IconData> iconMap = {
+      'Icons.wb_sunny': Icons.wb_sunny,
+      'Icons.nightlight_round': Icons.nightlight_round,
+      'Icons.bedtime': Icons.bedtime,
+      'Icons.alarm': Icons.alarm,
+      'Icons.mosque': Icons.mosque,
+      'Icons.home': Icons.home,
+      'Icons.restaurant': Icons.restaurant,
+      'Icons.menu_book': Icons.menu_book,
+      'Icons.favorite': Icons.favorite,
+      'Icons.star': Icons.star,
+      'Icons.water_drop': Icons.water_drop,
+      'Icons.insights': Icons.insights,
+      'Icons.travel_explore': Icons.travel_explore,
+      'Icons.healing': Icons.healing,
+      'Icons.family_restroom': Icons.family_restroom,
+      'Icons.school': Icons.school,
+      'Icons.work': Icons.work,
+      'Icons.emoji_events': Icons.emoji_events,
+    };
+    
+    return iconMap[iconString] ?? Icons.label_important;
   }
   
   // Methods for favorites/counters
@@ -140,8 +178,8 @@ class AthkarService {
     await prefs.setBool(key, !currentValue);
   }
   
-  // Get all favorites
-  Future<List<FavoriteThikr>> getAllFavorites() async {
+  // Get all favorites with improved sorting
+  Future<List<FavoriteThikr>> getAllFavorites({String? sortBy}) async {
     final prefs = await SharedPreferences.getInstance();
     final favoriteKeys = prefs.getKeys().where((key) => key.startsWith('favorite_'));
     
@@ -162,14 +200,51 @@ class AthkarService {
             favorites.add(FavoriteThikr(
               category: category,
               thikr: category.athkar[thikrIndex],
-              thikrIndex: thikrIndex
+              thikrIndex: thikrIndex,
+              dateAdded: await getFavoriteAddedDate(categoryId, thikrIndex) ?? DateTime.now(),
             ));
           }
         }
       }
     }
     
+    // Sort favorites based on sortBy parameter
+    if (sortBy != null) {
+      switch (sortBy) {
+        case 'category':
+          favorites.sort((a, b) => a.category.title.compareTo(b.category.title));
+          break;
+        case 'date_added_newest':
+          favorites.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
+          break;
+        case 'date_added_oldest':
+          favorites.sort((a, b) => a.dateAdded.compareTo(b.dateAdded));
+          break;
+        case 'length':
+          favorites.sort((a, b) => a.thikr.text.length.compareTo(b.thikr.text.length));
+          break;
+        case 'count':
+          favorites.sort((a, b) => a.thikr.count.compareTo(b.thikr.count));
+          break;
+      }
+    }
+    
     return favorites;
+  }
+  
+  // Save the date when a thikr was added to favorites
+  Future<void> saveFavoriteAddedDate(String categoryId, int thikrIndex) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'favorite_date_${categoryId}_$thikrIndex';
+    await prefs.setString(key, DateTime.now().toIso8601String());
+  }
+  
+  // Get the date when a thikr was added to favorites
+  Future<DateTime?> getFavoriteAddedDate(String categoryId, int thikrIndex) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'favorite_date_${categoryId}_$thikrIndex';
+    final dateString = prefs.getString(key);
+    return dateString != null ? DateTime.parse(dateString) : null;
   }
   
   // Get thikr count
@@ -184,34 +259,245 @@ class AthkarService {
     final prefs = await SharedPreferences.getInstance();
     final key = 'count_${categoryId}_$thikrIndex';
     await prefs.setInt(key, count);
+    
+    // إذا كان هذا هو أول إكمال للذكر، قم بتسجيل تاريخ الإكمال
+    if (count > 0) {
+      final completionCountKey = 'completion_count_${categoryId}_$thikrIndex';
+      final currentCompletions = prefs.getInt(completionCountKey) ?? 0;
+      
+      if (currentCompletions == 0) {
+        // تسجيل تاريخ أول إكمال
+        final firstCompletionKey = 'first_completion_${categoryId}_$thikrIndex';
+        await prefs.setString(firstCompletionKey, DateTime.now().toIso8601String());
+      }
+      
+      // زيادة عدد مرات الإكمال
+      await prefs.setInt(completionCountKey, currentCompletions + 1);
+      
+      // تسجيل تاريخ آخر إكمال
+      final lastCompletionKey = 'last_completion_${categoryId}_$thikrIndex';
+      await prefs.setString(lastCompletionKey, DateTime.now().toIso8601String());
+    }
   }
 
-  // Get notification preferences
+  // تحسين نظام إعدادات الإشعارات
+  
+  // الحصول على إعدادات الإشعارات الكاملة لفئة معينة
+  Future<NotificationSettings> getNotificationSettings(String categoryId) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // الحصول على الإعدادات الأساسية
+    final enabled = prefs.getBool('notification_${categoryId}_enabled') ?? true;
+    final customTime = prefs.getString('notification_${categoryId}_custom_time');
+    final customSound = prefs.getString('notification_${categoryId}_custom_sound');
+    final vibrate = prefs.getBool('notification_${categoryId}_vibrate') ?? true;
+    final showLed = prefs.getBool('notification_${categoryId}_show_led') ?? true;
+    
+    // استرجاع لون LED إذا كان موجوداً
+    final ledColorString = prefs.getString('notification_${categoryId}_led_color');
+    Color? ledColor;
+    if (ledColorString != null) {
+      try {
+        ledColor = Color(int.parse(ledColorString));
+      } catch (e) {
+        print('Error parsing LED color: $e');
+      }
+    }
+    
+    // استرجاع أهمية الإشعار
+    final importance = prefs.getInt('notification_${categoryId}_importance') ?? 4;
+    
+    return NotificationSettings(
+      isEnabled: enabled,
+      customTime: customTime,
+      customSound: customSound,
+      vibrate: vibrate,
+      showLed: showLed,
+      ledColor: ledColor,
+      importance: importance,
+    );
+  }
+  
+  // حفظ إعدادات الإشعارات الكاملة لفئة معينة
+  Future<void> saveNotificationSettings(String categoryId, NotificationSettings settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    await prefs.setBool('notification_${categoryId}_enabled', settings.isEnabled);
+    
+    if (settings.customTime != null) {
+      await prefs.setString('notification_${categoryId}_custom_time', settings.customTime!);
+    } else {
+      await prefs.remove('notification_${categoryId}_custom_time');
+    }
+    
+    if (settings.customSound != null) {
+      await prefs.setString('notification_${categoryId}_custom_sound', settings.customSound!);
+    } else {
+      await prefs.remove('notification_${categoryId}_custom_sound');
+    }
+    
+    await prefs.setBool('notification_${categoryId}_vibrate', settings.vibrate);
+    await prefs.setBool('notification_${categoryId}_show_led', settings.showLed);
+    
+    if (settings.ledColor != null) {
+      await prefs.setString('notification_${categoryId}_led_color', settings.ledColor!.value.toString());
+    } else {
+      await prefs.remove('notification_${categoryId}_led_color');
+    }
+    
+    await prefs.setInt('notification_${categoryId}_importance', settings.importance ?? 4);
+  }
+  
+  // تبسيط - الحصول على حالة تفعيل الإشعار
   Future<bool> getNotificationEnabled(String categoryId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'notification_${categoryId}_enabled';
-    return prefs.getBool(key) ?? true; // Default to enabled
+    final settings = await getNotificationSettings(categoryId);
+    return settings.isEnabled;
   }
-
-  // Set notification preferences
+  
+  // تبسيط - ضبط حالة تفعيل الإشعار
   Future<void> setNotificationEnabled(String categoryId, bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'notification_${categoryId}_enabled';
-    await prefs.setBool(key, enabled);
+    final settings = await getNotificationSettings(categoryId);
+    await saveNotificationSettings(
+      categoryId, 
+      settings.copyWith(isEnabled: enabled)
+    );
   }
-
-  // Get custom notification time (if user has set one)
+  
+  // تبسيط - الحصول على وقت الإشعار المخصص
   Future<String?> getCustomNotificationTime(String categoryId) async {
+    final settings = await getNotificationSettings(categoryId);
+    return settings.customTime;
+  }
+  
+  // تبسيط - ضبط وقت الإشعار المخصص
+  Future<void> setCustomNotificationTime(String categoryId, String time) async {
+    final settings = await getNotificationSettings(categoryId);
+    await saveNotificationSettings(
+      categoryId, 
+      settings.copyWith(customTime: time)
+    );
+  }
+  
+  // الحصول على قائمة الأوقات الإضافية للإشعارات
+  Future<List<String>> getAdditionalNotificationTimes(String categoryId) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'notification_${categoryId}_custom_time';
-    return prefs.getString(key);
+    final key = 'notification_${categoryId}_additional_times';
+    final jsonList = prefs.getString(key);
+    
+    if (jsonList != null) {
+      try {
+        final List<dynamic> decoded = json.decode(jsonList);
+        return decoded.map((item) => item.toString()).toList();
+      } catch (e) {
+        print('Error decoding additional times: $e');
+      }
+    }
+    
+    return [];
+  }
+  
+  // حفظ قائمة الأوقات الإضافية للإشعارات
+  Future<void> saveAdditionalNotificationTimes(String categoryId, List<String> times) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'notification_${categoryId}_additional_times';
+    await prefs.setString(key, json.encode(times));
+  }
+  
+  // إضافة وقت إشعار إضافي
+  Future<void> addAdditionalNotificationTime(String categoryId, String time) async {
+    final times = await getAdditionalNotificationTimes(categoryId);
+    if (!times.contains(time)) {
+      times.add(time);
+      await saveAdditionalNotificationTimes(categoryId, times);
+    }
+  }
+  
+  // حذف وقت إشعار إضافي
+  Future<void> removeAdditionalNotificationTime(String categoryId, String time) async {
+    final times = await getAdditionalNotificationTimes(categoryId);
+    times.remove(time);
+    await saveAdditionalNotificationTimes(categoryId, times);
   }
 
-  // Set custom notification time
-  Future<void> setCustomNotificationTime(String categoryId, String time) async {
+  // إحصائيات الأذكار
+  
+  // الحصول على عدد مرات إكمال ذكر معين
+  Future<int> getThikrCompletionCount(String categoryId, int thikrIndex) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'notification_${categoryId}_custom_time';
-    await prefs.setString(key, time);
+    final key = 'completion_count_${categoryId}_$thikrIndex';
+    return prefs.getInt(key) ?? 0;
+  }
+  
+  // الحصول على تاريخ أول إكمال لذكر معين
+  Future<DateTime?> getThikrFirstCompletionDate(String categoryId, int thikrIndex) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'first_completion_${categoryId}_$thikrIndex';
+    final dateString = prefs.getString(key);
+    return dateString != null ? DateTime.parse(dateString) : null;
+  }
+  
+  // الحصول على تاريخ آخر إكمال لذكر معين
+  Future<DateTime?> getThikrLastCompletionDate(String categoryId, int thikrIndex) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'last_completion_${categoryId}_$thikrIndex';
+    final dateString = prefs.getString(key);
+    return dateString != null ? DateTime.parse(dateString) : null;
+  }
+  
+  // الحصول على إحصائيات إكمال لفئة كاملة
+  Future<CategoryStats> getCategoryStats(String categoryId) async {
+    final category = await getAthkarCategory(categoryId);
+    if (category == null) {
+      return CategoryStats(
+        totalCompletions: 0,
+        totalThikrs: 0,
+        completedThikrs: 0,
+        lastCompletionDate: null,
+      );
+    }
+    
+    int totalCompletions = 0;
+    int completedThikrs = 0;
+    DateTime? lastCompletionDate;
+    
+    for (int i = 0; i < category.athkar.length; i++) {
+      final completions = await getThikrCompletionCount(categoryId, i);
+      totalCompletions += completions;
+      
+      if (completions > 0) {
+        completedThikrs++;
+        
+        final date = await getThikrLastCompletionDate(categoryId, i);
+        if (date != null && (lastCompletionDate == null || date.isAfter(lastCompletionDate))) {
+          lastCompletionDate = date;
+        }
+      }
+    }
+    
+    return CategoryStats(
+      totalCompletions: totalCompletions,
+      totalThikrs: category.athkar.length,
+      completedThikrs: completedThikrs,
+      lastCompletionDate: lastCompletionDate,
+    );
+  }
+  
+  // الحصول على إحصائيات إكمال لجميع الفئات
+  Future<Map<String, CategoryStats>> getAllCategoriesStats() async {
+    final categories = await loadAllAthkarCategories();
+    final Map<String, CategoryStats> stats = {};
+    
+    for (final category in categories) {
+      stats[category.id] = await getCategoryStats(category.id);
+    }
+    
+    return stats;
+  }
+  
+  // مسح الإعدادات وبدء من جديد
+  Future<void> resetAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   }
 }
 
@@ -220,10 +506,31 @@ class FavoriteThikr {
   final AthkarCategory category;
   final Thikr thikr;
   final int thikrIndex;
+  final DateTime dateAdded;
   
   FavoriteThikr({
     required this.category,
     required this.thikr,
     required this.thikrIndex,
+    required this.dateAdded,
   });
+}
+
+// إحصائيات فئة الأذكار
+class CategoryStats {
+  final int totalCompletions;
+  final int totalThikrs;
+  final int completedThikrs;
+  final DateTime? lastCompletionDate;
+  
+  CategoryStats({
+    required this.totalCompletions,
+    required this.totalThikrs,
+    required this.completedThikrs,
+    this.lastCompletionDate,
+  });
+  
+  // نسبة الأذكار المكتملة
+  double get completionPercentage => 
+    totalThikrs > 0 ? (completedThikrs / totalThikrs) * 100 : 0;
 }

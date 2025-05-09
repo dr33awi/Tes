@@ -180,7 +180,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     try {
       await _notificationService.sendTestNotification(
         'اختبار الإشعارات',
-        'هذا اختبار للتأكد من عمل الإشعارات بشكل صحيح',
+        
       );
       
       // Show confirmation
