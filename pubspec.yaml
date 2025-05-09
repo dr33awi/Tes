@@ -73,7 +73,7 @@ dependencies:
   fl_chart: ^1.0.0                        # عرض رسومات بيانية متنوعة
   syncfusion_flutter_charts: ^29.1.41      # رفعنا الإصدار لدعم intl ^0.19.0
   logger: ^2.5.0                           # تسجيل وتتبع الأحداث والأخطاء
-  flutter_native_timezone: ^2.0.0
+  #flutter_native_timezone: ^2.0.0
 
 
 dev_dependencies:

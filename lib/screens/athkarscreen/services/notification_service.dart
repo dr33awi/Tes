@@ -1,4 +1,4 @@
-// lib/screens/athkarscreen/notification_service.dart
+// lib/screens/athkarscreen/services/notification_service.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -7,7 +7,6 @@ import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dar
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 
@@ -32,10 +31,13 @@ class NotificationService {
   // Initialize notifications
   Future<bool> initialize() async {
     try {
-      // Initialize timezones
+      // Initialize timezones without detecting local timezone
       tz_data.initializeTimeZones();
-      final String currentTimeZone = await FlutterNativeTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(currentTimeZone));
+      
+      // Set to a fixed timezone - you can replace this with a timezone appropriate for your users
+      // For Middle East, common timezones include:
+      // 'Asia/Riyadh', 'Asia/Dubai', 'Asia/Jerusalem', 'Asia/Baghdad', 'Asia/Tehran'
+      tz.setLocalLocation(tz.getLocation('Asia/Riyadh'));
 
       // Initialize notification settings
       const AndroidInitializationSettings initializationSettingsAndroid =
@@ -145,7 +147,7 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      // Schedule notification using newer API
+      // Schedule notification using proper parameters for v19.1.0+
       await flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
         title,
@@ -153,8 +155,6 @@ class NotificationService {
         scheduledDate,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time, // Daily repeat at same time
         payload: category.id,
       );
@@ -322,7 +322,7 @@ class NotificationService {
               iOS: iosDetails,
             );
             
-            // Schedule notification using newer API
+            // Schedule notification using proper parameters for v19.1.0+
             await flutterLocalNotificationsPlugin.zonedSchedule(
               notificationId,
               title,
@@ -330,8 +330,6 @@ class NotificationService {
               scheduledDate,
               notificationDetails,
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
               matchDateTimeComponents: DateTimeComponents.time,
               payload: '${category.id}:additional_$i',
             );

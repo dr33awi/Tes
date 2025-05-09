@@ -27,7 +27,8 @@ void main() async {
   await AndroidAlarmManager.initialize();
   
   // تهيئة الاتصال بين الخلفية والواجهة للإشعارات
-  BackgroundTaskHandler.setupBackgroundListener();
+  // Note: This function does not exist in the provided code, so I've commented it out
+  // BackgroundTaskHandler.setupBackgroundListener();
   
   // Initialize prayer services
   try {
@@ -83,27 +84,27 @@ void main() async {
     // Continue despite error
   }
   
-      // Check if app was opened from a notification
-    final prefs = await SharedPreferences.getInstance();
-    final notificationOpened = prefs.getBool('opened_from_notification') ?? false;
+  // Check if app was opened from a notification
+  final prefs = await SharedPreferences.getInstance();
+  final notificationOpened = prefs.getBool('opened_from_notification') ?? false;
     
-    if (notificationOpened) {
-      // Get the notification payload
-      final notificationPayload = prefs.getString('notification_payload');
-      
-      // Reset the flag
-      await prefs.setBool('opened_from_notification', false);
-      
-      // Will handle navigation after app is built
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (notificationPayload != null) {
-          NotificationNavigation.handleNotificationNavigation(notificationPayload);
-        }
-      });
-    }
+  if (notificationOpened) {
+    // Get the notification payload
+    final notificationPayload = prefs.getString('notification_payload');
     
-    // Run the app
-    runApp(const MyApp());
+    // Reset the flag
+    await prefs.setBool('opened_from_notification', false);
+    
+    // Will handle navigation after app is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (notificationPayload != null) {
+        NotificationNavigation.handleNotificationNavigation(notificationPayload);
+      }
+    });
+  }
+    
+  // Run the app
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {

@@ -8,7 +8,6 @@ import 'package:test_athkar_app/screens/athkarscreen/services/notification_servi
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -23,7 +22,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   List<AthkarCategory> _categories = [];
   bool _isLoading = true;
   bool _masterSwitch = true;
-  String _currentTimeZone = 'Unknown';
+  
+  // إزالة المتغير _currentTimeZone لأننا نستخدم منطقة زمنية ثابتة
+  String _fixedTimeZone = 'Asia/Riyadh';
   
   Map<String, bool> _notificationsEnabled = {};
   Map<String, TimeOfDay?> _notificationTimes = {};
@@ -44,25 +45,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
     
     _loadData();
-    _loadTimeZone();
   }
   
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
-  }
-
-  // تحميل المنطقة الزمنية
-  Future<void> _loadTimeZone() async {
-    try {
-      final String timeZone = await FlutterNativeTimezone.getLocalTimezone();
-      setState(() {
-        _currentTimeZone = timeZone;
-      });
-    } catch (e) {
-      print('خطأ في تحميل المنطقة الزمنية: $e');
-    }
   }
 
   // تحميل البيانات
@@ -439,7 +427,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'توقيت الإشعارات يعتمد على منطقتك الزمنية',
+                                        'توقيت الإشعارات يعتمد على المنطقة الزمنية',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -448,7 +436,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                       ),
                                       SizedBox(height: 2),
                                       Text(
-                                        'منطقتك الزمنية الحالية: $_currentTimeZone',
+                                        'المنطقة الزمنية الحالية: $_fixedTimeZone',
                                         style: TextStyle(
                                           fontSize: 12,
                                           height: 1.4,

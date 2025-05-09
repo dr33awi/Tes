@@ -1,9 +1,10 @@
-// lib/screens/athkarscreen/athkar_screen.dart - محسّن
+// lib/screens/athkarscreen/screen/athkar_screen.dart - محسّن
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
+import 'package:test_athkar_app/screens/athkarscreen/notification_settings_screen.dart'; // إضافة استيراد شاشة إعدادات الإشعارات
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kPrimaryLight, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -152,7 +153,17 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // أزلنا action الإضافي
+        // إضافة زر إعدادات الإشعارات
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.notifications_active,
+              color: kPrimary,
+            ),
+            tooltip: 'إعدادات الإشعارات',
+            onPressed: () => _navigateToNotificationSettings(),
+          ),
+        ],
       ),
       body: _isLoading
           ? _buildLoadingIndicator()
@@ -362,6 +373,43 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
                               color: kPrimary,
                             ),
                           ),
+                          Spacer(),
+                          
+                          // إضافة زر جديد لإعدادات الإشعارات
+                          InkWell(
+                            onTap: () => _navigateToNotificationSettings(),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: kPrimary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: kPrimary.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.notifications_active,
+                                    size: 18,
+                                    color: kPrimary,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'إعدادات الإشعارات',
+                                    style: TextStyle(
+                                      color: kPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -377,6 +425,16 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
                 ),
               ),
             ),
+    );
+  }
+
+  // التنقل إلى شاشة إعدادات الإشعارات
+  void _navigateToNotificationSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NotificationSettingsScreen(),
+      ),
     );
   }
 
