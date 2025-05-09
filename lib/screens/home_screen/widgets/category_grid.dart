@@ -2,10 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/favorites_screen/favorites_screen.dart';
-import 'package:test_athkar_app/screens/athkarscreen/tasbih_screen.dart';
+import 'package:test_athkar_app/screens/tasbih_screen.dart';
 import '../../hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary; // للحصول على الألوان الأساسية
-import 'package:test_athkar_app/screens/athkarscreen/athkar_screen.dart';
+import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_screen.dart';
 import 'package:test_athkar_app/adhan/screens/prayer_times_screen.dart';
 
 

@@ -81,7 +81,7 @@
       </activity>
       
       <!-- لا تحذف البيانات الوصفية أدناه.
-           يستخدمها أداة Flutter لإنشاء GeneratedPluginRegistrant.java -->
+      يستخدمها أداة Flutter لإنشاء GeneratedPluginRegistrant.java -->
       <meta-data
           android:name="flutterEmbedding"
           android:value="2" />

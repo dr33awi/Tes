@@ -1,0 +1,80 @@
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+    id 'dev.flutter.flutter-gradle-plugin'
+}
+
+android {
+    namespace "com.example.test_athkar_app"
+    compileSdkVersion 35
+    ndkVersion "27.0.12077973"
+
+    defaultConfig {
+        applicationId "com.example.test_athkar_app"
+        minSdkVersion 23
+        targetSdkVersion 35
+        versionCode 1
+        versionName "1.0"
+        
+        // إضافة دعم multidex لتجنب مشكلة الحد الأقصى للطرق
+        multiDexEnabled true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+
+            // ✅ تجنّب خطأ shrinkResources
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+    
+    // حل مشاكل تكرار الملفات
+    packagingOptions {
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/license.txt',
+                'META-INF/NOTICE',
+                'META-INF/NOTICE.txt',
+                'META-INF/notice.txt',
+                'META-INF/*.kotlin_module',
+                'META-INF/proguard/androidx-annotations.pro'
+            ]
+        }
+    }
+    
+    // تجنب تحذيرات API القديمة
+    lintOptions {
+        disable 'Deprecated'
+        disable 'ObsoleteLintCustomCheck'
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
+    classpath 'com.android.tools.build:gradle:7.0.4'
+    // إضافة دعم multidex
+    implementation 'androidx.multidex:multidex:2.0.1'
+    
+    // مكتبات إضافية لدعم ميزة الإشعارات
+    implementation 'androidx.work:work-runtime-ktx:2.8.1'
+}
+
+flutter {
+    source '../..'
+}
