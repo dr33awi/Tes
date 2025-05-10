@@ -75,7 +75,11 @@ dependencies:
   weekday_selector: ^1.1.0
   flutter_native_timezone_latest: ^1.0.0
   percent_indicator: ^4.2.5
-  #flutter_native_timezone: ^2.0.0
+
+
+  sensors_plus: ^6.1.1
+
+
 
 
 dev_dependencies:
@@ -84,6 +88,8 @@ dev_dependencies:
   flutter_lints: ^5.0.0                    # أدوات لتحسين جودة الكود وتنبيهات التنسيق
   build_runner: ^2.4.8                     # توليد الكود تلقائيًا
   mockito: ^5.4.4                          # إنشاء كائنات وهمية للاختبار
+
+
 
 flutter:
   uses-material-design: true

@@ -6,7 +6,7 @@ import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_scree
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/notification_settings_screen.dart'; // إضافة استيراد شاشة إعدادات الإشعارات
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
-    show kPrimary, kPrimaryLight, kSurface;
+    show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class AthkarScreen extends StatefulWidget {
@@ -23,56 +23,49 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'id': 'morning',
       'title': 'أذكار الصباح',
       'icon': Icons.wb_sunny,
-      'description': 'الأذكار التي تقال في الصباح بعد صلاة الفجر حتى الضحى',
-      'color1': const Color(0xFFFFD54F), 
+      'color1': const Color(0xFFFFD54F),
       'color2': const Color(0xFFFFA000),
     },
     {
       'id': 'evening',
       'title': 'أذكار المساء',
       'icon': Icons.nightlight_round,
-      'description': 'الأذكار التي تقال في المساء بعد صلاة العصر حتى صلاة العشاء',
-      'color1': const Color(0xFFAB47BC), 
+      'color1': const Color(0xFFAB47BC),
       'color2': const Color(0xFF7B1FA2),
     },
     {
       'id': 'sleep',
       'title': 'أذكار النوم',
       'icon': Icons.bedtime,
-      'description': 'الأذكار التي تقال عند النوم',
-      'color1': const Color(0xFF5C6BC0), 
+      'color1': const Color(0xFF5C6BC0),
       'color2': const Color(0xFF3949AB),
     },
     {
       'id': 'wake',
       'title': 'أذكار الاستيقاظ',
       'icon': Icons.alarm,
-      'description': 'الأذكار التي تقال عند الاستيقاظ من النوم',
-      'color1': const Color(0xFFFFB74D), 
+      'color1': const Color(0xFFFFB74D),
       'color2': const Color(0xFFFF9800),
     },
     {
       'id': 'prayer',
       'title': 'أذكار الصلاة',
       'icon': Icons.mosque,
-      'description': 'الأذكار التي تقال بعد الصلاة',
-      'color1': const Color(0xFF4DB6AC), 
+      'color1': const Color(0xFF4DB6AC),
       'color2': const Color(0xFF00695C),
     },
     {
       'id': 'home',
       'title': 'أذكار المنزل',
       'icon': Icons.home,
-      'description': 'الأذكار التي تقال عند دخول المنزل والخروج منه',
-      'color1': const Color(0xFF66BB6A), 
+      'color1': const Color(0xFF66BB6A),
       'color2': const Color(0xFF2E7D32),
     },
     {
       'id': 'food',
       'title': 'أذكار الطعام',
       'icon': Icons.restaurant,
-      'description': 'الأذكار التي تقال قبل الطعام وبعده',
-      'color1': const Color(0xFFE57373), 
+      'color1': const Color(0xFFE57373),
       'color2': const Color(0xFFC62828),
     },
   ];
@@ -152,7 +145,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
               Icons.notifications_active,
               color: kPrimary,
             ),
-            tooltip: 'إعدادات الإشعارات',
+            tooltip: 'إشعارات',
             onPressed: () => _navigateToNotificationSettings(),
           ),
         ],
@@ -177,167 +170,153 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             child: Card(
-                              elevation: 8,
+                              elevation: 15,
                               shadowColor: kPrimary.withOpacity(0.3),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Container(
-                                padding: EdgeInsets.all(16),
+                                width: double.infinity,
                                 decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
                                   gradient: LinearGradient(
-                                    colors: [kPrimary, kPrimaryLight],
                                     begin: Alignment.topRight,
                                     end: Alignment.bottomLeft,
+                                    colors: [
+                                      kPrimary,
+                                      Color(0xFF2D6852) // لون غامق لمزيد من العمق
+                                    ],
                                     stops: const [0.3, 1.0],
                                   ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: kPrimary.withOpacity(0.2),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
                                 ),
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    // نمط زخرفي في الخلفية
-                                    Positioned(
-                                      right: -20,
-                                      top: -20,
-                                      child: Opacity(
-                                        opacity: 0.08,
-                                        child: Image.asset(
-                                          'assets/images/islamic_pattern.png',
-                                          width: 100,
-                                          height: 100,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            // إذا لم يتم العثور على الصورة، استخدم أيقونة بديلة
-                                            return Icon(
-                                              Icons.format_quote,
-                                              size: 80,
-                                              color: Colors.white.withOpacity(0.1),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Container(
-                                              width: 36,
-                                              height: 36,
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withOpacity(0.2),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                Icons.info_outline,
-                                                color: Colors.white,
-                                                size: 20,
-                                              ),
-                                            ),
-                                            SizedBox(width: 10),
-                                            Text(
-                                              'فضل الأذكار',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 12),
-                                        Container(
-                                          width: double.infinity,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // عنوان فضل الأذكار على اليمين
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(bottom: 12),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 16,
-                                            vertical: 14,
+                                            vertical: 6,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: Colors.white.withOpacity(0.15),
-                                              width: 1,
+                                            color: Colors.black.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(20),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.1),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Text(
+                                            'فضل الأذكار',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
                                             ),
                                           ),
-                                          child: Stack(
-                                            children: [
-                                              // علامة اقتباس في البداية
-                                              Positioned(
-                                                top: 0,
-                                                right: 0,
+                                        ),
+                                      ),
+                                      
+                                      // قسم الاقتباس
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 14,
+                                        ),
+                                        margin: const EdgeInsets.only(bottom: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: Colors.white.withOpacity(0.12),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            // علامة اقتباس في البداية
+                                            Positioned(
+                                              top: -4,
+                                              right: -4,
+                                              child: Icon(
+                                                Icons.format_quote,
+                                                size: 16,
+                                                color: Colors.white.withOpacity(0.5),
+                                              ),
+                                            ),
+                                            
+                                            // نص الحديث
+                                            Padding(
+                                              padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+                                              child: Text(
+                                                'قال رسول الله ﷺ: مثل الذي يذكر ربه والذي لا يذكر ربه مثل الحي والميت',
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  height: 1.8,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                  fontFamily: 'Amiri-Bold',
+                                                ),
+                                              ),
+                                            ),
+                                            
+                                            // علامة اقتباس في النهاية
+                                            Positioned(
+                                              bottom: -4,
+                                              left: -4,
+                                              child: Transform.rotate(
+                                                angle: 3.14, // 180 درجة
                                                 child: Icon(
                                                   Icons.format_quote,
                                                   size: 16,
                                                   color: Colors.white.withOpacity(0.5),
                                                 ),
                                               ),
-                                              
-                                              Center(
-                                                child: Text(
-                                                  'قال رسول الله ﷺ: «مثل الذي يذكر ربه والذي لا يذكر ربه مثل الحي والميت»',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 16,
-                                                    height: 1.8,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontFamily: 'Amiri-Bold',
-                                                  ),
-                                                ),
-                                              ),
-                                              
-                                              // علامة اقتباس في النهاية
-                                              Positioned(
-                                                bottom: 0,
-                                                left: 0,
-                                                child: Transform.rotate(
-                                                  angle: 3.14, // 180 درجة
-                                                  child: Icon(
-                                                    Icons.format_quote,
-                                                    size: 16,
-                                                    color: Colors.white.withOpacity(0.5),
-                                                  ),
-                                                ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      
+                                      // المصدر
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(20),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.1),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
                                               ),
                                             ],
                                           ),
-                                        ),
-                                        
-                                        SizedBox(height: 8),
-                                        Center(
-                                          child: Container(
-                                            margin: EdgeInsets.only(top: 8),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(0.2),
-                                              borderRadius: BorderRadius.circular(14),
-                                            ),
-                                            child: Text(
-                                              'رواه البخاري',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                                          child: Text(
+                                            'رواه البخاري',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
                                             ),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -346,67 +325,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
                       ),
                     ),
                     
-                    // عنوان أقسام الأذكار
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.category_rounded,
-                            color: kPrimary,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'أقسام الأذكار',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: kPrimary,
-                            ),
-                          ),
-                          Spacer(),
-                          
-                          // إضافة زر جديد لإعدادات الإشعارات
-                          InkWell(
-                            onTap: () => _navigateToNotificationSettings(),
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: kPrimary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: kPrimary.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.notifications_active,
-                                    size: 18,
-                                    color: kPrimary,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'إعدادات الإشعارات',
-                                    style: TextStyle(
-                                      color: kPrimary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     
                     // عرض قائمة الأذكار
                     _buildAthkarList(),
@@ -435,23 +354,27 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
     return AnimationLimiter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: ListView.builder(
+        child: GridView.builder(
           shrinkWrap: true,
           physics: NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.1,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
           itemCount: _athkarCategories.length,
           itemBuilder: (context, index) {
             final category = _athkarCategories[index];
             
-            return AnimationConfiguration.staggeredList(
+            return AnimationConfiguration.staggeredGrid(
               position: index,
               duration: const Duration(milliseconds: 500),
-              child: SlideAnimation(
-                verticalOffset: 50.0,
+              columnCount: 2,
+              child: ScaleAnimation(
+                scale: 0.9,
                 child: FadeInAnimation(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildAthkarCategoryCard(category, index),
-                  ),
+                  child: _buildAthkarCategoryCard(category, index),
                 ),
               ),
             );
@@ -499,98 +422,57 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
               children: [
                 // أيقونة في الخلفية
                 Positioned(
-                  right: -20,
-                  bottom: -20,
+                  right: -15,
+                  bottom: -15,
                   child: Icon(
                     category['icon'] as IconData,
-                    size: 100,
+                    size: 80,
                     color: Colors.white.withOpacity(0.1),
                   ),
                 ),
                 
                 // محتوى البطاقة
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: IntrinsicHeight( // يضمن ارتفاع متساوٍ
-                    child: Row(
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // دائرة الأيقونة
                         Container(
-                          width: 50,
-                          height: 50,
+                          width: 60,
+                          height: 60,
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.25),
-                              width: 1,
-                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Center(
                             child: Icon(
                               category['icon'] as IconData,
                               color: Colors.white,
-                              size: 28,
+                              size: 35,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(height: 16),
                         
-                        // نص العنوان والوصف
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                category['title'] as String,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              if (category['description'] != null)
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.15),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    category['description'] as String,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 12,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        
-                        // أيقونة السهم
-                        Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.white,
-                              size: 14,
-                            ),
+                        // نص العنوان
+                        Text(
+                          category['title'] as String,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
                       ],
@@ -626,7 +508,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       title: category['title'] as String,
       icon: category['icon'] as IconData,
       color: category['color1'] as Color,
-      description: category['description'] as String,
+      description: '', // قيمة فارغة للوصف حيث تم إزالته
       athkar: [], // سيتم تحميل الأذكار في صفحة التفاصيل
     );
     

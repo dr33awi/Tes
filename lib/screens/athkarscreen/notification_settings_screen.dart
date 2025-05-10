@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/notification_defaults.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
 import 'package:test_athkar_app/screens/athkarscreen/notification_info_screen.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
@@ -31,7 +30,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   // Maps to track notification settings
   Map<String, bool> _notificationsEnabled = {};
   Map<String, TimeOfDay?> _notificationTimes = {};
-  Map<String, String?> _notificationSounds = {};
   
   // Animation controllers
   late AnimationController _animationController;
@@ -71,7 +69,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       // Load notification settings for each category
       final Map<String, bool> enabledMap = {};
       final Map<String, TimeOfDay?> timeMap = {};
-      final Map<String, String?> soundMap = {};
       
       for (final category in categories) {
         // Load notification status
@@ -81,9 +78,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         // Load saved notification time
         final savedTime = await _notificationService.getNotificationTime(category.id);
         timeMap[category.id] = savedTime;
-        
-        // Load notification sounds (would need to be implemented)
-        soundMap[category.id] = category.notifySound;
       }
       
       if (mounted) {
@@ -91,7 +85,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _categories = categories;
           _notificationsEnabled = enabledMap;
           _notificationTimes = timeMap;
-          _notificationSounds = soundMap;
           _isLoading = false;
           
           // Update master switch based on enabled notifications
@@ -311,91 +304,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
 
-  // Edit notification sound for a specific category
-  Future<void> _editNotificationSound(AthkarCategory category) async {
-    // Haptic feedback
-    HapticFeedback.lightImpact();
-    
-    // Get available sounds
-    final availableSounds = NotificationDefaults.getAvailableSounds();
-    
-    // Current sound
-    String? currentSound = _notificationSounds[category.id] ?? 
-                          NotificationDefaults.getDefaultSoundForCategory(category.id);
-    
-    // Show sound picker dialog
-    final selectedSound = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('اختر صوت الإشعار'),
-        content: Container(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: availableSounds.length,
-            itemBuilder: (context, index) {
-              final soundKey = availableSounds.keys.elementAt(index);
-              final soundName = availableSounds[soundKey]!;
-              
-              return RadioListTile<String>(
-                title: Text(soundName),
-                value: soundKey,
-                groupValue: currentSound,
-                onChanged: (value) {
-                  Navigator.of(context).pop(value);
-                },
-                activeColor: kPrimary,
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('إلغاء'),
-            style: TextButton.styleFrom(foregroundColor: kPrimary),
-          ),
-        ],
-      ),
-    );
-    
-    if (selectedSound != null) {
-      // Update sound
-      setState(() {
-        _notificationSounds[category.id] = selectedSound;
-      });
-      
-      // Create updated category with new sound
-      final updatedCategory = category.copyWith(
-        notifySound: selectedSound,
-      );
-      
-      // Reschedule notification to apply new sound
-      if (_notificationsEnabled[category.id] == true && _notificationTimes[category.id] != null) {
-        await _notificationService.cancelAthkarNotification(category.id);
-        await _notificationService.scheduleAthkarNotification(
-            updatedCategory, _notificationTimes[category.id]!);
-        
-        // Schedule additional notifications if category has multiple reminders
-        if (updatedCategory.hasMultipleReminders && updatedCategory.additionalNotifyTimes != null) {
-          await _notificationService.scheduleAdditionalNotifications(updatedCategory);
-        }
-      }
-      
-      // Show message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تم تحديث صوت الإشعار لـ ${category.title}'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: kPrimary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
   // Format notification time
   String _formatTimeOfDay(TimeOfDay time) {
     final hours = time.hour.toString().padLeft(2, '0');
@@ -408,9 +316,27 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     return '$hours:$minutes $period';
   }
   
-  // Get category color
-  Color _getCategoryColor(AthkarCategory category) {
-    return category.color;
+  // استخراج لون الفئة بناءً على معرف الفئة
+  Color _getCategoryColorWithId(String categoryId) {
+    // ألوان الفئات كما في athkar_screen
+    switch (categoryId) {
+      case 'morning':
+        return const Color(0xFFFFD54F);
+      case 'evening':
+        return const Color(0xFFAB47BC);
+      case 'sleep':
+        return const Color(0xFF5C6BC0);
+      case 'wake':
+        return const Color(0xFFFFB74D);
+      case 'prayer':
+        return const Color(0xFF4DB6AC);
+      case 'home':
+        return const Color(0xFF66BB6A);
+      case 'food':
+        return const Color(0xFFE57373);
+      default:
+        return kPrimary; // اللون الافتراضي
+    }
   }
   
   // Test notification
@@ -510,98 +436,131 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               child: Column(
                 children: [
                   // Master switch and explanation
-                  Card(
-                    margin: EdgeInsets.all(16),
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: kPrimary.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    Icons.notifications_active,
-                                    color: kPrimary,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'الإشعارات',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: kPrimary,
-                                  ),
-                                ),
-                              ),
-                              Switch(
-                                value: _masterSwitch,
-                                onChanged: _toggleAllNotifications,
-                                activeColor: kPrimary,
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.grey.shade300,
-                                width: 1,
-                              ),
+                  AnimationConfiguration.synchronized(
+                    duration: const Duration(milliseconds: 400),
+                    child: SlideAnimation(
+                      verticalOffset: 30.0,
+                      child: FadeInAnimation(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                          child: Card(
+                            elevation: 8,
+                            shadowColor: kPrimary.withOpacity(0.3),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  color: Colors.blue,
-                                  size: 24,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topRight,
+                                  end: Alignment.bottomLeft,
+                                  colors: [
+                                    kPrimary,
+                                    Color(0xFF2D6852),
+                                  ],
+                                  stops: const [0.3, 1.0],
                                 ),
-                                SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'توقيت الإشعارات يعتمد على المنطقة الزمنية',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          height: 1.4,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  children: [
+                                    // زر التفعيل الرئيسي
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.2),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.notifications_active,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            'تفعيل الإشعارات',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                        Switch(
+                                          value: _masterSwitch,
+                                          onChanged: _toggleAllNotifications,
+                                          activeColor: Colors.white,
+                                          inactiveThumbColor: Colors.white70,
+                                          activeTrackColor: Colors.white.withOpacity(0.5),
+                                          inactiveTrackColor: Colors.white30,
+                                        ),
+                                      ],
+                                    ),
+                                    
+                                    SizedBox(height: 12),
+                                    
+                                    // معلومات المنطقة الزمنية
+                                    Container(
+                                      padding: EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.15),
+                                          width: 1,
                                         ),
                                       ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        'المنطقة الزمنية الحالية: $_deviceTimeZone',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          height: 1.4,
-                                          color: Colors.grey[700],
-                                        ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.access_time,
+                                            color: Colors.white,
+                                            size: 22,
+                                          ),
+                                          SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'توقيت الإشعارات يعتمد على المنطقة الزمنية',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                    height: 1.4,
+                                                  ),
+                                                ),
+                                                SizedBox(height: 4),
+                                                Text(
+                                                  'المنطقة الزمنية الحالية: $_deviceTimeZone',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    height: 1.4,
+                                                    color: Colors.white.withOpacity(0.8),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -610,15 +569,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   Expanded(
                     child: AnimationLimiter(
                       child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.all(16),
                         itemCount: _categories.length,
                         itemBuilder: (context, index) {
                           final category = _categories[index];
                           final bool isNotificationEnabled = _notificationsEnabled[category.id] ?? false;
                           final TimeOfDay? notificationTime = _notificationTimes[category.id];
-                          final String? notificationSound = _notificationSounds[category.id];
-                          
-                          final bool isPressed = _isPressed && _pressedIndex == index;
+                          final Color color1 = _getCategoryColorWithId(category.id);
+                          final Color color2 = Color(0xFF2D6852);
                           
                           return AnimationConfiguration.staggeredList(
                             position: index,
@@ -629,143 +587,157 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                 child: Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: Card(
-                                    elevation: 3,
+                                    elevation: 8,
+                                    shadowColor: color1.withOpacity(0.3),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
                                     ),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 150),
-                                      transform: Matrix4.identity()..scale(isPressed ? 0.98 : 1.0),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Row(
-                                          children: [
-                                            // Category icon
-                                            Container(
-                                              width: 50,
-                                              height: 50,
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: [
-                                                    _getCategoryColor(category),
-                                                    _getCategoryColor(category).withOpacity(0.7),
-                                                  ],
-                                                  begin: Alignment.topRight,
-                                                  end: Alignment.bottomLeft,
-                                                ),
-                                                shape: BoxShape.circle,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: _getCategoryColor(category).withOpacity(0.3),
-                                                    blurRadius: 5,
-                                                    offset: Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Icon(
-                                                category.icon,
-                                                color: Colors.white,
-                                                size: 24,
-                                              ),
-                                            ),
-                                            SizedBox(width: 16),
-                                            
-                                            // Category details
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    category.title,
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 16,
-                                                      color: Colors.black87,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            color1,
+                                            color2,
+                                          ],
+                                          begin: Alignment.topRight,
+                                          end: Alignment.bottomLeft,
+                                          stops: const [0.3, 1.0],
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: InkWell(
+                                        onTap: () => isNotificationEnabled 
+                                          ? _editNotificationTime(category)
+                                          : _toggleNotification(category, true),
+                                        borderRadius: BorderRadius.circular(20),
+                                        splashColor: Colors.white.withOpacity(0.1),
+                                        highlightColor: Colors.white.withOpacity(0.05),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Row(
+                                            children: [
+                                              // دائرة الأيقونة
+                                              Container(
+                                                width: 50,
+                                                height: 50,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.2),
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black.withOpacity(0.1),
+                                                      spreadRadius: 1,
+                                                      blurRadius: 4,
+                                                      offset: Offset(0, 2),
                                                     ),
+                                                  ],
+                                                ),
+                                                child: Center(
+                                                  child: Icon(
+                                                    category.icon,
+                                                    color: Colors.white,
+                                                    size: 28,
                                                   ),
-                                                  SizedBox(height: 6),
-                                                  Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons.access_time,
-                                                        size: 14,
-                                                        color: Colors.grey[600],
+                                                ),
+                                              ),
+                                              SizedBox(width: 16),
+                                              
+                                              // تفاصيل الأذكار
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      category.title,
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 16,
                                                       ),
-                                                      SizedBox(width: 4),
-                                                      Text(
-                                                        isNotificationEnabled && notificationTime != null 
-                                                            ? _formatTimeOfDay(notificationTime)
-                                                            : 'غير مفعّل',
-                                                        style: TextStyle(
-                                                          color: isNotificationEnabled 
-                                                              ? _getCategoryColor(category)
-                                                              : Colors.grey[600],
-                                                          fontWeight: isNotificationEnabled 
-                                                              ? FontWeight.bold
-                                                              : FontWeight.normal,
-                                                          fontSize: 14,
-                                                        ),
+                                                    ),
+                                                    SizedBox(height: 8),
+                                                    Container(
+                                                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white.withOpacity(0.15),
+                                                        borderRadius: BorderRadius.circular(10),
                                                       ),
-                                                    ],
-                                                  ),
-                                                  
-                                                  // Sound info (if notification is enabled)
-                                                  if (isNotificationEnabled && notificationSound != null) 
-                                                    Padding(
-                                                      padding: const EdgeInsets.only(top: 6),
                                                       child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
                                                         children: [
                                                           Icon(
-                                                            Icons.volume_up,
-                                                            size: 14,
-                                                            color: Colors.grey[600],
+                                                            Icons.access_time,
+                                                            size: 16,
+                                                            color: Colors.white,
                                                           ),
-                                                          SizedBox(width: 4),
+                                                          SizedBox(width: 6),
                                                           Text(
-                                                            NotificationDefaults.getAvailableSounds()[notificationSound] ?? 'صوت الجهاز',
+                                                            isNotificationEnabled && notificationTime != null 
+                                                                ? _formatTimeOfDay(notificationTime)
+                                                                : 'غير مفعّل',
                                                             style: TextStyle(
-                                                              color: Colors.grey[600],
-                                                              fontSize: 12,
+                                                              color: Colors.white,
+                                                              fontWeight: isNotificationEnabled 
+                                                                  ? FontWeight.bold
+                                                                  : FontWeight.normal,
+                                                              fontSize: 13,
                                                             ),
                                                           ),
                                                         ],
                                                       ),
                                                     ),
+                                                  ],
+                                                ),
+                                              ),
+                                              
+                                              // أزرار التحكم
+                                              Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Switch(
+                                                    value: isNotificationEnabled,
+                                                    onChanged: (value) => _toggleNotification(category, value),
+                                                    activeColor: Colors.white,
+                                                    inactiveThumbColor: Colors.white70,
+                                                    activeTrackColor: Colors.white.withOpacity(0.5),
+                                                    inactiveTrackColor: Colors.white30,
+                                                  ),
+                                                  if (isNotificationEnabled)
+                                                    TextButton(
+                                                      onPressed: () => _editNotificationTime(category),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.edit,
+                                                            size: 16,
+                                                            color: Colors.white,
+                                                          ),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                            'تعديل',
+                                                            style: TextStyle(
+                                                              color: Colors.white,
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      style: TextButton.styleFrom(
+                                                        backgroundColor: Colors.white.withOpacity(0.2),
+                                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(15),
+                                                        ),
+                                                        minimumSize: Size.zero,
+                                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                      ),
+                                                    ),
                                                 ],
                                               ),
-                                            ),
-                                            
-                                            // Edit sound button
-                                            if (isNotificationEnabled) 
-                                              IconButton(
-                                                icon: Icon(
-                                                  Icons.volume_up,
-                                                  color: _getCategoryColor(category),
-                                                  size: 20,
-                                                ),
-                                                tooltip: 'تعديل الصوت',
-                                                onPressed: () => _editNotificationSound(category),
-                                              ),
-                                            
-                                            // Edit time button
-                                            if (isNotificationEnabled) 
-                                              IconButton(
-                                                icon: Icon(
-                                                  Icons.edit,
-                                                  color: _getCategoryColor(category),
-                                                  size: 20,
-                                                ),
-                                                tooltip: 'تعديل الوقت',
-                                                onPressed: () => _editNotificationTime(category),
-                                              ),
-                                            
-                                            // Enable/disable notifications switch
-                                            Switch(
-                                              value: isNotificationEnabled,
-                                              onChanged: (value) => _toggleNotification(category, value),
-                                              activeColor: _getCategoryColor(category),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -778,9 +750,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       ),
                     ),
                   ),
-                  
-                  // Bottom padding space
-                  SizedBox(height: 16),
                 ],
               ),
             ),
