@@ -1,5 +1,6 @@
 // lib/services/notification_navigation.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
@@ -8,9 +9,60 @@ import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dar
 class NotificationNavigation {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   
+  /// Initialize notification navigation
+  static Future<void> initialize() async {
+    // Check if app was opened from notification
+    final isFromNotification = await checkNotificationOpen();
+    if (isFromNotification) {
+      final payload = await getNotificationPayload();
+      if (payload != null && payload.isNotEmpty) {
+        // Delay navigation to ensure app is fully loaded
+        Future.delayed(const Duration(milliseconds: 500), () {
+          handleNotificationNavigation(payload);
+        });
+      }
+      
+      // Clear notification data
+      await clearNotificationData();
+    }
+  }
+  
+  /// Check if the app was opened from a notification
+  static Future<bool> checkNotificationOpen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool('opened_from_notification') ?? false;
+    } catch (e) {
+      print('Error checking notification open: $e');
+      return false;
+    }
+  }
+  
+  /// Get the notification payload that opened the app
+  static Future<String?> getNotificationPayload() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('notification_payload');
+    } catch (e) {
+      print('Error getting notification payload: $e');
+      return null;
+    }
+  }
+  
+  /// Clear notification open data
+  static Future<void> clearNotificationData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('opened_from_notification', false);
+      await prefs.remove('notification_payload');
+    } catch (e) {
+      print('Error clearing notification data: $e');
+    }
+  }
+
   /// Navigate to the appropriate screen based on notification payload
-  static Future<void> handleNotificationNavigation(String? payload) async {
-    if (payload == null || payload.isEmpty) return;
+  static Future<void> handleNotificationNavigation(String payload) async {
+    if (payload.isEmpty) return;
     
     // Extract category ID and any additional parameters
     final parts = payload.split(':');

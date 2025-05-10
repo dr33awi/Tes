@@ -1,49 +1,63 @@
-// lib/screens/athkarscreen/services/notification_service.dart
+// lib/services/notification_service.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
-import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
+import 'package:flutter_native_timezone_latest/flutter_native_timezone_latest.dart';
 
 class NotificationService {
-  // Singleton implementation
+  // Singleton pattern implementation
   static final NotificationService _instance = NotificationService._internal();
+  
   factory NotificationService() => _instance;
+  
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  final AthkarService _athkarService = AthkarService();
-  
+  // Guarda la zona horaria del dispositivo
+  String _deviceTimeZone = 'UTC';
+      
   // Alarm IDs for background notifications
   static const int morningAthkarAlarmId = 1001;
   static const int eveningAthkarAlarmId = 1002;
   static const int sleepAthkarAlarmId = 1003;
   static const int wakeAthkarAlarmId = 1004;
   static const int prayerAthkarAlarmId = 1005;
+  static const int homeAthkarAlarmId = 1006;
+  static const int foodAthkarAlarmId = 1007;
+  static const int quranAthkarAlarmId = 1008;
 
   // Initialize notifications
   Future<bool> initialize() async {
     try {
-      // Initialize timezones without detecting local timezone
+      // Initialize timezones
       tz_data.initializeTimeZones();
       
-      // Set to a fixed timezone - you can replace this with a timezone appropriate for your users
-      // For Middle East, common timezones include:
-      // 'Asia/Riyadh', 'Asia/Dubai', 'Asia/Jerusalem', 'Asia/Baghdad', 'Asia/Tehran'
-      tz.setLocalLocation(tz.getLocation('Asia/Riyadh'));
+      // Get device timezone
+      try {
+        _deviceTimeZone = await FlutterNativeTimezoneLatest.getLocalTimezone();
+        // Set the timezone
+        tz.setLocalLocation(tz.getLocation(_deviceTimeZone));
+        print('Device timezone: $_deviceTimeZone');
+      } catch (e) {
+        print('Error getting device timezone: $e');
+        // Fallback to a safe default
+        _deviceTimeZone = 'UTC';
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      }
 
-      // Initialize notification settings
+      // Initialize notification settings for Android
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
 
-      // For newer versions (19.1.0+)
+      // For iOS
       final DarwinInitializationSettings initializationSettingsDarwin =
           DarwinInitializationSettings();
 
@@ -51,22 +65,21 @@ class NotificationService {
           InitializationSettings(
         android: initializationSettingsAndroid,
         iOS: initializationSettingsDarwin,
-        macOS: initializationSettingsDarwin,
       );
 
+      // Initialize plugin
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
-        // Using the correct callback for newer versions
-        onDidReceiveNotificationResponse: (NotificationResponse details) {
-          final String? payload = details.payload;
-          if (payload != null && payload.isNotEmpty) {
-            _handleNotificationTap(payload);
-          }
-        },
+        onDidReceiveNotificationResponse: _onNotificationResponse,
       );
 
-      // Request permissions (newer API)
+      // Request permissions
       await _requestPermissions();
+      
+      // Initialize Android Alarm Manager for more reliable notifications
+      if (Platform.isAndroid) {
+        await AndroidAlarmManager.initialize();
+      }
       
       // Initialize scheduled notifications
       await scheduleAllSavedNotifications();
@@ -104,13 +117,16 @@ class NotificationService {
   }
 
   // Handle notification tap
-  Future<void> _handleNotificationTap(String payload) async {
+  void _onNotificationResponse(NotificationResponse response) async {
     // Save payload for navigation
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('opened_from_notification', true);
-    await prefs.setString('notification_payload', payload);
-    
-    print('Notification tapped with payload: $payload');
+    final String? payload = response.payload;
+    if (payload != null && payload.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('opened_from_notification', true);
+      await prefs.setString('notification_payload', payload);
+      
+      print('Notification tapped with payload: $payload');
+    }
   }
 
   // Schedule athkar notification
@@ -127,19 +143,24 @@ class NotificationService {
       final title = category.notifyTitle ?? 'حان موعد ${category.title}';
       final body = category.notifyBody ?? 'اضغط هنا لقراءة الأذكار';
       
-      // Set notification details for newer versions
+      // Set notification details
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
         'athkar_channel_id',
         'أذكار',
         channelDescription: 'تنبيهات الأذكار',
         importance: Importance.high,
         priority: Priority.high,
+        sound: category.notifySound != null 
+          ? RawResourceAndroidNotificationSound(category.notifySound!) 
+          : null,
+        icon: '@mipmap/ic_launcher',
       );
       
       final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: category.notifySound != null ? '${category.notifySound}.aiff' : null,
       );
       
       final NotificationDetails notificationDetails = NotificationDetails(
@@ -147,7 +168,7 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      // Schedule notification using proper parameters for v19.1.0+
+      // Schedule notification
       await flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
         title,
@@ -177,28 +198,7 @@ class NotificationService {
   // Schedule background alarm (for Android)
   Future<void> _scheduleBackgroundAlarm(
       AthkarCategory category, TimeOfDay notificationTime, String title, String body) async {
-    int alarmId;
-    
-    // Get alarm ID based on category
-    switch (category.id) {
-      case 'morning':
-        alarmId = morningAthkarAlarmId;
-        break;
-      case 'evening':
-        alarmId = eveningAthkarAlarmId;
-        break;
-      case 'sleep':
-        alarmId = sleepAthkarAlarmId;
-        break;
-      case 'wake':
-        alarmId = wakeAthkarAlarmId;
-        break;
-      case 'prayer':
-        alarmId = prayerAthkarAlarmId;
-        break;
-      default:
-        alarmId = category.id.hashCode.abs() % 1000 + 2000;
-    }
+    int alarmId = _getAlarmIdForCategory(category.id);
     
     // Calculate alarm time
     final now = DateTime.now();
@@ -233,6 +233,30 @@ class NotificationService {
     );
   }
   
+  // Get alarm ID based on category ID
+  int _getAlarmIdForCategory(String categoryId) {
+    switch (categoryId) {
+      case 'morning':
+        return morningAthkarAlarmId;
+      case 'evening':
+        return eveningAthkarAlarmId;
+      case 'sleep':
+        return sleepAthkarAlarmId;
+      case 'wake':
+        return wakeAthkarAlarmId;
+      case 'prayer':
+        return prayerAthkarAlarmId;
+      case 'home':
+        return homeAthkarAlarmId;
+      case 'food':
+        return foodAthkarAlarmId;
+      case 'quran':
+        return quranAthkarAlarmId;
+      default:
+        return categoryId.hashCode.abs() % 1000 + 2000;
+    }
+  }
+  
   // Callback for background alarm
   @pragma('vm:entry-point')
   static Future<void> _showAthkarNotificationCallback(int id, Map<String, dynamic>? params) async {
@@ -242,7 +266,7 @@ class NotificationService {
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
     
-    // Set up notification details for newer versions
+    // Set up notification details
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'athkar_channel_id',
       'أذكار',
@@ -302,19 +326,23 @@ class NotificationService {
             final title = category.notifyTitle ?? 'حان موعد ${category.title}';
             final body = category.notifyBody ?? 'اضغط هنا لقراءة الأذكار';
             
-            // Set notification details for newer versions
+            // Set notification details
             final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
               'athkar_channel_id',
               'أذكار',
               channelDescription: 'تنبيهات الأذكار',
               importance: Importance.high,
               priority: Priority.high,
+              sound: category.notifySound != null 
+                ? RawResourceAndroidNotificationSound(category.notifySound!) 
+                : null,
             );
             
             final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
               presentAlert: true,
               presentBadge: true,
               presentSound: true,
+              sound: category.notifySound != null ? '${category.notifySound}.aiff' : null,
             );
             
             final NotificationDetails notificationDetails = NotificationDetails(
@@ -322,7 +350,7 @@ class NotificationService {
               iOS: iosDetails,
             );
             
-            // Schedule notification using proper parameters for v19.1.0+
+            // Schedule notification
             await flutterLocalNotificationsPlugin.zonedSchedule(
               notificationId,
               title,
@@ -390,28 +418,8 @@ class NotificationService {
       
       // Cancel background alarms on Android
       if (Platform.isAndroid) {
-        int alarmId;
-        
-        switch (categoryId) {
-          case 'morning':
-            alarmId = morningAthkarAlarmId;
-            break;
-          case 'evening':
-            alarmId = eveningAthkarAlarmId;
-            break;
-          case 'sleep':
-            alarmId = sleepAthkarAlarmId;
-            break;
-          case 'wake':
-            alarmId = wakeAthkarAlarmId;
-            break;
-          case 'prayer':
-            alarmId = prayerAthkarAlarmId;
-            break;
-          default:
-            alarmId = categoryId.hashCode.abs() % 1000 + 2000;
-        }
-        
+        // Cancel main alarm
+        int alarmId = _getAlarmIdForCategory(categoryId);
         await AndroidAlarmManager.cancel(alarmId);
         
         // Cancel additional alarms
@@ -434,11 +442,15 @@ class NotificationService {
       await flutterLocalNotificationsPlugin.cancelAll();
       
       if (Platform.isAndroid) {
+        // Cancel all known alarms
         await AndroidAlarmManager.cancel(morningAthkarAlarmId);
         await AndroidAlarmManager.cancel(eveningAthkarAlarmId);
         await AndroidAlarmManager.cancel(sleepAthkarAlarmId);
         await AndroidAlarmManager.cancel(wakeAthkarAlarmId);
         await AndroidAlarmManager.cancel(prayerAthkarAlarmId);
+        await AndroidAlarmManager.cancel(homeAthkarAlarmId);
+        await AndroidAlarmManager.cancel(foodAthkarAlarmId);
+        await AndroidAlarmManager.cancel(quranAthkarAlarmId);
       }
     } catch (e) {
       print('Error canceling all notifications: $e');
@@ -474,27 +486,47 @@ class NotificationService {
   // Schedule all saved notifications
   Future<void> scheduleAllSavedNotifications() async {
     try {
-      // Get all categories
-      final categories = await _athkarService.loadAllAthkarCategories();
+      // Get all categories that have saved notification settings
+      final prefs = await SharedPreferences.getInstance();
       
-      for (final category in categories) {
-        final isEnabled = await isNotificationEnabled(category.id);
+      // Get all keys related to notifications
+      final allKeys = prefs.getKeys();
+      final notificationKeys = allKeys.where((key) => key.startsWith('notification_') && key.endsWith('_enabled'));
+      
+      for (final key in notificationKeys) {
+        // Extract category ID from key
+        final categoryId = key.replaceAll('notification_', '').replaceAll('_enabled', '');
+        
+        // Check if notification is enabled
+        final isEnabled = prefs.getBool(key) ?? false;
+        
         if (isEnabled) {
-          final savedTime = await getNotificationTime(category.id);
-          if (savedTime != null) {
-            await scheduleAthkarNotification(category, savedTime);
-            await scheduleAdditionalNotifications(category);
-          } else if (category.notifyTime != null) {
-            // Use default time from category
-            final defaultTimeParts = category.notifyTime!.split(':');
-            if (defaultTimeParts.length == 2) {
-              final hour = int.tryParse(defaultTimeParts[0]);
-              final minute = int.tryParse(defaultTimeParts[1]);
+          // Get saved time
+          final timeKey = 'notification_${categoryId}_time';
+          final timeString = prefs.getString(timeKey);
+          
+          if (timeString != null) {
+            // Parse time
+            final timeParts = timeString.split(':');
+            if (timeParts.length == 2) {
+              final hour = int.tryParse(timeParts[0]);
+              final minute = int.tryParse(timeParts[1]);
               
               if (hour != null && minute != null) {
-                final defaultTime = TimeOfDay(hour: hour, minute: minute);
-                await scheduleAthkarNotification(category, defaultTime);
-                await scheduleAdditionalNotifications(category);
+                final notificationTime = TimeOfDay(hour: hour, minute: minute);
+                
+                // Create dummy category for scheduling
+                final category = AthkarCategory(
+                  id: categoryId,
+                  title: _getCategoryTitle(categoryId),
+                  icon: _getCategoryIcon(categoryId),
+                  color: _getCategoryColor(categoryId),
+                  athkar: [],
+                  notifyTime: timeString,
+                );
+                
+                // Schedule notification
+                await scheduleAthkarNotification(category, notificationTime);
               }
             }
           }
@@ -522,7 +554,7 @@ class NotificationService {
     return categoryId.hashCode.abs() % 100000;
   }
 
-  // Calculate the scheduled date for a notification
+  // Calculate the scheduled date for a notification using device's local timezone
   tz.TZDateTime _getScheduledDate(TimeOfDay notificationTime) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
@@ -562,11 +594,88 @@ class NotificationService {
       case 'quran':
         return const TimeOfDay(hour: 20, minute: 0); // 8:00 PM
       default:
-        return TimeOfDay.now();
+        return const TimeOfDay(hour: 8, minute: 0); // 8:00 AM default
     }
   }
   
-  // Test functions
+  // Get current timezone name
+  String getCurrentTimezoneName() {
+    return _deviceTimeZone;
+  }
+  
+  // Helper methods for creating dummy categories when needed
+  
+  // Get category title based on ID
+  String _getCategoryTitle(String categoryId) {
+    switch (categoryId) {
+      case 'morning':
+        return 'أذكار الصباح';
+      case 'evening':
+        return 'أذكار المساء';
+      case 'sleep':
+        return 'أذكار النوم';
+      case 'wake':
+        return 'أذكار الاستيقاظ';
+      case 'prayer':
+        return 'أذكار الصلاة';
+      case 'home':
+        return 'أذكار المنزل';
+      case 'food':
+        return 'أذكار الطعام';
+      case 'quran':
+        return 'أدعية قرآنية';
+      default:
+        return 'أذكار';
+    }
+  }
+  
+  // Get category icon based on ID
+  IconData _getCategoryIcon(String categoryId) {
+    switch (categoryId) {
+      case 'morning':
+        return Icons.wb_sunny;
+      case 'evening':
+        return Icons.nightlight_round;
+      case 'sleep':
+        return Icons.bedtime;
+      case 'wake':
+        return Icons.alarm;
+      case 'prayer':
+        return Icons.mosque;
+      case 'home':
+        return Icons.home;
+      case 'food':
+        return Icons.restaurant;
+      case 'quran':
+        return Icons.menu_book;
+      default:
+        return Icons.notifications;
+    }
+  }
+  
+  // Get category color based on ID
+  Color _getCategoryColor(String categoryId) {
+    switch (categoryId) {
+      case 'morning':
+        return const Color(0xFFFFD54F); // Yellow
+      case 'evening':
+        return const Color(0xFFAB47BC); // Purple
+      case 'sleep':
+        return const Color(0xFF5C6BC0); // Blue
+      case 'wake':
+        return const Color(0xFFFFB74D); // Orange
+      case 'prayer':
+        return const Color(0xFF4DB6AC); // Teal
+      case 'home':
+        return const Color(0xFF66BB6A); // Green
+      case 'food':
+        return const Color(0xFFE57373); // Red
+      case 'quran':
+        return const Color(0xFF9575CD); // Light purple
+      default:
+        return const Color(0xFF447055); // Default app color
+    }
+  }
   
   // Test immediate notification
   Future<void> testImmediateNotification() async {

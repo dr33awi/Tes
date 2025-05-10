@@ -1,8 +1,8 @@
-// lib/services/athkar_notification_defaults.dart
+// lib/services/notification_defaults.dart
 import 'package:flutter/material.dart';
 
 /// Provides default values for Athkar notifications
-class AthkarNotificationDefaults {
+class NotificationDefaults {
   // Default notification times for each Athkar category
   static Map<String, TimeOfDay> defaultNotificationTimes = {
     'morning': const TimeOfDay(hour: 6, minute: 0),    // 6:00 AM
@@ -69,5 +69,18 @@ class AthkarNotificationDefaults {
   /// Get the default notification sound for a specific category
   static String getDefaultSoundForCategory(String categoryId) {
     return defaultNotificationSounds[categoryId] ?? 'default';
+  }
+  
+  /// Get the list of available notification sounds
+  static Map<String, String> getAvailableSounds() {
+    return {
+      'short_azan': 'أذان قصير',
+      'dua': 'دعاء',
+      'birds': 'عصافير',
+      'reminder': 'تنبيه عام',
+      'quran': 'تلاوة قرآن',
+      'bell': 'جرس',
+      'default': 'الصوت الافتراضي للجهاز',
+    };
   }
 }

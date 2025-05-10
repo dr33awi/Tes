@@ -75,14 +75,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'color1': const Color(0xFFE57373), 
       'color2': const Color(0xFFC62828),
     },
-    {
-      'id': 'quran',
-      'title': 'أدعية قرآنية',
-      'icon': Icons.menu_book,
-      'description': 'أدعية من القرآن الكريم',
-      'color1': const Color(0xFF9575CD), 
-      'color2': const Color(0xFF512DA8),
-    },
   ];
   
   // للتحكم في حالة التحميل

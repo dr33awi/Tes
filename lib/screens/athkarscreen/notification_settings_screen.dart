@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/notification_defaults.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/notification_info_screen.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -23,13 +25,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   bool _isLoading = true;
   bool _masterSwitch = true;
   
-  // إزالة المتغير _currentTimeZone لأننا نستخدم منطقة زمنية ثابتة
-  String _fixedTimeZone = 'Asia/Riyadh';
+  // Variable para la zona horaria del dispositivo
+  String _deviceTimeZone = '';
   
+  // Maps to track notification settings
   Map<String, bool> _notificationsEnabled = {};
   Map<String, TimeOfDay?> _notificationTimes = {};
+  Map<String, String?> _notificationSounds = {};
   
-  // متغيرات للتأثيرات البصرية
+  // Animation controllers
   late AnimationController _animationController;
   int? _pressedIndex;
   bool _isPressed = false;
@@ -38,11 +42,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   void initState() {
     super.initState();
     
-    // إعداد الأنيميشن
+    // Setup animations
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    
+    // Obtener zona horaria del dispositivo
+    _deviceTimeZone = _notificationService.getCurrentTimezoneName();
     
     _loadData();
   }
@@ -53,26 +60,30 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     super.dispose();
   }
 
-  // تحميل البيانات
+  // Load notification data
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     
     try {
-      // تحميل جميع فئات الأذكار
+      // Load all athkar categories
       final categories = await _athkarService.loadAllAthkarCategories();
       
-      // تحميل إعدادات الإشعارات لكل فئة
+      // Load notification settings for each category
       final Map<String, bool> enabledMap = {};
       final Map<String, TimeOfDay?> timeMap = {};
+      final Map<String, String?> soundMap = {};
       
       for (final category in categories) {
-        // تحميل حالة تفعيل الإشعارات
+        // Load notification status
         final isEnabled = await _notificationService.isNotificationEnabled(category.id);
         enabledMap[category.id] = isEnabled;
         
-        // تحميل وقت الإشعارات المحفوظ
+        // Load saved notification time
         final savedTime = await _notificationService.getNotificationTime(category.id);
         timeMap[category.id] = savedTime;
+        
+        // Load notification sounds (would need to be implemented)
+        soundMap[category.id] = category.notifySound;
       }
       
       if (mounted) {
@@ -80,45 +91,46 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _categories = categories;
           _notificationsEnabled = enabledMap;
           _notificationTimes = timeMap;
+          _notificationSounds = soundMap;
           _isLoading = false;
           
-          // تحديد حالة المفتاح الرئيسي بناءً على ما إذا كانت جميع الإشعارات مفعلة
+          // Update master switch based on enabled notifications
           _updateMasterSwitch();
         });
       }
     } catch (e) {
-      print('خطأ في تحميل البيانات: $e');
+      print('Error loading data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
   
-  // تحديث حالة المفتاح الرئيسي
+  // Update master switch state
   void _updateMasterSwitch() {
     if (_notificationsEnabled.isEmpty) {
       _masterSwitch = false;
       return;
     }
     
-    // التحقق مما إذا كانت جميع الإشعارات مفعلة
+    // Check if any notifications are enabled
     final enabledCount = _notificationsEnabled.values.where((enabled) => enabled).length;
     _masterSwitch = enabledCount > 0;
   }
 
-  // تبديل حالة الإشعارات لجميع الفئات
+  // Toggle all notifications
   Future<void> _toggleAllNotifications(bool value) async {
     setState(() => _masterSwitch = value);
     
-    // تطبيق الإعداد على جميع الفئات
+    // Apply setting to all categories
     for (final category in _categories) {
       await _toggleNotification(category, value, updateState: false);
     }
     
-    // تحديث الواجهة
+    // Update UI
     setState(() {});
     
-    // عرض رسالة
+    // Show message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(value ? 'تم تفعيل جميع الإشعارات' : 'تم إيقاف جميع الإشعارات'),
@@ -131,21 +143,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
 
-  // تبديل حالة الإشعارات لفئة معينة
+  // Toggle notification for a specific category
   Future<void> _toggleNotification(AthkarCategory category, bool value, {bool updateState = true}) async {
-    // تأثير اهتزاز خفيف
+    // Haptic feedback
     HapticFeedback.lightImpact();
     
     if (value) {
-      // تفعيل الإشعارات
+      // Enable notifications
       
-      // اختيار الوقت المناسب للإشعار
+      // Choose appropriate time for notification
       TimeOfDay? selectedTime = _notificationTimes[category.id];
       
-      // إذا لم يكن هناك وقت محفوظ، استخدم الوقت الافتراضي من الفئة أو اعرض منتقي الوقت
+      // If no saved time, use default time from category or show time picker
       if (selectedTime == null) {
         if (category.notifyTime != null) {
-          // استخدام الوقت الافتراضي من الفئة
+          // Use default time from category
           final timeParts = category.notifyTime!.split(':');
           if (timeParts.length == 2) {
             final hour = int.tryParse(timeParts[0]);
@@ -157,12 +169,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           }
         }
         
-        // إذا لم يتوفر وقت افتراضي، اعرض منتقي الوقت
+        // If no default time, show time picker
         if (selectedTime == null) {
-          // اقتراح وقت بناءً على نوع الفئة
+          // Suggest time based on category type
           TimeOfDay suggestedTime = NotificationService.getSuggestedTimeForCategory(category.id);
           
-          // عرض منتقي الوقت
+          // Show time picker
           final pickedTime = await showTimePicker(
             context: context,
             initialTime: suggestedTime,
@@ -186,7 +198,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           );
           
           if (pickedTime == null) {
-            // المستخدم ألغى اختيار الوقت
+            // User canceled time selection
             if (updateState) {
               setState(() {
                 _notificationsEnabled[category.id] = false;
@@ -201,9 +213,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         }
       }
       
-      // جدولة الإشعار
+      // Schedule notification
       await _notificationService.scheduleAthkarNotification(category, selectedTime!);
-      await _notificationService.scheduleAdditionalNotifications(category);
+      
+      // Schedule additional notifications if category has multiple reminders
+      if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
+        await _notificationService.scheduleAdditionalNotifications(category);
+      }
       
       if (updateState) {
         setState(() {
@@ -215,10 +231,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _notificationTimes[category.id] = selectedTime;
       }
       
-      // تحديث المفتاح الرئيسي
+      // Update master switch
       _updateMasterSwitch();
     } else {
-      // إلغاء الإشعارات
+      // Cancel notifications
       await _notificationService.cancelAthkarNotification(category.id);
       
       if (updateState) {
@@ -229,21 +245,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _notificationsEnabled[category.id] = false;
       }
       
-      // تحديث المفتاح الرئيسي
+      // Update master switch
       _updateMasterSwitch();
     }
   }
 
-  // تعديل وقت الإشعار لفئة معينة
+  // Edit notification time for a specific category
   Future<void> _editNotificationTime(AthkarCategory category) async {
-    // تأثير اهتزاز خفيف
+    // Haptic feedback
     HapticFeedback.lightImpact();
     
-    // الحصول على الوقت الحالي
+    // Get current time
     TimeOfDay initialTime = _notificationTimes[category.id] ?? 
                            NotificationService.getSuggestedTimeForCategory(category.id);
     
-    // عرض منتقي الوقت
+    // Show time picker
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: initialTime,
@@ -267,17 +283,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
     
     if (pickedTime != null) {
-      // تحديث وقت الإشعار
+      // Update notification time
       setState(() {
         _notificationTimes[category.id] = pickedTime;
         _notificationsEnabled[category.id] = true;
       });
       
-      // جدولة الإشعار بالوقت الجديد
+      // Schedule notification with new time
       await _notificationService.scheduleAthkarNotification(category, pickedTime);
-      await _notificationService.scheduleAdditionalNotifications(category);
       
-      // عرض رسالة
+      // Schedule additional notifications if category has multiple reminders
+      if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
+        await _notificationService.scheduleAdditionalNotifications(category);
+      }
+      
+      // Show message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('تم تحديث وقت الإشعار لـ ${category.title}'),
@@ -291,7 +311,92 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
 
-  // تنسيق وقت الإشعار
+  // Edit notification sound for a specific category
+  Future<void> _editNotificationSound(AthkarCategory category) async {
+    // Haptic feedback
+    HapticFeedback.lightImpact();
+    
+    // Get available sounds
+    final availableSounds = NotificationDefaults.getAvailableSounds();
+    
+    // Current sound
+    String? currentSound = _notificationSounds[category.id] ?? 
+                          NotificationDefaults.getDefaultSoundForCategory(category.id);
+    
+    // Show sound picker dialog
+    final selectedSound = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('اختر صوت الإشعار'),
+        content: Container(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: availableSounds.length,
+            itemBuilder: (context, index) {
+              final soundKey = availableSounds.keys.elementAt(index);
+              final soundName = availableSounds[soundKey]!;
+              
+              return RadioListTile<String>(
+                title: Text(soundName),
+                value: soundKey,
+                groupValue: currentSound,
+                onChanged: (value) {
+                  Navigator.of(context).pop(value);
+                },
+                activeColor: kPrimary,
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('إلغاء'),
+            style: TextButton.styleFrom(foregroundColor: kPrimary),
+          ),
+        ],
+      ),
+    );
+    
+    if (selectedSound != null) {
+      // Update sound
+      setState(() {
+        _notificationSounds[category.id] = selectedSound;
+      });
+      
+      // Create updated category with new sound
+      final updatedCategory = category.copyWith(
+        notifySound: selectedSound,
+      );
+      
+      // Reschedule notification to apply new sound
+      if (_notificationsEnabled[category.id] == true && _notificationTimes[category.id] != null) {
+        await _notificationService.cancelAthkarNotification(category.id);
+        await _notificationService.scheduleAthkarNotification(
+            updatedCategory, _notificationTimes[category.id]!);
+        
+        // Schedule additional notifications if category has multiple reminders
+        if (updatedCategory.hasMultipleReminders && updatedCategory.additionalNotifyTimes != null) {
+          await _notificationService.scheduleAdditionalNotifications(updatedCategory);
+        }
+      }
+      
+      // Show message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم تحديث صوت الإشعار لـ ${category.title}'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kPrimary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: EdgeInsets.all(16),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  // Format notification time
   String _formatTimeOfDay(TimeOfDay time) {
     final hours = time.hour.toString().padLeft(2, '0');
     final minutes = time.minute.toString().padLeft(2, '0');
@@ -303,9 +408,36 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     return '$hours:$minutes $period';
   }
   
-  // الحصول على لون الفئة
+  // Get category color
   Color _getCategoryColor(AthkarCategory category) {
     return category.color;
+  }
+  
+  // Test notification
+  Future<void> _testNotification() async {
+    await _notificationService.testImmediateNotification();
+    
+    // Show message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تم إرسال إشعار تجريبي'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: kPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: EdgeInsets.all(16),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+  
+  // Navigate to notification info screen
+  void _navigateToInfoScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NotificationInfoScreen(),
+      ),
+    );
   }
 
   @override
@@ -331,6 +463,26 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          // Info button
+          IconButton(
+            icon: const Icon(
+              Icons.info_outline,
+              color: kPrimary,
+            ),
+            tooltip: 'معلومات عن الإشعارات',
+            onPressed: _navigateToInfoScreen,
+          ),
+          // Test notification button
+          IconButton(
+            icon: const Icon(
+              Icons.notifications_active,
+              color: kPrimary,
+            ),
+            tooltip: 'اختبار الإشعارات',
+            onPressed: _testNotification,
+          ),
+        ],
       ),
       body: _isLoading
           ? Center(
@@ -357,7 +509,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               textDirection: TextDirection.rtl,
               child: Column(
                 children: [
-                  // المفتاح الرئيسي وشرح
+                  // Master switch and explanation
                   Card(
                     margin: EdgeInsets.all(16),
                     elevation: 4,
@@ -436,7 +588,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                       ),
                                       SizedBox(height: 2),
                                       Text(
-                                        'المنطقة الزمنية الحالية: $_fixedTimeZone',
+                                        'المنطقة الزمنية الحالية: $_deviceTimeZone',
                                         style: TextStyle(
                                           fontSize: 12,
                                           height: 1.4,
@@ -454,7 +606,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     ),
                   ),
                   
-                  // قائمة فئات الأذكار
+                  // Athkar categories list
                   Expanded(
                     child: AnimationLimiter(
                       child: ListView.builder(
@@ -464,6 +616,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                           final category = _categories[index];
                           final bool isNotificationEnabled = _notificationsEnabled[category.id] ?? false;
                           final TimeOfDay? notificationTime = _notificationTimes[category.id];
+                          final String? notificationSound = _notificationSounds[category.id];
                           
                           final bool isPressed = _isPressed && _pressedIndex == index;
                           
@@ -487,7 +640,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                         padding: const EdgeInsets.all(16),
                                         child: Row(
                                           children: [
-                                            // أيقونة الفئة
+                                            // Category icon
                                             Container(
                                               width: 50,
                                               height: 50,
@@ -517,7 +670,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                             ),
                                             SizedBox(width: 16),
                                             
-                                            // تفاصيل الفئة
+                                            // Category details
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -555,11 +708,46 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                                       ),
                                                     ],
                                                   ),
+                                                  
+                                                  // Sound info (if notification is enabled)
+                                                  if (isNotificationEnabled && notificationSound != null) 
+                                                    Padding(
+                                                      padding: const EdgeInsets.only(top: 6),
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(
+                                                            Icons.volume_up,
+                                                            size: 14,
+                                                            color: Colors.grey[600],
+                                                          ),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                            NotificationDefaults.getAvailableSounds()[notificationSound] ?? 'صوت الجهاز',
+                                                            style: TextStyle(
+                                                              color: Colors.grey[600],
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                                 ],
                                               ),
                                             ),
                                             
-                                            // زر تعديل الوقت
+                                            // Edit sound button
+                                            if (isNotificationEnabled) 
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.volume_up,
+                                                  color: _getCategoryColor(category),
+                                                  size: 20,
+                                                ),
+                                                tooltip: 'تعديل الصوت',
+                                                onPressed: () => _editNotificationSound(category),
+                                              ),
+                                            
+                                            // Edit time button
                                             if (isNotificationEnabled) 
                                               IconButton(
                                                 icon: Icon(
@@ -571,7 +759,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                                 onPressed: () => _editNotificationTime(category),
                                               ),
                                             
-                                            // زر تفعيل/إيقاف الإشعارات
+                                            // Enable/disable notifications switch
                                             Switch(
                                               value: isNotificationEnabled,
                                               onChanged: (value) => _toggleNotification(category, value),
@@ -590,6 +778,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       ),
                     ),
                   ),
+                  
+                  // Bottom padding space
+                  SizedBox(height: 16),
                 ],
               ),
             ),
