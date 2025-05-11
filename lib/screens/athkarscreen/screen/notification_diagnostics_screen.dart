@@ -1,9 +1,9 @@
-// lib/screens/athkarscreen/notification_diagnostics_screen.dart
+// lib/screens/athkarscreen/screen/notification_diagnostics_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
+import 'package:test_athkar_app/services/notification_service.dart'; // استيراد خدمة الإشعارات الموحدة
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/services/do_not_disturb_service.dart';
@@ -22,7 +22,7 @@ class NotificationDiagnosticsScreen extends StatefulWidget {
 }
 
 class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsScreen> {
-  final NotificationService _notificationService = NotificationService();
+  final NotificationService _notificationService = NotificationService(); // استخدام الخدمة الموحدة
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
   final DoNotDisturbService _doNotDisturbService = DoNotDisturbService();
@@ -334,17 +334,17 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
   }
   
   // Open notification settings
-Future<void> _openNotificationSettings() async {
-  try {
-    await AppSettings.openAppSettings(type: AppSettingsType.notification);
-  } catch (e) {
-    _errorLoggingService.logError(
-      'NotificationDiagnosticsScreen',
-      'Error opening notification settings',
-      e
-    );
+  Future<void> _openNotificationSettings() async {
+    try {
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+    } catch (e) {
+      _errorLoggingService.logError(
+        'NotificationDiagnosticsScreen',
+        'Error opening notification settings',
+        e
+      );
+    }
   }
-}
   
   // Open battery settings
   Future<void> _openBatterySettings() async {

@@ -1,10 +1,10 @@
-// lib/screens/athkarscreen/multiple_notifications_screen.dart
+// lib/screens/athkarscreen/screen/multiple_notifications_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
+import 'package:test_athkar_app/services/notification_service.dart'; // استيراد خدمة الإشعارات الموحدة
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
@@ -24,7 +24,7 @@ class MultipleNotificationsScreen extends StatefulWidget {
 
 class _MultipleNotificationsScreenState extends State<MultipleNotificationsScreen> {
   final AthkarService _athkarService = AthkarService();
-  final NotificationService _notificationService = NotificationService();
+  final NotificationService _notificationService = NotificationService(); // استخدام الخدمة الموحدة
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   
   List<String> _notificationTimes = [];
@@ -211,9 +211,6 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
         // Remove from list
         await _athkarService.removeAdditionalNotificationTime(widget.category.id, timeString);
         
-        // Cancel the associated notification
-        // This is handled when re-scheduling all notifications
-        
         // Re-schedule all remaining notifications
         final updatedTimes = _notificationTimes.where((t) => t != timeString).toList();
         final updatedCategory = widget.category.copyWith(
@@ -221,14 +218,15 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
           additionalNotifyTimes: updatedTimes,
         );
         
-        // We need to re-schedule the main notification and all additional ones
-        final mainTime = await _notificationService.getNotificationTime(widget.category.id);
-        if (mainTime != null) {
-          await _notificationService.scheduleAthkarNotification(updatedCategory, mainTime);
-        }
-        
+        // Re-schedule notifications using unified notification service
         if (updatedTimes.isNotEmpty) {
           await _notificationService.scheduleAdditionalNotifications(updatedCategory);
+        } else {
+          // If no additional times left, just keep the main notification
+          final mainTime = await _notificationService.getNotificationTime(widget.category.id);
+          if (mainTime != null) {
+            await _notificationService.scheduleAthkarNotification(updatedCategory, mainTime);
+          }
         }
         
         // Refresh the list

@@ -1,10 +1,10 @@
-// lib/screens/athkarscreen/notification_settings_screen.dart
+// lib/screens/athkarscreen/screen/notification_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
+import 'package:test_athkar_app/services/notification_service.dart'; // استيراد خدمة الإشعارات الموحدة
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/notification_info_screen.dart';
@@ -22,7 +22,7 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> with SingleTickerProviderStateMixin {
   final AthkarService _athkarService = AthkarService();
-  final NotificationService _notificationService = NotificationService();
+  final NotificationService _notificationService = NotificationService(); // استخدام الخدمة الموحدة
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
   
@@ -239,7 +239,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           // If no default time, show time picker
           if (selectedTime == null) {
             // Suggest time based on category type
-            TimeOfDay suggestedTime = NotificationService.getSuggestedTimeForCategory(category.id);
+            TimeOfDay suggestedTime = _notificationService.getSuggestedTimeForCategory(category.id);
             
             // Show time picker
             final pickedTime = await showTimePicker(
@@ -280,8 +280,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           }
         }
         
-        // Schedule notification
-        await _notificationService.scheduleAthkarNotification(category, selectedTime);
+        // Schedule notification using the unified service
+        await _notificationService.scheduleAthkarNotification(category, selectedTime!);
         
         // Schedule additional notifications if category has multiple reminders
         if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
@@ -344,7 +344,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     try {
       // Get current time
       TimeOfDay initialTime = _notificationTimes[category.id] ?? 
-                           NotificationService.getSuggestedTimeForCategory(category.id);
+                         _notificationService.getSuggestedTimeForCategory(category.id);
       
       // Show time picker
       final pickedTime = await showTimePicker(

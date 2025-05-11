@@ -868,6 +868,15 @@ await flutterLocalNotificationsPlugin.zonedSchedule(
         default:
           title = 'أذكار $categoryId';
       }
+      
+   return AthkarCategory(
+  id: categoryId,
+  title: title,
+  notifyTitle: 'حان موعد $title',
+  notifyBody: 'اضغط هنا لقراءة الأذكار',
+  icon: _getCategoryIcon(categoryId),
+  color: _getCategoryColor(categoryId), // إضافة المعلمة color
+    );
     } catch (e) {
       await _errorLoggingService.logError(
         'NotificationService', 
