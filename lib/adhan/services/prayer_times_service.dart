@@ -8,7 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
 import 'package:test_athkar_app/adhan/widgets/location_permission_dialog.dart';
-import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
+import 'package:test_athkar_app/adhan/services/enhanced_prayer_notification_service.dart';
 
 /// Service for managing prayer times
 /// 
@@ -48,7 +48,7 @@ class PrayerTimesService {
   bool _isInitialized = false;
   
   // Notification service instance
-  final PrayerNotificationService _notificationService = PrayerNotificationService();
+final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNotificationService();
   
   /// Initialize the service
   Future<bool> initialize() async {
@@ -758,69 +758,47 @@ class PrayerTimesService {
   }
   
   /// Schedule prayer notifications - طريقة محسنة لجدولة إشعارات الصلاة
-  Future<bool> schedulePrayerNotifications() async {
-    try {
-      debugPrint('Starting to schedule prayer notifications');
-      
-      // التحقق مما إذا كان يجب تحديث الإشعارات
-      final shouldUpdate = await _notificationService.shouldUpdateNotifications();
-      if (!shouldUpdate) {
-        debugPrint('Notifications already up-to-date for today');
-        return true;
-      }
-      
-      // Get prayer times
-      List<PrayerTimeModel> prayerTimes;
-      try {
-        // Try to get updated times
-        prayerTimes = await getPrayerTimesFromAPI(useDefaultLocationIfNeeded: true);
-        debugPrint('Got prayer times from API, count: ${prayerTimes.length}');
-      } catch (e) {
-        debugPrint('Error getting prayer times for notifications: $e');
-        
-        // Use cache if available
-        if (_cachedPrayerTimes != null) {
-          debugPrint('Using cached prayer times as fallback');
-          prayerTimes = _cachedPrayerTimes!;
-        } else {
-          // Use default times in case of error
-          debugPrint('Using default prayer times as fallback');
-          prayerTimes = _createDefaultPrayerTimes();
-        }
-      }
-      
-      // Prepare list of prayer times for scheduling notifications
-      final List<Map<String, dynamic>> notificationTimes = [];
-      
-      // أضف جميع أوقات الصلاة للجدولة
-      for (final prayer in prayerTimes) {
-        notificationTimes.add({
-          'name': prayer.name,
-          'time': prayer.time,
-        });
-      }
-      
-      debugPrint('Preparing to schedule notifications for ${notificationTimes.length} prayer times');
-      
-      // Schedule notifications for all prayer times
-      if (notificationTimes.isNotEmpty) {
-        final scheduledCount = await _notificationService.scheduleAllPrayerNotifications(notificationTimes);
-        debugPrint('Successfully scheduled $scheduledCount prayer notifications');
-        
-        // التحقق من الإشعارات المجدولة
-        final pendingNotifications = await _notificationService.getPendingNotifications();
-        debugPrint('Total pending notifications after scheduling: ${pendingNotifications.length}');
-        
-        return scheduledCount > 0;
-      } else {
-        debugPrint('No prayer times to schedule notifications for');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Error scheduling prayer notifications: $e');
-      return false;
+Future<bool> schedulePrayerNotifications() async {
+  try {
+    debugPrint('Starting to schedule prayer notifications');
+    
+    // التحقق مما إذا كان يجب تحديث الإشعارات
+    final shouldUpdate = await _notificationService.shouldUpdateNotifications();
+    if (!shouldUpdate) {
+      debugPrint('Prayer notifications already up-to-date for today');
+      return true;
     }
+    
+    // Get prayer times
+    List<PrayerTimeModel> prayerTimes;
+    try {
+      // Try to get updated times
+      prayerTimes = await getPrayerTimesFromAPI(useDefaultLocationIfNeeded: true);
+      debugPrint('Got prayer times from API, count: ${prayerTimes.length}');
+    } catch (e) {
+      debugPrint('Error getting prayer times for notifications: $e');
+      
+      // Use cache if available
+      if (_cachedPrayerTimes != null) {
+        debugPrint('Using cached prayer times as fallback');
+        prayerTimes = _cachedPrayerTimes!;
+      } else {
+        // Use default times in case of error
+        debugPrint('Using default prayer times as fallback');
+        prayerTimes = _createDefaultPrayerTimes();
+      }
+    }
+    
+    // جدولة الإشعارات باستخدام الخدمة المحسنة
+    final scheduledCount = await _notificationService.schedulePrayerTimes(prayerTimes);
+    debugPrint('Successfully scheduled $scheduledCount prayer notifications');
+    
+    return scheduledCount > 0;
+  } catch (e) {
+    debugPrint('Error scheduling prayer notifications: $e');
+    return false;
   }
+}
   
   /// Update calculation method
   void updateCalculationMethod(String method) {

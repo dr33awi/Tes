@@ -1,19 +1,27 @@
-// lib/adhan/services/prayer_notification_service.dart
+// lib/adhan/services/enhanced_prayer_notification_service.dart
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
+import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:flutter_native_timezone_latest/flutter_native_timezone_latest.dart';
 
-class PrayerNotificationService {
-  // Singleton implementation
-  static final PrayerNotificationService _instance = PrayerNotificationService._internal();
-  factory PrayerNotificationService() => _instance;
-  PrayerNotificationService._internal();
+class EnhancedPrayerNotificationService {
+  // Singleton pattern implementation
+  static final EnhancedPrayerNotificationService _instance = EnhancedPrayerNotificationService._internal();
+  factory EnhancedPrayerNotificationService() => _instance;
+  EnhancedPrayerNotificationService._internal();
 
+  // Flutter Local Notifications Plugin
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+  final PrayerTimesService _prayerService = PrayerTimesService();
   
   // Notification settings
   bool _isNotificationEnabled = true;
@@ -36,23 +44,50 @@ class PrayerNotificationService {
     'العشاء': 10,
   };
   
+  // Store device timezone
+  String _deviceTimeZone = 'UTC';
+  
+  // Alarm IDs for background notifications
+  static const int fajrAlarmId = 2001;
+  static const int sunriseAlarmId = 2002;
+  static const int dhuhrAlarmId = 2003;
+  static const int asrAlarmId = 2004;
+  static const int maghribAlarmId = 2005;
+  static const int ishaAlarmId = 2006;
+  
   bool _isInitialized = false;
   BuildContext? _context;
 
+  // Initialize the service
   Future<bool> initialize() async {
     if (_isInitialized) {
-      debugPrint('Notification service already initialized');
+      debugPrint('Prayer notification service already initialized');
       return true;
     }
     
     try {
-      debugPrint('Initializing notification service...');
+      debugPrint('Initializing prayer notification service...');
       
       // Initialize timezone data
       tz_data.initializeTimeZones();
       
-      // تهيئة مدير المنبهات للأندرويد
-      await initAlarmManager();
+      // Get device timezone
+      try {
+        _deviceTimeZone = await FlutterNativeTimezoneLatest.getLocalTimezone();
+        // Set the timezone
+        tz.setLocalLocation(tz.getLocation(_deviceTimeZone));
+        debugPrint('Device timezone: $_deviceTimeZone');
+      } catch (e) {
+        debugPrint('Error getting device timezone: $e');
+        // Fallback to a safe default
+        _deviceTimeZone = 'UTC';
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      }
+      
+      // Initialize Android Alarm Manager
+      if (Platform.isAndroid) {
+        await AndroidAlarmManager.initialize();
+      }
       
       // Configure local notifications
       const AndroidInitializationSettings androidSettings = 
@@ -94,19 +129,6 @@ class PrayerNotificationService {
     }
   }
   
-  // تهيئة مدير المنبهات للأندرويد
-  Future<bool> initAlarmManager() async {
-    try {
-      // تهيئة مدير المنبهات للأندرويد
-      final initialized = await AndroidAlarmManager.initialize();
-      debugPrint('Android Alarm Manager initialized: $initialized');
-      return initialized;
-    } catch (e) {
-      debugPrint('Failed to initialize Android Alarm Manager: $e');
-      return false;
-    }
-  }
-  
   // إنشاء قناة الإشعارات بأولوية عالية
   Future<void> _createNotificationChannel() async {
     try {
@@ -116,9 +138,9 @@ class PrayerNotificationService {
       if (androidPlugin != null) {
         // إنشاء قناة إشعارات عالية الأولوية
         const AndroidNotificationChannel channel = AndroidNotificationChannel(
-          'prayer_channel',
+          'prayer_times_channel',
           'Prayer Times',
-          description: 'Prayer time notifications',
+          description: 'Notifications for prayer times',
           importance: Importance.max, // أقصى أولوية
           enableVibration: true,
           enableLights: true,
@@ -134,15 +156,15 @@ class PrayerNotificationService {
         
         if (channels != null) {
           for (var existingChannel in channels) {
-            if (existingChannel.id == 'prayer_channel') {
+            if (existingChannel.id == 'prayer_times_channel') {
               channelExists = true;
-              debugPrint('Notification channel exists with importance: ${existingChannel.importance}');
+              debugPrint('Prayer notification channel exists with importance: ${existingChannel.importance}');
               break;
             }
           }
         }
         
-        debugPrint('Notification channel created successfully: $channelExists');
+        debugPrint('Prayer notification channel created successfully: $channelExists');
       } else {
         debugPrint('Android plugin is null, cannot create notification channel');
       }
@@ -151,7 +173,7 @@ class PrayerNotificationService {
     }
   }
 
-  // التحقق من إذن الإشعارات - احتفظنا بالاسم الأصلي للطريقة
+  // التحقق من إذن الإشعارات
   Future<bool> checkNotificationPermission() async {
     try {
       // Check current permission status
@@ -165,7 +187,7 @@ class PrayerNotificationService {
     }
   }
   
-  // طلب إذن الإشعارات - احتفظنا بالاسم الأصلي للطريقة
+  // طلب إذن الإشعارات
   Future<bool> requestNotificationPermission() async {
     try {
       debugPrint('Requesting notification permission...');
@@ -185,6 +207,7 @@ class PrayerNotificationService {
           alert: true,
           badge: true,
           sound: true,
+          critical: true, // لتجاوز وضع عدم الإزعاج
         );
         
         debugPrint('iOS notification permission: $iosPermission');
@@ -194,7 +217,7 @@ class PrayerNotificationService {
       // Save permission status
       if (permissionGranted) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('notification_permission_granted', true);
+        await prefs.setBool('prayer_notification_permission_granted', true);
       } else {
         // إذا لم يتم منح الإذن، حاول عرض حوار توضيحي
         if (_context != null) {
@@ -247,8 +270,10 @@ class PrayerNotificationService {
   }
   
   void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('Notification tapped: ${response.id}');
-    debugPrint('Notification payload: ${response.payload}');
+    debugPrint('Prayer notification tapped: ${response.id}');
+    debugPrint('Prayer notification payload: ${response.payload}');
+    
+    // هنا يمكن إضافة منطق للانتقال إلى شاشة الصلوات عند النقر على الإشعار
   }
   
   Future<void> _loadNotificationSettings() async {
@@ -272,7 +297,7 @@ class PrayerNotificationService {
         _prayerReminderTimes[prayer] = reminderMinutes;
       }
       
-      debugPrint('Notification settings loaded successfully');
+      debugPrint('Prayer notification settings loaded successfully');
       debugPrint('Master toggle: $_isNotificationEnabled');
       debugPrint('Prayer settings: $_prayerNotificationSettings');
     } catch (e) {
@@ -303,7 +328,7 @@ class PrayerNotificationService {
         );
       }
       
-      debugPrint('Notification settings saved successfully');
+      debugPrint('Prayer notification settings saved successfully');
     } catch (e) {
       debugPrint('Error saving notification settings: $e');
     }
@@ -314,14 +339,14 @@ class PrayerNotificationService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final today = DateTime.now().toIso8601String().split('T')[0]; // YYYY-MM-DD format
-      await prefs.setString('last_notification_schedule_date', today);
-      debugPrint('Last schedule date saved: $today');
+      await prefs.setString('prayer_last_notification_schedule_date', today);
+      debugPrint('Prayer last schedule date saved: $today');
     } catch (e) {
-      debugPrint('Error saving last schedule date: $e');
+      debugPrint('Error saving prayer last schedule date: $e');
     }
   }
   
-  // جدولة إشعارات الصلاة باستخدام AlarmManager
+  // جدولة إشعار صلاة فردي
   Future<bool> schedulePrayerNotification({
     required String prayerName,
     required DateTime prayerTime,
@@ -343,10 +368,10 @@ class PrayerNotificationService {
     
     try {
       // إعداد تفاصيل الإشعار الأندرويد بأقصى أولوية
-      final androidDetails = const AndroidNotificationDetails(
-        'prayer_channel',
+      final androidDetails = AndroidNotificationDetails(
+        'prayer_times_channel',
         'Prayer Times',
-        channelDescription: 'Prayer time notifications',
+        channelDescription: 'Notifications for prayer times',
         importance: Importance.max,
         priority: Priority.max,
         styleInformation: BigTextStyleInformation(''),
@@ -356,10 +381,14 @@ class PrayerNotificationService {
         fullScreenIntent: true,
         category: AndroidNotificationCategory.alarm,
         visibility: NotificationVisibility.public,
+        color: _getPrayerColor(prayerName),
+        ledColor: _getPrayerColor(prayerName),
+        ledOnMs: 1000,
+        ledOffMs: 500,
       );
       
       // إعداد تفاصيل الإشعار iOS
-      final iosDetails = const DarwinNotificationDetails(
+      final iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
@@ -387,52 +416,181 @@ class PrayerNotificationService {
       await prefs.setString('prayer_notification_${notificationId}_title', title);
       await prefs.setString('prayer_notification_${notificationId}_body', body);
       
-      // حساب الفرق الزمني بين الآن ووقت الإشعار
-      final difference = prayerTime.difference(now);
-      final diffInSeconds = difference.inSeconds;
+      // تحويل DateTime إلى TZDateTime
+      final scheduledDate = tz.TZDateTime.from(prayerTime, tz.local);
       
-      // جدولة الإشعار باستخدام AlarmManager للأندرويد
-      final success = await AndroidAlarmManager.oneShot(
-        Duration(seconds: diffInSeconds),
-        notificationId,
-        _showNotificationCallback,
-        exact: true,
-        wakeup: true,
-        rescheduleOnReboot: true,
-        allowWhileIdle: true,
-      );
-      
-      // أيضًا جدولة الإشعار باستخدام الطريقة التقليدية كنسخة احتياطية
+      // جدولة الإشعار باستخدام المكتبة
       await _notificationsPlugin.zonedSchedule(
         notificationId,
         title,
         body,
-        tz.TZDateTime.from(prayerTime, tz.local),
+        scheduledDate,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        // Changes made here - removed uiLocalNotificationDateInterpretation
+        matchDateTimeComponents: DateTimeComponents.time, // للتكرار اليومي
+        payload: 'prayer_$prayerName',
       );
+      
+      // جدولة الإشعار باستخدام AlarmManager للأندرويد
+      if (Platform.isAndroid) {
+        final alarmId = _getAlarmIdForPrayer(prayerName) + (isReminder ? 10000 : 0);
+        
+        // حساب الفرق الزمني بين الآن ووقت الإشعار
+        final difference = prayerTime.difference(now);
+        final diffInSeconds = difference.inSeconds;
+        
+        await AndroidAlarmManager.oneShot(
+          Duration(seconds: diffInSeconds),
+          alarmId,
+          _showPrayerNotificationCallback,
+          exact: true,
+          wakeup: true,
+          rescheduleOnReboot: true,
+          allowWhileIdle: true,
+          params: {
+            'prayerName': prayerName,
+            'notificationId': notificationId,
+            'title': title,
+            'body': body,
+            'isReminder': isReminder,
+          },
+        );
+      }
       
       final timeString = '${prayerTime.hour}:${prayerTime.minute.toString().padLeft(2, '0')}';
       debugPrint('Successfully scheduled ${isReminder ? "reminder" : "notification"} for $prayerName at $timeString (ID: $notificationId)');
-      debugPrint('AlarmManager scheduled: $success, Time difference: ${diffInSeconds}s');
       
       return true;
     } catch (e) {
-      debugPrint('Error scheduling notification for $prayerName: $e');
+      debugPrint('Error scheduling prayer notification for $prayerName: $e');
       return false;
     }
   }
   
-  // جدولة جميع إشعارات الصلاة بشكل محسن - مع التأكد من التسجيل
-  Future<int> scheduleAllPrayerNotifications(List<Map<String, dynamic>> prayerTimes) async {
+  // دالة ساكنة تُستدعى من قبل AlarmManager
+  @pragma('vm:entry-point')
+  static void _showPrayerNotificationCallback(int id, Map<String, dynamic>? params) async {
+    if (params == null) return;
+    
+    try {
+      debugPrint('Prayer AlarmManager callback triggered for notification ID: $id');
+      
+      // استخراج معلومات الإشعار
+      final prayerName = params['prayerName'] as String;
+      final notificationId = params['notificationId'] as int;
+      final title = params['title'] as String;
+      final body = params['body'] as String;
+      final isReminder = params['isReminder'] as bool;
+      
+      // تهيئة مكتبة الإشعارات
+      final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
+      
+      const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+      
+      await notifications.initialize(initSettings);
+      
+      // إنشاء قناة الإشعارات
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin = 
+          notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+          
+      if (androidPlugin != null) {
+        const AndroidNotificationChannel channel = AndroidNotificationChannel(
+          'prayer_times_channel',
+          'Prayer Times',
+          description: 'Notifications for prayer times',
+          importance: Importance.max,
+          enableVibration: true,
+          playSound: true,
+        );
+        
+        await androidPlugin.createNotificationChannel(channel);
+      }
+      
+      // عرض الإشعار
+      await notifications.show(
+        notificationId,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'prayer_times_channel',
+            'Prayer Times',
+            channelDescription: 'Notifications for prayer times',
+            importance: Importance.max,
+            priority: Priority.max,
+            playSound: true,
+            enableVibration: true,
+            fullScreenIntent: true,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: 'prayer_$prayerName',
+      );
+      
+      debugPrint('AlarmManager prayer notification displayed: $title');
+    } catch (e) {
+      debugPrint('Error in AlarmManager prayer callback: $e');
+    }
+  }
+  
+  // الحصول على معرف الإنذار حسب اسم الصلاة
+  int _getAlarmIdForPrayer(String prayerName) {
+    switch (prayerName) {
+      case 'الفجر':
+        return fajrAlarmId;
+      case 'الشروق':
+        return sunriseAlarmId;
+      case 'الظهر':
+        return dhuhrAlarmId;
+      case 'العصر':
+        return asrAlarmId;
+      case 'المغرب':
+        return maghribAlarmId;
+      case 'العشاء':
+        return ishaAlarmId;
+      default:
+        return prayerName.hashCode.abs() % 1000 + 3000;
+    }
+  }
+  
+  // الحصول على لون الصلاة
+  Color _getPrayerColor(String prayerName) {
+    switch (prayerName) {
+      case 'الفجر':
+        return const Color(0xFF5B68D9);
+      case 'الشروق':
+        return const Color(0xFFFF9E0D);
+      case 'الظهر':
+        return const Color(0xFFFFB746);
+      case 'العصر':
+        return const Color(0xFFFF8A65);
+      case 'المغرب':
+        return const Color(0xFF5C6BC0);
+      case 'العشاء':
+        return const Color(0xFF1A237E);
+      default:
+        return const Color(0xFF4DB6AC);
+    }
+  }
+  
+  // جدولة جميع إشعارات الصلوات
+  Future<int> schedulePrayerTimes(List<PrayerTimeModel> prayerTimes) async {
     if (!_isInitialized) {
-      debugPrint('Initializing notification service before scheduling notifications');
+      debugPrint('Initializing notification service before scheduling prayer notifications');
       await initialize();
     }
     
     // إلغاء الإشعارات السابقة
-    debugPrint('Cancelling previous notifications before scheduling new ones');
+    debugPrint('Cancelling previous prayer notifications before scheduling new ones');
     await cancelAllNotifications();
     
     // التحقق من أذونات الإشعارات
@@ -441,20 +599,20 @@ class PrayerNotificationService {
       debugPrint('Notification permission not granted - Requesting permission');
       final permissionRequested = await requestNotificationPermission();
       if (!permissionRequested) {
-        debugPrint('Failed to get notification permission - Cannot schedule notifications');
+        debugPrint('Failed to get notification permission - Cannot schedule prayer notifications');
         return 0;
       }
     }
     
     int scheduledCount = 0;
-    int notificationId = 1000; // بداية بمعرف كبير لتجنب التعارض
+    int notificationId = 2000; // بداية بمعرف كبير لتجنب التعارض
     
     debugPrint('Starting to schedule notifications for ${prayerTimes.length} prayer times');
     
     // تحضير قائمة أوقات الصلوات القادمة فقط
     final now = DateTime.now();
     final futurePrayers = prayerTimes.where((prayer) {
-      final prayerTime = prayer['time'] as DateTime;
+      final prayerTime = prayer.time;
       // اضافة تحقق إضافي
       return prayerTime.isAfter(now.subtract(const Duration(minutes: 1))); // أضفنا هامش دقيقة
     }).toList();
@@ -463,8 +621,8 @@ class PrayerNotificationService {
     
     // جدولة الإشعارات الجديدة لكل صلاة
     for (final prayer in futurePrayers) {
-      final prayerName = prayer['name'] as String;
-      final prayerTime = prayer['time'] as DateTime;
+      final prayerName = prayer.name;
+      final prayerTime = prayer.time;
       
       // تخطي صلاة الشروق إذا كانت غير مفعلة في الإعدادات
       if (prayerName == 'الشروق' && !_prayerNotificationSettings['الشروق']!) {
@@ -518,142 +676,107 @@ class PrayerNotificationService {
     final pendingNotifications = await getPendingNotifications();
     debugPrint('Total pending notifications after scheduling: ${pendingNotifications.length}');
     
-    debugPrint('Finished scheduling notifications. Total scheduled: $scheduledCount');
+    debugPrint('Finished scheduling prayer notifications. Total scheduled: $scheduledCount');
     return scheduledCount;
   }
   
-  // دالة ساكنة تُستدعى من قبل AlarmManager
-  @pragma('vm:entry-point')
-  static void _showNotificationCallback(int id) async {
-    try {
-      debugPrint('AlarmManager callback triggered for notification ID: $id');
-      
-      // قراءة معلومات الإشعار من التخزين المشترك
-      final prefs = await SharedPreferences.getInstance();
-      final title = prefs.getString('prayer_notification_${id}_title') ?? 'وقت الصلاة';
-      final body = prefs.getString('prayer_notification_${id}_body') ?? 'حان وقت الصلاة';
-      
-      // تهيئة مكتبة الإشعارات
-      final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
-      
-      const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
-      const InitializationSettings initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      );
-      
-      await notifications.initialize(initSettings);
-      
-      // إنشاء قناة الإشعارات
-      final AndroidFlutterLocalNotificationsPlugin? androidPlugin = 
-          notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-          
-      if (androidPlugin != null) {
-        const AndroidNotificationChannel channel = AndroidNotificationChannel(
-          'prayer_channel',
-          'Prayer Times',
-          description: 'Prayer time notifications',
-          importance: Importance.max,
-          enableVibration: true,
-          playSound: true,
-        );
-        
-        await androidPlugin.createNotificationChannel(channel);
-      }
-      
-      // عرض الإشعار
-      await notifications.show(
-        id,
-        title,
-        body,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'prayer_channel',
-            'Prayer Times',
-            channelDescription: 'Prayer time notifications',
-            importance: Importance.max,
-            priority: Priority.max,
-            playSound: true,
-            enableVibration: true,
-            fullScreenIntent: true,
-          ),
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-      );
-      
-      debugPrint('AlarmManager notification displayed: $title');
-    } catch (e) {
-      debugPrint('Error in AlarmManager callback: $e');
-    }
-  }
-  
-  // إلغاء جميع الإشعارات
+  // إلغاء جميع إشعارات الصلوات
   Future<void> cancelAllNotifications() async {
     try {
-      await _notificationsPlugin.cancelAll();
-      debugPrint('All notifications cancelled successfully');
+      // الحصول على جميع الإشعارات المعلقة
+      final pendingNotifications = await getPendingNotifications();
+      
+      // إلغاء كل إشعار معلق يبدأ بـ 'prayer_'
+      for (final notification in pendingNotifications) {
+        if (notification.payload?.startsWith('prayer_') ?? false) {
+          await _notificationsPlugin.cancel(notification.id);
+        }
+      }
+      
+      // إلغاء جميع الإنذارات المرتبطة بالصلوات في Android
+      if (Platform.isAndroid) {
+        await AndroidAlarmManager.cancel(fajrAlarmId);
+        await AndroidAlarmManager.cancel(sunriseAlarmId);
+        await AndroidAlarmManager.cancel(dhuhrAlarmId);
+        await AndroidAlarmManager.cancel(asrAlarmId);
+        await AndroidAlarmManager.cancel(maghribAlarmId);
+        await AndroidAlarmManager.cancel(ishaAlarmId);
+        
+        // إلغاء إنذارات التذكير
+        await AndroidAlarmManager.cancel(fajrAlarmId + 10000);
+        await AndroidAlarmManager.cancel(sunriseAlarmId + 10000);
+        await AndroidAlarmManager.cancel(dhuhrAlarmId + 10000);
+        await AndroidAlarmManager.cancel(asrAlarmId + 10000);
+        await AndroidAlarmManager.cancel(maghribAlarmId + 10000);
+        await AndroidAlarmManager.cancel(ishaAlarmId + 10000);
+      }
+      
+      debugPrint('All prayer notifications cancelled successfully');
     } catch (e) {
-      debugPrint('Error canceling notifications: $e');
+      debugPrint('Error canceling prayer notifications: $e');
     }
   }
   
-  // فحص الإشعارات الفعالة مع تفاصيل أكثر
-  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+  // التحقق مما إذا كان يجب تحديث الإشعارات
+  Future<bool> shouldUpdateNotifications() async {
     try {
-      final pendingNotifications = await _notificationsPlugin.pendingNotificationRequests();
-      debugPrint('Pending notifications: ${pendingNotifications.length}');
+      final prefs = await SharedPreferences.getInstance();
+      final lastScheduleDate = prefs.getString('prayer_last_notification_schedule_date');
+      final today = DateTime.now().toIso8601String().split('T')[0]; // YYYY-MM-DD format
       
-      if (pendingNotifications.isNotEmpty) {
-        for (var i = 0; i < pendingNotifications.length; i++) {
-          final notification = pendingNotifications[i];
-          debugPrint('Notification #${i+1}: ID=${notification.id}, Title=${notification.title}, Body=${notification.body}');
-        }
-      } else {
-        debugPrint('No pending notifications found!');
+      debugPrint('Prayer last schedule date: $lastScheduleDate, Today: $today');
+      
+      // إذا لم يكن هناك تاريخ مسجل أو كان التاريخ مختلفًا عن اليوم الحالي
+      if (lastScheduleDate == null || lastScheduleDate != today) {
+        return true;
       }
       
-      return pendingNotifications;
+      // التحقق من عدد الإشعارات المجدولة المرتبطة بالصلوات
+      final pendingNotifications = await getPendingNotifications();
+      final prayerNotifications = pendingNotifications.where(
+        (notification) => notification.payload?.startsWith('prayer_') ?? false
+      ).toList();
+      
+      if (prayerNotifications.isEmpty) {
+        debugPrint('No pending prayer notifications found, should update');
+        return true;
+      }
+      
+      return false;
     } catch (e) {
-      debugPrint('Error getting pending notifications: $e');
+      debugPrint('Error checking if prayer notifications should be updated: $e');
+      return true; // في حالة الشك، قم بالتحديث
+    }
+  }
+  
+  // الحصول على الإشعارات المعلقة
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    try {
+      return await _notificationsPlugin.pendingNotificationRequests();
+    } catch (e) {
+      debugPrint('Error getting pending prayer notifications: $e');
       return [];
     }
   }
   
-  // طريقة جديدة: اختبار إنشاء وتلقي الإشعارات على الفور
-  Future<bool> testImmediateNotification() async {
+  // اختبار الإشعارات - إرسال إشعار فوري
+  Future<bool> testPrayerNotification() async {
     try {
-      debugPrint('Testing immediate notification...');
-      
-      // التحقق من أذونات الإشعارات
-      final hasPermission = await checkNotificationPermission();
-      if (!hasPermission) {
-        debugPrint('Notification permission not granted - Requesting for test notification');
-        final permissionRequested = await requestNotificationPermission();
-        if (!permissionRequested) {
-          debugPrint('Failed to get notification permission for test notification');
-          return false;
-        }
-      }
-      
-      // إعداد تفاصيل الإشعار بأقصى أولوية
-      final androidDetails = const AndroidNotificationDetails(
-        'prayer_channel',
+      // إعداد تفاصيل الإشعار الأندرويد بأقصى أولوية
+      final androidDetails = AndroidNotificationDetails(
+        'prayer_times_channel',
         'Prayer Times',
-        channelDescription: 'Prayer time notifications',
+        channelDescription: 'Notifications for prayer times',
         importance: Importance.max,
         priority: Priority.max,
         playSound: true,
         enableVibration: true,
-        ticker: 'Test Notification',
+        ticker: 'Prayer Time Test',
         fullScreenIntent: true,
       );
       
-      final iosDetails = const DarwinNotificationDetails(
+      // إعداد تفاصيل الإشعار iOS
+      final iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
@@ -662,150 +785,79 @@ class PrayerNotificationService {
       
       final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
       
-      // إنشاء إشعار فوري للاختبار
-      final testId = 9999;
+      // إرسال إشعار اختبار
       await _notificationsPlugin.show(
-        testId,
-        'اختبار الإشعارات',
-        'هذا اختبار للتأكد من عمل نظام الإشعارات بشكل صحيح.',
+        9999,
+        'اختبار إشعارات الصلاة',
+        'هذا اختبار للتأكد من عمل إشعارات الصلاة بشكل صحيح',
         details,
-        payload: 'test_notification',
+        payload: 'prayer_test',
       );
       
-      debugPrint('Test notification sent with ID: $testId');
-      
-      // التحقق من تسجيل الإشعار (لن يظهر في pendingNotifications لأنه فوري)
+      debugPrint('Test prayer notification sent successfully');
       return true;
     } catch (e) {
-      debugPrint('Error sending test notification: $e');
+      debugPrint('Error sending test prayer notification: $e');
       return false;
     }
   }
   
-  // إضافة طريقة لاختبار إشعار مجدول بعد 30 ثانية باستخدام AlarmManager
-  Future<bool> testScheduledNotification() async {
-    try {
-      debugPrint('Testing scheduled notification with AlarmManager...');
+  // التحقق من إذا كانت الإشعارات مفعلة لصلاة معينة
+  bool isPrayerNotificationEnabled(String prayerName) {
+    return _isNotificationEnabled && (_prayerNotificationSettings[prayerName] ?? false);
+  }
+  
+  // تغيير حالة تفعيل إشعارات الصلاة
+  Future<void> setPrayerNotificationEnabled(String prayerName, bool enabled) async {
+    if (_prayerNotificationSettings.containsKey(prayerName)) {
+      _prayerNotificationSettings[prayerName] = enabled;
+      await saveNotificationSettings();
       
-      // التحقق من أذونات الإشعارات
-      final hasPermission = await checkNotificationPermission();
-      if (!hasPermission) {
-        final permissionRequested = await requestNotificationPermission();
-        if (!permissionRequested) {
-          debugPrint('Failed to get notification permission for test notification');
-          return false;
-        }
+      // إعادة جدولة الإشعارات إذا تم تفعيل الإشعارات
+      if (enabled) {
+        await _prayerService.schedulePrayerNotifications();
       }
-      
-      // تهيئة مدير المنبهات للأندرويد
-      await initAlarmManager();
-      
-      // حفظ معلومات الإشعار الاختباري
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('prayer_notification_9998_title', 'اختبار إشعار مجدول');
-      await prefs.setString('prayer_notification_9998_body', 'هذا اختبار للتأكد من عمل نظام الإشعارات المجدولة بعد 30 ثانية.');
-      
-      // تعيين منبه بعد 30 ثانية
-      final testId = 9998;
-      final success = await AndroidAlarmManager.oneShot(
-        const Duration(seconds: 30),
-        testId,
-        _showNotificationCallback,
-        exact: true,
-        wakeup: true,
-        rescheduleOnReboot: true,
-        allowWhileIdle: true,
-      );
-      
-      debugPrint('AlarmManager oneShot scheduled: $success');
-      
-      // أيضًا تجربة النظام العادي للإشعارات المجدولة
-      final scheduledTime = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 30));
-      await _notificationsPlugin.zonedSchedule(
-        testId + 1,
-        'اختبار نظام الإشعارات العادي',
-        'هذا اختبار للتأكد من عمل نظام الإشعارات المجدولة العادي بعد 30 ثانية.',
-        scheduledTime,
-        NotificationDetails(
-          android: const AndroidNotificationDetails(
-            'prayer_channel',
-            'Prayer Times',
-            channelDescription: 'Prayer time notifications',
-            importance: Importance.max,
-            priority: Priority.max,
-            playSound: true,
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        // Changes made here - removed uiLocalNotificationDateInterpretation
-      );
-      
-      debugPrint('Test scheduled in two ways for 30 seconds from now');
-      return true;
-    } catch (e) {
-      debugPrint('Error scheduling test notification: $e');
-      return false;
     }
   }
   
+  // الحصول على مهلة التذكير المسبق لصلاة معينة
+  int getPrayerReminderTime(String prayerName) {
+    return _prayerReminderTimes[prayerName] ?? 10;
+  }
+  
+  // تعديل مهلة التذكير المسبق لصلاة معينة
+  Future<void> setPrayerReminderTime(String prayerName, int minutes) async {
+    if (_prayerReminderTimes.containsKey(prayerName)) {
+      _prayerReminderTimes[prayerName] = minutes;
+      await saveNotificationSettings();
+      
+      // إعادة جدولة الإشعارات لتطبيق المهلة الجديدة
+      if (_prayerNotificationSettings[prayerName] == true) {
+        await _prayerService.schedulePrayerNotifications();
+      }
+    }
+  }
+  
+  // الحصول على حالة تفعيل إشعارات الصلاة بشكل عام
   bool get isNotificationEnabled => _isNotificationEnabled;
   
+  // تغيير حالة تفعيل إشعارات الصلاة بشكل عام
   set isNotificationEnabled(bool value) {
     _isNotificationEnabled = value;
     saveNotificationSettings();
+    
+    if (value) {
+      // إعادة جدولة الإشعارات إذا تم تفعيل الإشعارات
+      _prayerService.schedulePrayerNotifications();
+    } else {
+      // إلغاء جميع الإشعارات إذا تم تعطيل الإشعارات
+      cancelAllNotifications();
+    }
   }
   
+  // الحصول على قائمة إعدادات إشعارات الصلوات
   Map<String, bool> get prayerNotificationSettings => Map.unmodifiable(_prayerNotificationSettings);
   
+  // الحصول على قائمة مهل التذكير المسبق للصلوات
   Map<String, int> get prayerReminderTimes => Map.unmodifiable(_prayerReminderTimes);
-  
-  Future<void> setPrayerNotificationEnabled(String prayer, bool enabled) async {
-    if (_prayerNotificationSettings.containsKey(prayer)) {
-      _prayerNotificationSettings[prayer] = enabled;
-      await saveNotificationSettings();
-    }
-  }
-  
-  // إضافة طريقة لتعديل وقت التذكير المسبق
-  Future<void> setPrayerReminderTime(String prayer, int minutes) async {
-    if (_prayerReminderTimes.containsKey(prayer)) {
-      _prayerReminderTimes[prayer] = minutes;
-      await saveNotificationSettings();
-    }
-  }
-  
-  bool get isInitialized => _isInitialized;
-  
-  // اضافة طريقة للتحقق مما إذا كان يجب تحديث الإشعارات
-  Future<bool> shouldUpdateNotifications() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastScheduleDate = prefs.getString('last_notification_schedule_date');
-      final today = DateTime.now().toIso8601String().split('T')[0]; // YYYY-MM-DD format
-      
-      debugPrint('Last schedule date: $lastScheduleDate, Today: $today');
-      
-      // إذا لم يكن هناك تاريخ مسجل أو كان التاريخ مختلفًا عن اليوم الحالي
-      if (lastScheduleDate == null || lastScheduleDate != today) {
-        return true;
-      }
-      
-      // التحقق من عدد الإشعارات المجدولة
-      final pendingNotifications = await getPendingNotifications();
-      if (pendingNotifications.isEmpty) {
-        debugPrint('No pending notifications found, should update');
-        return true;
-      }
-      
-      return false;
-    } catch (e) {
-      debugPrint('Error checking if notifications should be updated: $e');
-      return true; // في حالة الشك، قم بالتحديث
-    }
-  }
 }

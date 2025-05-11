@@ -1,7 +1,7 @@
 // lib/adhan/screens/notification_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
+import 'package:test_athkar_app/adhan/services/enhanced_prayer_notification_service.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
@@ -15,7 +15,7 @@ class NotificationSettingsScreen extends StatefulWidget {
 }
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-  final PrayerNotificationService _notificationService = PrayerNotificationService();
+final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNotificationService();
   final PrayerTimesService _prayerService = PrayerTimesService();
   
   bool _isLoading = true;
