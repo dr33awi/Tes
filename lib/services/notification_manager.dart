@@ -1,37 +1,36 @@
-// lib/services/notification/notification_manager.dart
+// lib/services/notification_manager.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/notification_service_interface.dart';
 import 'package:test_athkar_app/services/android_notification_service.dart';
 import 'package:test_athkar_app/services/ios_notification_service.dart';
 import 'dart:io' show Platform;
 
-/// Manager für alle Benachrichtigungsfunktionen der App
-/// Dient als zentrale Anlaufstelle für alle Benachrichtigungsfunktionen
+/// مدير مركزي لجميع وظائف الإشعارات في التطبيق
 class NotificationManager {
-  // Das spezifische Service-Implementierung basierend auf der Plattform
+  // الخدمة المحددة للمنصة
   late NotificationServiceInterface _notificationService;
   
-  // Abhängigkeiten
+  // التبعيات
   final ErrorLoggingService _errorLoggingService;
   
-  // Konstanten für lokale Speicherung
+  // ثوابت للتخزين المحلي
   static const String _keyNotificationSettings = 'notification_settings';
   
-  // Benutzereinstellungen
+  // إعدادات المستخدم
   NotificationSettings _settings = NotificationSettings();
   
   NotificationManager({
     required ErrorLoggingService errorLoggingService,
   }) : _errorLoggingService = errorLoggingService {
-    // Plattformspezifischen Service initialisieren
     _initPlatformService();
   }
   
-  /// Initialisiert den richtigen Service basierend auf der Plattform
+  /// تهيئة الخدمة المناسبة للمنصة
   void _initPlatformService() {
     final serviceLocator = GetIt.instance;
     
@@ -40,21 +39,21 @@ class NotificationManager {
     } else if (Platform.isIOS) {
       _notificationService = serviceLocator<IOSNotificationService>();
     } else {
-      // Fallback-Implementierung
+      // خدمة احتياطية
       _notificationService = serviceLocator<AndroidNotificationService>();
     }
   }
   
-  /// Initialisiert den NotificationManager
+  /// تهيئة مدير الإشعارات
   Future<bool> initialize() async {
     try {
-      // Benutzereinstellungen laden
+      // تحميل إعدادات المستخدم
       await _loadSettings();
       
-      // Plattformspezifischen Service initialisieren
+      // تهيئة الخدمة الخاصة بالمنصة
       final result = await _notificationService.initialize();
       
-      // Service mit Benutzereinstellungen konfigurieren
+      // تكوين الخدمة بناءً على إعدادات المستخدم
       if (result) {
         await _notificationService.configureFromPreferences();
       }
@@ -63,14 +62,14 @@ class NotificationManager {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationManager', 
-        'Fehler bei der Initialisierung des NotificationManagers', 
+        'خطأ في تهيئة مدير الإشعارات', 
         e
       );
       return false;
     }
   }
   
-  /// Lädt die Benutzereinstellungen aus dem lokalen Speicher
+  /// تحميل إعدادات المستخدم من التخزين المحلي
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -84,13 +83,13 @@ class NotificationManager {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationManager', 
-        'Fehler beim Laden der Benachrichtigungseinstellungen', 
+        'خطأ في تحميل إعدادات الإشعارات', 
         e
       );
     }
   }
   
-  /// Speichert die Benutzereinstellungen im lokalen Speicher
+  /// حفظ إعدادات المستخدم في التخزين المحلي
   Future<void> _saveSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -98,23 +97,23 @@ class NotificationManager {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationManager', 
-        'Fehler beim Speichern der Benachrichtigungseinstellungen', 
+        'خطأ في حفظ إعدادات الإشعارات', 
         e
       );
     }
   }
   
-  /// Gibt die aktuellen Benutzereinstellungen zurück
+  /// الحصول على إعدادات المستخدم الحالية
   NotificationSettings get settings => _settings;
   
-  /// Aktualisiert die Benutzereinstellungen
+  /// تحديث إعدادات المستخدم
   Future<void> updateSettings(NotificationSettings newSettings) async {
     _settings = newSettings;
     await _saveSettings();
     await _notificationService.configureFromPreferences();
   }
   
-  /// Aktiviert oder deaktiviert alle Benachrichtigungen
+  /// تفعيل أو تعطيل جميع الإشعارات
   Future<bool> setNotificationsEnabled(bool enabled) async {
     try {
       final result = await _notificationService.setNotificationsEnabled(enabled);
@@ -126,192 +125,195 @@ class NotificationManager {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationManager', 
-        'Fehler beim Ändern des Benachrichtigungsstatus', 
+        'خطأ في تغيير حالة الإشعارات', 
         e
       );
       return false;
     }
   }
   
-  /// Prüft, ob alle notwendigen Berechtigungen und Einstellungen für Benachrichtigungen vorhanden sind
+  /// التحقق من جميع المتطلبات والأذونات الضرورية
   Future<bool> checkNotificationPrerequisites(BuildContext context) async {
     return await _notificationService.checkNotificationPrerequisites(context);
   }
   
-  /// Plant eine Benachrichtigung für eine bestimmte Athkar-Kategorie
-  Future<bool> scheduleAthkarNotification({
-    required AthkarCategory category,
+  /// جدولة إشعار عام
+  Future<bool> scheduleNotification({
+    required String notificationId,
+    required String title,
+    required String body,
     required TimeOfDay notificationTime,
+    String? channelId,
+    String? payload,
+    Color? color,
+    bool repeat = true,
+    int? priority,
+  }) async {
+    try {
+      if (!_settings.enabled) return false;
+      
+      return await _notificationService.scheduleNotification(
+        notificationId: notificationId,
+        title: title,
+        body: body,
+        notificationTime: notificationTime,
+        channelId: channelId,
+        payload: payload,
+        color: color,
+        repeat: repeat,
+        priority: priority,
+      );
+    } catch (e) {
+      _errorLoggingService.logError(
+        'NotificationManager', 
+        'خطأ في جدولة إشعار', 
+        e
+      );
+      return false;
+    }
+  }
+  
+  /// جدولة إشعارات متعددة
+  Future<bool> scheduleMultipleNotifications({
+    required String baseId,
+    required String title,
+    required String body,
+    required List<TimeOfDay> notificationTimes,
+    String? channelId,
+    String? payload,
+    Color? color,
     bool repeat = true,
   }) async {
     try {
       if (!_settings.enabled) return false;
       
-      // Prüfen, ob diese Kategorie aktiviert ist
-      if (!_isCategoryEnabled(category.id)) return false;
-      
-      return await _notificationService.scheduleAthkarNotification(
-        category: category,
-        notificationTime: notificationTime,
+      return await _notificationService.scheduleMultipleNotifications(
+        baseId: baseId,
+        title: title,
+        body: body,
+        notificationTimes: notificationTimes,
+        channelId: channelId,
+        payload: payload,
+        color: color,
         repeat: repeat,
       );
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationManager', 
-        'Fehler beim Planen einer Athkar-Benachrichtigung', 
+        'خطأ في جدولة إشعارات متعددة', 
         e
       );
       return false;
     }
   }
   
-  /// Prüft, ob eine bestimmte Kategorie aktiviert ist
-  bool _isCategoryEnabled(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return _settings.morningAthkarEnabled;
-      case 'evening':
-        return _settings.eveningAthkarEnabled;
-      case 'sleep':
-        return _settings.sleepAthkarEnabled;
-      case 'wake':
-        return _settings.wakeAthkarEnabled;
-      case 'prayer':
-        return _settings.prayerAthkarEnabled;
-      default:
-        return true; // Standardmäßig aktiviert
-    }
-  }
-  
-  /// Plant mehrere Benachrichtigungen für eine Athkar-Kategorie
-  Future<bool> scheduleMultipleAthkarNotifications({
-    required AthkarCategory category,
-    required List<TimeOfDay> notificationTimes,
-  }) async {
-    try {
-      if (!_settings.enabled) return false;
-      if (!_isCategoryEnabled(category.id)) return false;
-      
-      return await _notificationService.scheduleMultipleAthkarNotifications(
-        category: category,
-        notificationTimes: notificationTimes,
-      );
-    } catch (e) {
-      _errorLoggingService.logError(
-        'NotificationManager', 
-        'Fehler beim Planen mehrerer Athkar-Benachrichtigungen', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// Bricht eine Benachrichtigung ab
+  /// إلغاء إشعار
   Future<bool> cancelNotification(String notificationId) async {
     return await _notificationService.cancelNotification(notificationId);
   }
   
-  /// Bricht alle Benachrichtigungen ab
+  /// إلغاء جميع الإشعارات
   Future<bool> cancelAllNotifications() async {
     return await _notificationService.cancelAllNotifications();
   }
   
-  /// Plant alle gespeicherten Benachrichtigungen neu
+  /// إعادة جدولة جميع الإشعارات المحفوظة
   Future<void> rescheduleAllNotifications() async {
     await _notificationService.scheduleAllSavedNotifications();
   }
   
-  /// Sendet eine Testbenachrichtigung
+  /// إرسال إشعار اختباري
   Future<bool> sendTestNotification() async {
     return await _notificationService.testImmediateNotification();
   }
   
-  /// Überprüft und optimiert Benachrichtigungseinstellungen
+  /// التحقق من الإعدادات وتحسينات النظام
   Future<void> checkNotificationOptimizations(BuildContext context) async {
     await _notificationService.checkNotificationOptimizations(context);
   }
+  
+  /// إظهار إشعار بسيط فوري
+  Future<void> showSimpleNotification(String title, String body, {String? payload}) async {
+    await _notificationService.showSimpleNotification(
+      title,
+      body,
+      DateTime.now().millisecondsSinceEpoch,
+      payload: payload,
+    );
+  }
+  
+  /// الحصول على الإشعارات المعلقة
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    return await _notificationService.getPendingNotifications();
+  }
+  
+  /// التحقق من حالة إشعار معين
+  Future<bool> isNotificationEnabled(String notificationId) async {
+    return await _notificationService.isNotificationEnabled(notificationId);
+  }
+  
+  /// الحصول على وقت إشعار محفوظ
+  Future<TimeOfDay?> getNotificationTime(String notificationId) async {
+    return await _notificationService.getNotificationTime(notificationId);
+  }
 }
 
-/// Benutzereinstellungen für Benachrichtigungen
+/// إعدادات المستخدم للإشعارات
 class NotificationSettings {
   final bool enabled;
-  final bool morningAthkarEnabled;
-  final bool eveningAthkarEnabled;
-  final bool sleepAthkarEnabled;
-  final bool wakeAthkarEnabled;
-  final bool prayerAthkarEnabled;
   final bool soundEnabled;
   final bool vibrationEnabled;
+  final bool lightsEnabled;
   final bool shouldBypassDnd;
   final bool groupSimilarNotifications;
   
   NotificationSettings({
     this.enabled = true,
-    this.morningAthkarEnabled = true,
-    this.eveningAthkarEnabled = true,
-    this.sleepAthkarEnabled = true,
-    this.wakeAthkarEnabled = true,
-    this.prayerAthkarEnabled = true,
     this.soundEnabled = true,
     this.vibrationEnabled = true,
+    this.lightsEnabled = true,
     this.shouldBypassDnd = false,
     this.groupSimilarNotifications = true,
   });
   
-  /// Erstellt ein Objekt aus JSON
+  /// إنشاء من JSON
   factory NotificationSettings.fromJson(Map<String, dynamic> json) {
     return NotificationSettings(
       enabled: json['enabled'] ?? true,
-      morningAthkarEnabled: json['morningAthkarEnabled'] ?? true,
-      eveningAthkarEnabled: json['eveningAthkarEnabled'] ?? true,
-      sleepAthkarEnabled: json['sleepAthkarEnabled'] ?? true,
-      wakeAthkarEnabled: json['wakeAthkarEnabled'] ?? true,
-      prayerAthkarEnabled: json['prayerAthkarEnabled'] ?? true,
       soundEnabled: json['soundEnabled'] ?? true,
       vibrationEnabled: json['vibrationEnabled'] ?? true,
+      lightsEnabled: json['lightsEnabled'] ?? true,
       shouldBypassDnd: json['shouldBypassDnd'] ?? false,
       groupSimilarNotifications: json['groupSimilarNotifications'] ?? true,
     );
   }
   
-  /// Konvertiert in JSON
+  /// تحويل إلى JSON
   Map<String, dynamic> toJson() {
     return {
       'enabled': enabled,
-      'morningAthkarEnabled': morningAthkarEnabled,
-      'eveningAthkarEnabled': eveningAthkarEnabled,
-      'sleepAthkarEnabled': sleepAthkarEnabled,
-      'wakeAthkarEnabled': wakeAthkarEnabled,
-      'prayerAthkarEnabled': prayerAthkarEnabled,
       'soundEnabled': soundEnabled,
       'vibrationEnabled': vibrationEnabled,
+      'lightsEnabled': lightsEnabled,
       'shouldBypassDnd': shouldBypassDnd,
       'groupSimilarNotifications': groupSimilarNotifications,
     };
   }
   
-  /// Erstellt eine Kopie mit Änderungen
+  /// إنشاء نسخة مع تعديلات
   NotificationSettings copyWith({
     bool? enabled,
-    bool? morningAthkarEnabled,
-    bool? eveningAthkarEnabled,
-    bool? sleepAthkarEnabled,
-    bool? wakeAthkarEnabled,
-    bool? prayerAthkarEnabled,
     bool? soundEnabled,
     bool? vibrationEnabled,
+    bool? lightsEnabled,
     bool? shouldBypassDnd,
     bool? groupSimilarNotifications,
   }) {
     return NotificationSettings(
       enabled: enabled ?? this.enabled,
-      morningAthkarEnabled: morningAthkarEnabled ?? this.morningAthkarEnabled,
-      eveningAthkarEnabled: eveningAthkarEnabled ?? this.eveningAthkarEnabled,
-      sleepAthkarEnabled: sleepAthkarEnabled ?? this.sleepAthkarEnabled,
-      wakeAthkarEnabled: wakeAthkarEnabled ?? this.wakeAthkarEnabled,
-      prayerAthkarEnabled: prayerAthkarEnabled ?? this.prayerAthkarEnabled,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+      lightsEnabled: lightsEnabled ?? this.lightsEnabled,
       shouldBypassDnd: shouldBypassDnd ?? this.shouldBypassDnd,
       groupSimilarNotifications: groupSimilarNotifications ?? this.groupSimilarNotifications,
     );

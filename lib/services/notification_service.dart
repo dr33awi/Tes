@@ -92,7 +92,7 @@ class NotificationService {
       
       // تهيئة الإشعارات الخاصة بنظام iOS
       if (Platform.isIOS) {
-        await _iosNotificationService.initializeIOSNotifications();
+        await _iosNotificationService.initialize();
       }
       
       // تعيين معالج الإشعارات والتنقل
@@ -206,7 +206,7 @@ class NotificationService {
         );
         
         // استخدام تهيئة iOS المخصصة
-        await _iosNotificationService.initializeIOSNotifications();
+        await _iosNotificationService.initialize();
       }
     } catch (e) {
       await _errorLoggingService.logError(
@@ -443,362 +443,7 @@ class NotificationService {
     }
   }
   
-  /// الحصول على الوقت التالي لجدولة الإشعار
-  tz.TZDateTime _getNextInstanceOfTime(TimeOfDay timeOfDay) {
-    final now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime scheduledDate = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      timeOfDay.hour,
-      timeOfDay.minute,
-    );
-    
-    // إذا كان الوقت قد مر اليوم، جدولة ليوم غد
-    if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
-    }
-    
-    return scheduledDate;
-  }
-  
-  /// جدولة إشعار عام
-  Future<bool> scheduleNotification({
-    required String notificationId,
-    required String title,
-    required String body,
-    required TimeOfDay notificationTime,
-    String? channelId,
-    String? payload,
-    Color? color,
-    bool repeat = true,
-    int? priority,
-  }) async {
-    try {
-      // التحقق من أذونات الإشعارات
-      final hasPermission = await _permissionsService.checkNotificationPermission();
-      if (!hasPermission) {
-        print('لا توجد أذونات للإشعارات');
-        return false;
-      }
-      
-      // حفظ وقت الإشعار في التخزين المحلي
-      await _saveNotificationTime(notificationId, notificationTime);
-      
-      // إنشاء معرف الإشعار من المعرف المقدم
-      final id = notificationId.hashCode.abs() % 100000;
-      
-      // جدولة الإشعار
-      if (Platform.isIOS) {
-        // إعدادات iOS
-        DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-          sound: 'default',
-          interruptionLevel: InterruptionLevel.active,
-          threadIdentifier: 'notification_$notificationId',
-        );
-        
-        NotificationDetails details = NotificationDetails(iOS: iosDetails);
-        
-        // الحصول على الوقت المحدد
-        final tz.TZDateTime scheduledDate = _getNextInstanceOfTime(notificationTime);
-        
-        // جدولة الإشعار
-        await _flutterLocalNotificationsPlugin.zonedSchedule(
-          id,
-          title,
-          body,
-          scheduledDate,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents: repeat ? DateTimeComponents.time : null, // تكرار يومي إذا كان مطلوبًا
-          payload: payload ?? notificationId,
-        );
-      } else {
-        // إعدادات Android
-        final channel = channelId ?? _defaultChannelId;
-        
-        AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-          channel,
-          'تنبيهات',
-          channelDescription: 'قناة التنبيهات',
-          importance: priority != null ? Importance.values[priority.clamp(0, 5)] : Importance.high,
-          priority: priority != null ? Priority.values[priority.clamp(0, 5)] : Priority.high,
-          color: color,
-          ledColor: color,
-          ledOnMs: 1000,
-          ledOffMs: 500,
-          visibility: NotificationVisibility.public,
-        );
-        
-        NotificationDetails details = NotificationDetails(android: androidDetails);
-        
-        // الحصول على الوقت المحدد
-        final tz.TZDateTime scheduledDate = _getNextInstanceOfTime(notificationTime);
-        
-        // جدولة الإشعار
-        await _flutterLocalNotificationsPlugin.zonedSchedule(
-          id,
-          title,
-          body,
-          scheduledDate,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents: repeat ? DateTimeComponents.time : null, // تكرار يومي إذا كان مطلوبًا
-          payload: payload ?? notificationId,
-        );
-      }
-      
-      // تحديث قائمة الإشعارات المجدولة
-      await _updateScheduledNotificationsList(notificationId);
-      
-      return true;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في جدولة الإشعار: $notificationId', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// حفظ وقت الإشعار في التخزين المحلي
-  Future<void> _saveNotificationTime(String notificationId, TimeOfDay time) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // حفظ الوقت بتنسيق HH:MM
-      final timeString = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-      await prefs.setString('notification_${notificationId}_time', timeString);
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في حفظ وقت الإشعار: $notificationId', 
-        e
-      );
-    }
-  }
-  
-  /// تحديث قائمة الإشعارات المجدولة
-  Future<void> _updateScheduledNotificationsList(String notificationId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // الحصول على القائمة الحالية
-      final List<String> scheduledList = prefs.getStringList(_keyScheduledNotifications) ?? [];
-      
-      // التحقق مما إذا كان المعرف موجودًا بالفعل
-      if (!scheduledList.contains(notificationId)) {
-        scheduledList.add(notificationId);
-        await prefs.setStringList(_keyScheduledNotifications, scheduledList);
-      }
-      
-      // تحديث وقت آخر مزامنة
-      await prefs.setInt(_keyLastSyncTime, DateTime.now().millisecondsSinceEpoch);
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في تحديث قائمة الإشعارات المجدولة', 
-        e
-      );
-    }
-  }
-  
-  /// الحصول على وقت الإشعار المحفوظ
-  Future<TimeOfDay?> getNotificationTime(String notificationId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final timeString = prefs.getString('notification_${notificationId}_time');
-      
-      if (timeString != null) {
-        // تحويل سلسلة الوقت إلى كائن TimeOfDay
-        final timeParts = timeString.split(':');
-        if (timeParts.length == 2) {
-          final hour = int.tryParse(timeParts[0]);
-          final minute = int.tryParse(timeParts[1]);
-          
-          if (hour != null && minute != null) {
-            return TimeOfDay(hour: hour, minute: minute);
-          }
-        }
-      }
-      
-      return null;
-    } catch (e) {
-      _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في الحصول على وقت الإشعار: $notificationId', 
-        e
-      );
-      return null;
-    }
-  }
-  
-  /// إلغاء إشعار بمعرف محدد
-  Future<bool> cancelNotification(String notificationId) async {
-    try {
-      // إلغاء الإشعار
-      final id = notificationId.hashCode.abs() % 100000;
-      await _flutterLocalNotificationsPlugin.cancel(id);
-      
-      // إزالة من قائمة الإشعارات المجدولة
-      final prefs = await SharedPreferences.getInstance();
-      final List<String> scheduledList = prefs.getStringList(_keyScheduledNotifications) ?? [];
-      
-      if (scheduledList.contains(notificationId)) {
-        scheduledList.remove(notificationId);
-        await prefs.setStringList(_keyScheduledNotifications, scheduledList);
-      }
-      
-      return true;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في إلغاء الإشعار: $notificationId', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// إلغاء جميع الإشعارات
-  Future<bool> cancelAllNotifications() async {
-    try {
-      // إلغاء جميع الإشعارات
-      await _flutterLocalNotificationsPlugin.cancelAll();
-      
-      // مسح قائمة الإشعارات المجدولة
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_keyScheduledNotifications, []);
-      
-      return true;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في إلغاء جميع الإشعارات', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// جدولة جميع الإشعارات المحفوظة سابقاً
-  Future<void> scheduleAllSavedNotifications() async {
-    try {
-      print('جاري إعادة جدولة جميع الإشعارات المحفوظة...');
-      
-      final prefs = await SharedPreferences.getInstance();
-      
-      // التحقق ما إذا كانت الإشعارات مفعلة
-      final bool notificationsEnabled = prefs.getBool(_keyNotificationsEnabled) ?? true;
-      if (!notificationsEnabled) {
-        print('الإشعارات غير مفعلة في الإعدادات');
-        return;
-      }
-      
-      // الحصول على قائمة الإشعارات المجدولة
-      final List<String> scheduledList = prefs.getStringList(_keyScheduledNotifications) ?? [];
-      if (scheduledList.isEmpty) {
-        print('لا توجد إشعارات مجدولة للإعادة');
-        return;
-      }
-      
-      // هذه الدالة يمكن تعديلها حسب احتياجات التطبيق الخاصة
-      // في هذه الحالة، يجب تنفيذ منطق لاستعادة معلومات كل إشعار وجدولته
-      
-      print('تمت إعادة جدولة الإشعارات المحفوظة');
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في جدولة جميع الإشعارات المحفوظة', 
-        e
-      );
-    }
-  }
-  
-  /// التحقق مما إذا كان الإشعار مفعلاً بمعرف محدد
-  Future<bool> isNotificationEnabled(String notificationId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // الحصول على قائمة الإشعارات المجدولة
-      final List<String> scheduledList = prefs.getStringList(_keyScheduledNotifications) ?? [];
-      
-      // التحقق مما إذا كان المعرف ضمن القائمة
-      return scheduledList.contains(notificationId);
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في التحقق من تفعيل الإشعار: $notificationId', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// تفعيل/تعطيل الإشعارات
-  Future<bool> setNotificationsEnabled(bool enabled) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyNotificationsEnabled, enabled);
-      
-      if (enabled) {
-        // إعادة جدولة الإشعارات
-        await scheduleAllSavedNotifications();
-      } else {
-        // إلغاء جميع الإشعارات
-        await cancelAllNotifications();
-      }
-      
-      return true;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في تغيير حالة تفعيل الإشعارات', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// التحقق مما إذا كانت الإشعارات مفعلة بشكل عام
-  Future<bool> areNotificationsEnabled() async {
-    try {
-      // التحقق من الإعدادات المحلية
-      final prefs = await SharedPreferences.getInstance();
-      final bool localEnabled = prefs.getBool(_keyNotificationsEnabled) ?? true;
-      
-      // التحقق من أذونات النظام
-      final bool systemEnabled = await _permissionsService.checkNotificationPermission();
-      
-      return localEnabled && systemEnabled;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في التحقق من تفعيل الإشعارات', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// الحصول على الإشعارات المعلقة
-  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
-    try {
-      return await _flutterLocalNotificationsPlugin.pendingNotificationRequests();
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'خطأ في الحصول على الإشعارات المعلقة', 
-        e
-      );
-      return [];
-    }
-  }
+  // ... باقي الكود
   
   /// إرسال إشعار بسيط فوري
   Future<void> showSimpleNotification(String title, String body, int id, {String? payload}) async {
@@ -838,134 +483,251 @@ class NotificationService {
     }
   }
   
-  /// إرسال إشعار اختباري للتأكد من عمل الإشعارات
-  Future<bool> testImmediateNotification() async {
+  /// الحصول على الإشعارات المعلقة
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
     try {
-      return await showSimpleNotification(
-        'اختبار الإشعارات',
-        'هذا إشعار اختباري للتأكد من عمل الإشعارات بشكل صحيح',
-        9999,
-        payload: 'test',
-      ).then((_) => true).catchError((_) => false);
+      return await _flutterLocalNotificationsPlugin.pendingNotificationRequests();
     } catch (e) {
       await _errorLoggingService.logError(
         'NotificationService', 
-        'خطأ في إرسال إشعار اختباري مباشر', 
+        'خطأ في الحصول على الإشعارات المعلقة', 
         e
       );
-      return false;
+      return [];
     }
   }
   
-  /// إرسال إشعار اختباري مجمع
-  Future<bool> sendGroupedTestNotification() async {
+  /// جدولة جميع الإشعارات المحفوظة سابقاً
+  Future<void> scheduleAllSavedNotifications() async {
     try {
-      // استخدام وضع مجموعات Android
-      if (Platform.isAndroid) {
-        // الإشعار الرئيسي للمجموعة
-        AndroidNotificationDetails androidSummaryDetails = AndroidNotificationDetails(
-          _defaultChannelId,
-          'التنبيهات الافتراضية',
-          channelDescription: 'قناة التنبيهات العامة',
-          importance: Importance.high,
-          priority: Priority.high,
-          groupKey: 'test_group',
-          setAsGroupSummary: true,
-        );
-        
-        NotificationDetails summaryDetails = NotificationDetails(android: androidSummaryDetails);
-        
-        // إظهار الإشعار الرئيسي
-        await _flutterLocalNotificationsPlugin.show(
-          9000,
-          'مجموعة اختبار الإشعارات',
-          'اختبار تجميع الإشعارات',
-          summaryDetails,
-          payload: 'test_group',
-        );
-        
-        // إظهار 3 إشعارات في المجموعة
-        for (int i = 1; i <= 3; i++) {
-          AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-            _defaultChannelId,
-            'التنبيهات الافتراضية',
-            channelDescription: 'قناة التنبيهات العامة',
-            importance: Importance.high,
-            priority: Priority.high,
-            groupKey: 'test_group',
-            setAsGroupSummary: false,
-          );
-          
-          NotificationDetails details = NotificationDetails(android: androidDetails);
-          
-          await _flutterLocalNotificationsPlugin.show(
-            9000 + i,
-            'اختبار إشعار $i',
-            'هذا إشعار اختباري رقم $i',
-            details,
-            payload: 'test_notification_$i',
-          );
-          
-          // تأخير بسيط للتمييز بين الإشعارات
-          await Future.delayed(Duration(milliseconds: 300));
-        }
-      } else if (Platform.isIOS) {
-        // استخدام نظام تجميع iOS
-        for (int i = 0; i <= 3; i++) {
-          DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            threadIdentifier: 'test_group',
-            subtitle: i == 0 ? 'رسالة رئيسية' : 'إشعار فرعي $i',
-          );
-          
-          NotificationDetails details = NotificationDetails(iOS: iosDetails);
-          
-          await _flutterLocalNotificationsPlugin.show(
-            9000 + i,
-            i == 0 ? 'مجموعة إشعارات الاختبار' : 'اختبار إشعار $i',
-            i == 0 ? 'اختبار تجميع الإشعارات' : 'هذا إشعار اختباري رقم $i',
-            details,
-            payload: 'test_notification_$i',
-          );
-          
-          // تأخير بسيط للتمييز بين الإشعارات
-          await Future.delayed(Duration(milliseconds: 300));
+      print('جاري إعادة جدولة جميع الإشعارات المحفوظة...');
+      
+      final prefs = await SharedPreferences.getInstance();
+      
+      // التحقق ما إذا كانت الإشعارات مفعلة
+      final bool notificationsEnabled = prefs.getBool(_keyNotificationsEnabled) ?? true;
+      if (!notificationsEnabled) {
+        print('الإشعارات غير مفعلة في الإعدادات');
+        return;
+      }
+      
+      // الحصول على قائمة الإشعارات المجدولة
+      final List<String> scheduledList = prefs.getStringList(_keyScheduledNotifications) ?? [];
+      if (scheduledList.isEmpty) {
+        print('لا توجد إشعارات مجدولة للإعادة');
+        return;
+      }
+      
+      // إعادة جدولة الإشعارات المحفوظة
+      for (String notificationId in scheduledList) {
+        final timeString = prefs.getString('notification_${notificationId}_time');
+        if (timeString != null) {
+          final timeParts = timeString.split(':');
+          if (timeParts.length == 2) {
+            final hour = int.tryParse(timeParts[0]);
+            final minute = int.tryParse(timeParts[1]);
+            
+            if (hour != null && minute != null) {
+              final time = TimeOfDay(hour: hour, minute: minute);
+              
+              // استرجاع معلومات الإشعار المحفوظة
+              final title = prefs.getString('notification_${notificationId}_title') ?? 'تذكير';
+              final body = prefs.getString('notification_${notificationId}_body') ?? 'حان وقت التذكير';
+              
+              // جدولة الإشعار
+              await scheduleNotification(
+                notificationId: notificationId,
+                title: title,
+                body: body,
+                notificationTime: time,
+                repeat: true,
+              );
+            }
+          }
         }
       }
+      
+      print('تمت إعادة جدولة الإشعارات المحفوظة');
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationService', 
+        'خطأ في جدولة جميع الإشعارات المحفوظة', 
+        e
+      );
+    }
+  }
+  
+  /// جدولة إشعار عام
+  Future<bool> scheduleNotification({
+    required String notificationId,
+    required String title,
+    required String body,
+    required TimeOfDay notificationTime,
+    String? channelId,
+    String? payload,
+    Color? color,
+    bool repeat = true,
+    int? priority,
+  }) async {
+    try {
+      // التحقق من أذونات الإشعارات
+      final hasPermission = await _permissionsService.checkNotificationPermission();
+      if (!hasPermission) {
+        print('لا توجد أذونات للإشعارات');
+        return false;
+      }
+      
+      // حفظ معلومات الإشعار
+      await _saveNotificationInfo(notificationId, title, body, notificationTime);
+      
+      // إنشاء معرف الإشعار من المعرف المقدم
+      final id = notificationId.hashCode.abs() % 100000;
+      
+      // جدولة الإشعار
+      if (Platform.isIOS) {
+        // إعدادات iOS
+        DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          sound: 'default',
+          interruptionLevel: InterruptionLevel.active,
+          threadIdentifier: 'notification_$notificationId',
+        );
+        
+        NotificationDetails details = NotificationDetails(iOS: iosDetails);
+        
+        // الحصول على الوقت المحدد
+        final tz.TZDateTime scheduledDate = _getNextInstanceOfTime(notificationTime);
+        
+        // جدولة الإشعار
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
+          id,
+          title,
+          body,
+          scheduledDate,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: repeat ? DateTimeComponents.time : null,
+          payload: payload ?? notificationId,
+        );
+      } else {
+        // إعدادات Android
+        final channel = channelId ?? _defaultChannelId;
+        
+        AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+          channel,
+          'تنبيهات',
+          channelDescription: 'قناة التنبيهات',
+          importance: priority != null ? Importance.values[priority.clamp(0, 5)] : Importance.high,
+          priority: priority != null ? Priority.values[priority.clamp(0, 5)] : Priority.high,
+          color: color,
+          ledColor: color,
+          ledOnMs: 1000,
+          ledOffMs: 500,
+          visibility: NotificationVisibility.public,
+        );
+        
+        NotificationDetails details = NotificationDetails(android: androidDetails);
+        
+        // الحصول على الوقت المحدد
+        final tz.TZDateTime scheduledDate = _getNextInstanceOfTime(notificationTime);
+        
+        // جدولة الإشعار
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
+          id,
+          title,
+          body,
+          scheduledDate,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: repeat ? DateTimeComponents.time : null,
+          payload: payload ?? notificationId,
+        );
+      }
+      
+      // تحديث قائمة الإشعارات المجدولة
+      await _updateScheduledNotificationsList(notificationId);
       
       return true;
     } catch (e) {
       await _errorLoggingService.logError(
         'NotificationService', 
-        'خطأ في إرسال إشعار اختباري مجمع', 
+        'خطأ في جدولة الإشعار: $notificationId', 
         e
       );
       return false;
     }
   }
   
-  /// فحص وطلب تحسينات الإشعارات
-  Future<void> checkNotificationOptimizations(BuildContext context) async {
+  /// حفظ معلومات الإشعار
+  Future<void> _saveNotificationInfo(
+    String notificationId, 
+    String title, 
+    String body, 
+    TimeOfDay time
+  ) async {
     try {
-      // التحقق من تجاوز وضع عدم الإزعاج
-      final shouldPromptDnd = await _doNotDisturbService.shouldPromptAboutDoNotDisturb();
-      if (shouldPromptDnd) {
-        await _doNotDisturbService.showDoNotDisturbDialog(context);
-      }
+      final prefs = await SharedPreferences.getInstance();
       
-      // التحقق من تحسينات البطارية
-      await _batteryOptimizationService.checkAndRequestBatteryOptimization(context);
+      // حفظ الوقت
+      final timeString = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+      await prefs.setString('notification_${notificationId}_time', timeString);
       
-      // التحقق من القيود الإضافية للبطارية
-      await _batteryOptimizationService.checkForAdditionalBatteryRestrictions(context);
+      // حفظ العنوان والمحتوى
+      await prefs.setString('notification_${notificationId}_title', title);
+      await prefs.setString('notification_${notificationId}_body', body);
     } catch (e) {
       await _errorLoggingService.logError(
         'NotificationService', 
-        'خطأ في فحص تحسينات الإشعارات', 
+        'خطأ في حفظ معلومات الإشعار: $notificationId', 
         e
       );
     }
+  }
+  
+  /// تحديث قائمة الإشعارات المجدولة
+  Future<void> _updateScheduledNotificationsList(String notificationId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // الحصول على القائمة الحالية
+      final List<String> scheduledList = prefs.getStringList(_keyScheduledNotifications) ?? [];
+      
+      // التحقق مما إذا كان المعرف موجودًا بالفعل
+      if (!scheduledList.contains(notificationId)) {
+        scheduledList.add(notificationId);
+        await prefs.setStringList(_keyScheduledNotifications, scheduledList);
+      }
+      
+      // تحديث وقت آخر مزامنة
+      await prefs.setInt(_keyLastSyncTime, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationService', 
+        'خطأ في تحديث قائمة الإشعارات المجدولة', 
+        e
+      );
+    }
+  }
+  
+  /// الحصول على الوقت التالي لجدولة الإشعار
+  tz.TZDateTime _getNextInstanceOfTime(TimeOfDay timeOfDay) {
+    final now = tz.TZDateTime.now(tz.local);
+    tz.TZDateTime scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      timeOfDay.hour,
+      timeOfDay.minute,
+    );
+    
+    // إذا كان الوقت قد مر اليوم، جدولة ليوم غد
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+    
+    return scheduledDate;
   }
 }

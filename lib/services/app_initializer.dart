@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:test_athkar_app/services/notification_navigation.dart';
-import 'package:test_athkar_app/services/notification_service.dart';
+import 'package:test_athkar_app/services/notification_manager.dart';
 import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/do_not_disturb_service.dart';
@@ -29,7 +29,7 @@ class AppInitializer {
       // تهيئة حاوية التبعيات
       await setupServiceLocator();
       
-      // تهيئة خدمة الإشعارات
+      // تهيئة خدمة الإشعارات الموحدة
       await _initializeNotifications();
       
       // تهيئة التنقل من الإشعارات
@@ -53,31 +53,32 @@ class AppInitializer {
     }
   }
   
-  /// تهيئة خدمة الإشعارات
+  /// تهيئة خدمة الإشعارات الموحدة
   static Future<void> _initializeNotifications() async {
     try {
       print("جاري تهيئة خدمات الإشعارات...");
       
-      final NotificationService notificationService = 
-          serviceLocator<NotificationService>();
+      // استخدام NotificationManager بدلاً من NotificationService
+      final NotificationManager notificationManager = 
+          serviceLocator<NotificationManager>();
       
-      final initialized = await notificationService.initialize();
+      final initialized = await notificationManager.initialize();
       
       if (initialized) {
         print("تم تهيئة خدمة الإشعارات بنجاح");
         
         // إعادة جدولة جميع الإشعارات المحفوظة للتأكد من عملها
-        await notificationService.scheduleAllSavedNotifications();
+        await notificationManager.rescheduleAllNotifications();
         
         // التحقق من الإشعارات المعلقة (معلومات التصحيح)
-        final pendingNotifications = await notificationService.getPendingNotifications();
+        final pendingNotifications = await notificationManager.getPendingNotifications();
         print("عدد الإشعارات المعلقة: ${pendingNotifications.length}");
       } else {
         print("فشل في تهيئة خدمة الإشعارات");
         
         // محاولة التهيئة مرة أخرى بعد فترة
         await Future.delayed(Duration(seconds: 2));
-        await notificationService.initialize();
+        await notificationManager.initialize();
       }
     } catch (e) {
       serviceLocator<ErrorLoggingService>().logError(
@@ -98,10 +99,10 @@ class AppInitializer {
     try {
       print("جاري التحقق من جداول الإشعارات...");
       
-      final NotificationService notificationService = 
-          serviceLocator<NotificationService>();
+      final NotificationManager notificationManager = 
+          serviceLocator<NotificationManager>();
       
-      await notificationService.scheduleAllSavedNotifications();
+      await notificationManager.rescheduleAllNotifications();
       
       print("اكتمل التحقق من الإشعارات");
     } catch (e) {
@@ -144,8 +145,13 @@ class AppInitializer {
     }
   }
   
-  /// الحصول على كائن خدمة الإشعارات
-  static NotificationService getNotificationService() {
-    return serviceLocator<NotificationService>();
+  /// الحصول على كائن مدير الإشعارات
+  static NotificationManager getNotificationManager() {
+    return serviceLocator<NotificationManager>();
+  }
+  
+  /// الحصول على كائن خدمة الإشعارات (للتوافق القديم)
+  static NotificationManager getNotificationService() {
+    return serviceLocator<NotificationManager>();
   }
 }

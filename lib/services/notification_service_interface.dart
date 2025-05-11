@@ -1,9 +1,8 @@
-// lib/services/notification/notification_service_interface.dart
+// lib/services/notification_service_interface.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 
-/// واجهة لتوحيد خدمات الإشعارات عبر المنصات المختلفة
+/// واجهة موحدة لخدمات الإشعارات عبر المنصات المختلفة
 abstract class NotificationServiceInterface {
   /// تهيئة خدمة الإشعارات
   Future<bool> initialize();
@@ -21,17 +20,16 @@ abstract class NotificationServiceInterface {
     int? priority,
   });
   
-  /// جدولة إشعار لفئة الأذكار
-  Future<bool> scheduleAthkarNotification({
-    required AthkarCategory category,
-    required TimeOfDay notificationTime,
-    bool repeat = true,
-  });
-  
-  /// جدولة إشعارات متعددة لفئة الأذكار
-  Future<bool> scheduleMultipleAthkarNotifications({
-    required AthkarCategory category,
+  /// جدولة إشعارات متعددة
+  Future<bool> scheduleMultipleNotifications({
+    required String baseId,
+    required String title,
+    required String body,
     required List<TimeOfDay> notificationTimes,
+    String? channelId,
+    String? payload,
+    Color? color,
+    bool repeat = true,
   });
   
   /// إلغاء إشعار بمعرف محدد
@@ -76,13 +74,13 @@ abstract class NotificationServiceInterface {
   Future<TimeOfDay?> getNotificationTime(String notificationId);
   
   /// تكوين خدمة الإشعارات حسب تفضيلات المستخدم
-  Future<void> configureFromPreferences();
+  Future<bool> configureFromPreferences();
   
   /// التحقق من الأذونات والإعدادات قبل جدولة الإشعارات
   Future<bool> checkNotificationPrerequisites(BuildContext context);
 }
 
-/// فئة النموذج لتكوين الإشعارات
+/// فئة نموذج لتكوين الإشعارات
 class NotificationConfig {
   final bool enableSound;
   final bool enableVibration;
