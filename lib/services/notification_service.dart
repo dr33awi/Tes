@@ -1,605 +1,1232 @@
-// lib/services/notification_service.dart
+// lib/services/notification/notification_service.dart
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
-import 'package:test_athkar_app/services/error_logging_service.dart';
-import 'package:test_athkar_app/services/do_not_disturb_service.dart';
-import 'package:test_athkar_app/services/ios_notification_service.dart';
-import 'package:test_athkar_app/services/notification_grouping_service.dart';
-import 'package:test_athkar_app/services/battery_optimization_service.dart';
+import 'package:flutter_native_timezone_latest/flutter_native_timezone_latest.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 
-/// خدمة موحدة للإشعارات في التطبيق
+// المكتبات الداخلية للتطبيق
+import 'battery_optimization_service.dart';
+import 'error_logging_service.dart';
+import 'ios_notification_service.dart';
+import 'notification_grouping_service.dart';
+import 'do_not_disturb_service.dart';
+import '../models/notification_model.dart';
+
+/// نموذج بيانات الإشعار الموحد
+class NotificationData {
+  final String id;
+  final String title;
+  final String body;
+  final String? channelId;
+  final String? channelName;
+  final String? icon;
+  final String? payload;
+  final Color? color;
+  final Color? ledColor;
+  final bool isRecurring;
+  final bool isImportant;
+  final bool bypassDnd;
+  final List<String>? additionalTimes;
+  final String? soundName;
+  final Map<String, dynamic>? extraData;
+
+  NotificationData({
+    required this.id,
+    required this.title,
+    required this.body,
+    this.channelId,
+    this.channelName,
+    this.icon,
+    this.payload,
+    this.color,
+    this.ledColor,
+    this.isRecurring = false,
+    this.isImportant = false,
+    this.bypassDnd = false,
+    this.additionalTimes,
+    this.soundName,
+    this.extraData,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'body': body,
+      'channelId': channelId,
+      'channelName': channelName,
+      'icon': icon,
+      'payload': payload,
+      'color': color?.value,
+      'ledColor': ledColor?.value,
+      'isRecurring': isRecurring,
+      'isImportant': isImportant,
+      'bypassDnd': bypassDnd,
+      'additionalTimes': additionalTimes,
+      'soundName': soundName,
+      'extraData': extraData,
+    };
+  }
+
+  factory NotificationData.fromJson(Map<String, dynamic> json) {
+    return NotificationData(
+      id: json['id'],
+      title: json['title'],
+      body: json['body'],
+      channelId: json['channelId'],
+      channelName: json['channelName'],
+      icon: json['icon'],
+      payload: json['payload'],
+      color: json['color'] != null ? Color(json['color']) : null,
+      ledColor: json['ledColor'] != null ? Color(json['ledColor']) : null,
+      isRecurring: json['isRecurring'] ?? false,
+      isImportant: json['isImportant'] ?? false,
+      bypassDnd: json['bypassDnd'] ?? false,
+      additionalTimes: json['additionalTimes'] != null
+          ? List<String>.from(json['additionalTimes'])
+          : null,
+      soundName: json['soundName'],
+      extraData: json['extraData'],
+    );
+  }
+}
+
+/// خدمة الإشعارات الموحدة للتطبيق
 class NotificationService {
-  // مكونات الخدمة باستخدام التبعية المعكوسة
-  final ErrorLoggingService _errorLoggingService;
-  final DoNotDisturbService _doNotDisturbService;
-  final IOSNotificationService _iosNotificationService;
-  final NotificationGroupingService _notificationGroupingService;
-  final BatteryOptimizationService _batteryOptimizationService;
+  // نمط Singleton للتأكد من وجود نسخة واحدة فقط
+  static final NotificationService _instance = NotificationService._internal();
   
-  // كائن الإشعارات المحلية
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
+  factory NotificationService() => _instance;
   
-  // مفاتيح التخزين المحلي
-  static const String _keySavedNotifications = 'saved_notifications';
-  static const String _keyNotificationIdsMapping = 'notification_ids_mapping';
-  static const String _keyNotificationEnabled = 'notification_enabled';
-  static const String _keyCategoryEnabled = 'category_notification_enabled_';
-  static const String _keyCategoryTime = 'category_notification_time_';
-  static const String _keyNotificationStats = 'notification_stats';
+  NotificationService._internal();
+
+  // الخدمات المساعدة
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
+  final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
+  final NotificationGroupingService _notificationGroupingService = NotificationGroupingService();
+  final DoNotDisturbService _doNotDisturbService = DoNotDisturbService();
+  late final IOSNotificationService _iosNotificationService;
+
+  // تخزين المنطقة الزمنية للجهاز
+  String _deviceTimeZone = 'UTC';
   
-  // معرف قناة الإشعارات الافتراضية
-  static const String _defaultChannelId = 'athkar_channel';
+  // قنوات الإشعارات
+  static const String defaultChannelId = 'default_channel';
+  static const String defaultChannelName = 'Default Notifications';
+  static const String importantChannelId = 'important_channel';
+  static const String importantChannelName = 'Important Notifications';
+  static const String criticalChannelId = 'critical_channel';
+  static const String criticalChannelName = 'Critical Notifications';
   
-  // المُعرف الدولي لعرض الإشعارات
-  static const String _defaultIconResourceName = '@mipmap/ic_launcher';
+  // معرفات الإنذارات للإشعارات الخلفية
+  static const int dailyAlarmBaseId = 10000;
+  static const int weeklyAlarmBaseId = 20000;
+  static const int monthlyAlarmBaseId = 30000;
+  static const int backupAlarmBaseId = 50000;
   
-  // سجل التهيئة
+  // تتبع حالة التهيئة
   bool _isInitialized = false;
   
-  // تنفيذ نمط Singleton مع التبعية المعكوسة
-  static NotificationService? _instance;
-  
-  factory NotificationService({
-    ErrorLoggingService? errorLoggingService,
-    DoNotDisturbService? doNotDisturbService,
-    IOSNotificationService? iosNotificationService,
-    NotificationGroupingService? notificationGroupingService,
-    BatteryOptimizationService? batteryOptimizationService,
-    FlutterLocalNotificationsPlugin? flutterLocalNotificationsPlugin,
-  }) {
-    _instance ??= NotificationService._internal(
-      errorLoggingService ?? ErrorLoggingService(),
-      doNotDisturbService ?? DoNotDisturbService(),
-      iosNotificationService ?? IOSNotificationService(),
-      notificationGroupingService ?? NotificationGroupingService(),
-      batteryOptimizationService ?? BatteryOptimizationService(),
-      flutterLocalNotificationsPlugin ?? FlutterLocalNotificationsPlugin(),
-    );
-    return _instance!;
-  }
-  
-  // المُنشئ الداخلي
-  NotificationService._internal(
-    this._errorLoggingService,
-    this._doNotDisturbService,
-    this._iosNotificationService,
-    this._notificationGroupingService,
-    this._batteryOptimizationService,
-    this.flutterLocalNotificationsPlugin,
-  );
-  
   /// تهيئة خدمة الإشعارات
-  Future<bool> initialize() async {
+  Future<bool> initialize({
+    Function(NotificationResponse)? onNotificationTap,
+    bool requestPermissions = true,
+    bool checkBatteryOptimization = true,
+  }) async {
+    if (_isInitialized) return true;
+    
     try {
-      if (_isInitialized) {
-        return true;
-      }
+      // تسجيل بداية التهيئة
+      _errorLoggingService.logInfo('Initializing notification service');
       
-      // تهيئة بيانات المناطق الزمنية
+      // تهيئة المناطق الزمنية
       tz_data.initializeTimeZones();
       
-      // إعدادات تهيئة الإشعارات لنظام أندرويد
-      const AndroidInitializationSettings androidInitializationSettings =
-          AndroidInitializationSettings(_defaultIconResourceName);
-      
-      // إعدادات تهيئة الإشعارات لنظام iOS
-      final DarwinInitializationSettings iosInitializationSettings =
-          DarwinInitializationSettings(
-            requestAlertPermission: true,
-            requestBadgePermission: true,
-            requestSoundPermission: true,
-            requestCriticalPermission: true,
-          );
-      
-      // دمج إعدادات التهيئة لجميع الأنظمة
-      final InitializationSettings initializationSettings = InitializationSettings(
-        android: androidInitializationSettings,
-        iOS: iosInitializationSettings,
+      // الحصول على المنطقة الزمنية للجهاز
+      try {
+        _deviceTimeZone = await FlutterNativeTimezoneLatest.getLocalTimezone();
+        // تعيين المنطقة الزمنية
+        tz.setLocalLocation(tz.getLocation(_deviceTimeZone));
+        _errorLoggingService.logInfo('Device timezone: $_deviceTimeZone');
+      } catch (e) {
+        _errorLoggingService.logError('Error getting device timezone', e);
+        // التراجع إلى قيمة افتراضية آمنة
+        _deviceTimeZone = 'UTC';
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      }
+
+      // تهيئة إعدادات الإشعارات لنظام Android
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+
+      // تهيئة iOS
+      _iosNotificationService = IOSNotificationService();
+      final DarwinInitializationSettings initializationSettingsDarwin =
+          _iosNotificationService.getInitializationSettings();
+
+      final InitializationSettings initializationSettings =
+          InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsDarwin,
       );
-      
-      // تهيئة البلاجن بالإعدادات
+
+      // تهيئة Plugin
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
-        onDidReceiveNotificationResponse: _onNotificationResponse,
+        onDidReceiveNotificationResponse: onNotificationTap ?? _defaultNotificationTapHandler,
+        onDidReceiveBackgroundNotificationResponse: _backgroundNotificationTapHandler,
       );
+
+      // طلب الأذونات إذا كان مطلوبًا
+      if (requestPermissions) {
+        await _requestPermissions();
+      }
       
-      // تهيئة قنوات الإشعارات لنظام أندرويد
+      // تهيئة مدير الإنذار لنظام Android للإشعارات الأكثر موثوقية
       if (Platform.isAndroid) {
-        await _createNotificationChannels();
+        await AndroidAlarmManager.initialize();
+        
+        // التحقق من تحسين البطارية إذا كان مطلوبًا
+        if (checkBatteryOptimization) {
+          await _checkBatteryOptimization();
+        }
       }
       
-      // تهيئة إعدادات iOS الخاصة
-      if (Platform.isIOS) {
-        await _iosNotificationService.initializeIOSNotifications();
-      }
+      // إعادة جدولة الإشعارات المحفوظة
+      await _rescheduleAllSavedNotifications();
       
-      // تعيين علامة التهيئة
       _isInitialized = true;
-      
-      // تعيين إعدادات عدم الإزعاج لتجاوزها عند الحاجة
-      await _doNotDisturbService.configureNotificationChannelsForDoNotDisturb();
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics('initialization', 'Initialized notification service');
-      
+      _errorLoggingService.logInfo('Notification service initialized successfully');
       return true;
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error initializing notification service', 
-        e
-      );
+      _errorLoggingService.logError('Error initializing notification service', e);
       return false;
     }
   }
-  
-  /// إنشاء قنوات الإشعارات لنظام أندرويد
-  Future<void> _createNotificationChannels() async {
+
+  // التحقق من تحسين البطارية
+  Future<void> _checkBatteryOptimization() async {
     try {
-      // قناة إشعارات أذكار الصباح
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(const AndroidNotificationChannel(
-            'athkar_morning_channel',
-            'أذكار الصباح',
-            description: 'إشعارات أذكار الصباح',
-            importance: Importance.high,
-            sound: RawResourceAndroidNotificationSound('morning_notification'),
-            enableVibration: true,
-            enableLights: true,
-            ledColor: Color(0xFFFFD54F),
-          ));
-      
-      // قناة إشعارات أذكار المساء
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(const AndroidNotificationChannel(
-            'athkar_evening_channel',
-            'أذكار المساء',
-            description: 'إشعارات أذكار المساء',
-            importance: Importance.high,
-            sound: RawResourceAndroidNotificationSound('evening_notification'),
-            enableVibration: true,
-            enableLights: true,
-            ledColor: Color(0xFFAB47BC),
-          ));
-      
-      // قناة إشعارات أذكار النوم
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(const AndroidNotificationChannel(
-            'athkar_sleep_channel',
-            'أذكار النوم',
-            description: 'إشعارات أذكار النوم',
-            importance: Importance.high,
-            sound: RawResourceAndroidNotificationSound('sleep_notification'),
-            enableVibration: true,
-            enableLights: true,
-            ledColor: Color(0xFF5C6BC0),
-          ));
-      
-      // قناة إشعارات أذكار الاستيقاظ
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(const AndroidNotificationChannel(
-            'athkar_wake_channel',
-            'أذكار الاستيقاظ',
-            description: 'إشعارات أذكار الاستيقاظ',
-            importance: Importance.high,
-            sound: RawResourceAndroidNotificationSound('wake_notification'),
-            enableVibration: true,
-            enableLights: true,
-            ledColor: Color(0xFFFFB74D),
-          ));
-      
-      // قناة إشعارات عامة للأذكار
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(const AndroidNotificationChannel(
-            _defaultChannelId,
-            'إشعارات الأذكار',
-            description: 'الإشعارات العامة للأذكار',
-            importance: Importance.high,
-            enableVibration: true,
-            enableLights: true,
-          ));
+      if (Platform.isAndroid) {
+        final isOptimized = await _batteryOptimizationService.isBatteryOptimizationEnabled();
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('needs_battery_optimization', isOptimized);
+        
+        _errorLoggingService.logInfo('Battery optimization status: $isOptimized');
+      }
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error creating notification channels', 
-        e
-      );
+      _errorLoggingService.logError('Error checking battery optimization', e);
     }
   }
-  
-  /// معالجة استجابة الإشعارات
-  void _onNotificationResponse(NotificationResponse response) async {
+
+  // طلب أذونات الإشعارات
+  Future<bool> _requestPermissions() async {
+    try {
+      if (Platform.isAndroid) {
+        // لنظام Android 13+ (مستوى API 33 وما فوق)
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+            
+        // طلب إذن الإنذارات الدقيقة لـ API 31+
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestExactAlarmsPermission();
+            
+        _errorLoggingService.logInfo('Android notification permissions requested');
+        return true;
+      } else if (Platform.isIOS) {
+        // لنظام iOS
+        final granted = await _iosNotificationService.requestPermissions(
+          flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin
+        );
+        _errorLoggingService.logInfo('iOS notification permissions requested: $granted');
+        return granted;
+      }
+      return false;
+    } catch (e) {
+      _errorLoggingService.logError('Error requesting notification permissions', e);
+      return false;
+    }
+  }
+
+  // معالج النقر على الإشعار الافتراضي
+  void _defaultNotificationTapHandler(NotificationResponse response) async {
     try {
       final String? payload = response.payload;
-      final actionId = response.actionId;
-      
-      // تسجيل استجابة الإشعار للتصحيح
-      print('Notification response: $payload, action: $actionId');
-      
-      // توجيه الإشعار إلى المعالج المناسب
-      if (actionId == 'MARK_READ') {
-        // معالجة تمييز الإشعار كمقروء
-        _handleMarkAsRead(payload);
-      } else if (actionId == 'SNOOZE' || actionId == 'REMIND_LATER') {
-        // معالجة تأجيل الإشعار
-        _handleSnoozeNotification(payload);
-      } else {
-        // تخزين معلومات الإشعار للتنقل عند فتح التطبيق
-        if (payload != null && payload.isNotEmpty) {
-          await _saveNotificationOpenInfo(payload);
-        }
+      if (payload != null && payload.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('opened_from_notification', true);
+        await prefs.setString('notification_payload', payload);
+        
+        _errorLoggingService.logInfo('Notification tapped with payload: $payload');
+        
+        // تتبع تفاعل الإشعار
+        await _trackNotificationInteraction(payload);
       }
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error handling notification response', 
-        e
-      );
+      _errorLoggingService.logError('Error handling notification tap', e);
     }
   }
   
-  /// حفظ معلومات فتح الإشعار للتنقل لاحقاً
-  Future<void> _saveNotificationOpenInfo(String payload) async {
+  // معالج النقر على الإشعار في الخلفية
+  @pragma('vm:entry-point')
+  static void _backgroundNotificationTapHandler(NotificationResponse details) {
+    // هذه الدالة تعمل في الخلفية
+    // لا يمكن استخدام المتغيرات المرتبطة بالفئة هنا
+    // يمكن استخدام SharedPreferences لتخزين بيانات التفاعل
+    
+    try {
+      // يمكن تنفيذ عمليات بسيطة هنا
+      // أو استخدام MethodChannel للتواصل مع الكود الأصلي
+    } catch (e) {
+      print('Error handling background notification tap: $e');
+    }
+  }
+  
+  // تتبع تفاعل الإشعار
+  Future<void> _trackNotificationInteraction(String payload) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('opened_from_notification', true);
-      await prefs.setString('notification_payload', payload);
+      
+      // حفظ وقت التفاعل
+      final key = 'notification_interaction_${payload}_${DateTime.now().day}';
+      await prefs.setString(key, DateTime.now().toIso8601String());
+      
+      // زيادة عدد التفاعلات
+      final countKey = 'notification_interaction_count_$payload';
+      final int currentCount = prefs.getInt(countKey) ?? 0;
+      await prefs.setInt(countKey, currentCount + 1);
+      
+      _errorLoggingService.logInfo('Tracked notification interaction for: $payload');
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error saving notification open info', 
-        e
-      );
+      _errorLoggingService.logError('Error tracking notification interaction', e);
     }
   }
-  
-  /// معالجة تمييز الإشعار كمقروء
-  Future<void> _handleMarkAsRead(String? payload) async {
+
+  /// عرض إشعار فوري
+  Future<bool> showNotification({
+    required String id,
+    required String title,
+    required String body,
+    String? payload,
+    String? channelId,
+    String? channelName,
+    String? icon,
+    Color? color,
+    Color? ledColor,
+    bool isImportant = false,
+    bool bypassDnd = false,
+    String? soundName,
+    String? groupKey,
+  }) async {
     try {
-      if (payload == null || payload.isEmpty) return;
+      if (!_isInitialized) {
+        await initialize();
+      }
       
-      // تحليل معرف الفئة من البيانات
-      final categoryId = payload.split(':').first;
+      // تحديد قناة الإشعارات
+      final notificationChannelId = channelId ?? (isImportant ? 
+          (bypassDnd ? criticalChannelId : importantChannelId) : 
+          defaultChannelId);
+          
+      final notificationChannelName = channelName ?? (isImportant ? 
+          (bypassDnd ? criticalChannelName : importantChannelName) : 
+          defaultChannelName);
       
-      // تنفيذ المنطق المناسب بناءً على نوع الأذكار
-      // يمكن هنا تحديث العدادات أو تخزين معلومات القراءة
+      // إنشاء تفاصيل الإشعار
+      final androidDetails = AndroidNotificationDetails(
+        notificationChannelId,
+        notificationChannelName,
+        channelDescription: 'App notifications',
+        importance: isImportant ? Importance.high : Importance.default_,
+        priority: isImportant ? Priority.high : Priority.default_,
+        color: color,
+        ledColor: ledColor,
+        ledOnMs: ledColor != null ? 1000 : null,
+        ledOffMs: ledColor != null ? 500 : null,
+        icon: icon ?? '@mipmap/ic_launcher',
+        fullScreenIntent: isImportant,
+        category: _getNotificationCategory(isImportant),
+        groupKey: groupKey,
+        styleInformation: BigTextStyleInformation(body),
+        sound: soundName != null ? RawResourceAndroidNotificationSound(soundName) : null,
+      );
       
-      // إرسال إشعار تأكيد
+      final iosDetails = _iosNotificationService.getNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        interruptionLevel: _getIOSInterruptionLevel(isImportant, bypassDnd),
+        threadIdentifier: groupKey,
+        sound: soundName,
+      );
+      
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+      
+      // إنشاء معرف فريد للإشعار
+      final notificationId = _generateUniqueId(id);
+      
+      // عرض الإشعار
       await flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecondsSinceEpoch.remainder(100000),
-        'تم تسجيل قراءة الأذكار',
-        'بارك الله فيك على قراءة أذكار $categoryId',
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _defaultChannelId,
-            'إشعارات الأذكار',
-            channelDescription: 'الإشعارات العامة للأذكار',
-            importance: Importance.low,
-            priority: Priority.low,
-            showWhen: true,
-          ),
-        ),
-      );
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error handling mark as read', 
-        e
-      );
-    }
-  }
-  
-  /// معالجة تأجيل الإشعار
-  Future<void> _handleSnoozeNotification(String? payload) async {
-    try {
-      if (payload == null || payload.isEmpty) return;
-      
-      // تحليل معرف الفئة من البيانات
-      final categoryId = payload.split(':').first;
-      
-      // جدولة تذكير بعد 30 دقيقة
-      final tz.TZDateTime scheduledDate = tz.TZDateTime.now(tz.local).add(const Duration(minutes: 30));
-      
-      // تحديد معرف الإشعار الجديد
-      final int notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
-      
-      // جدولة الإشعار المؤجل
-      await flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
-        'تذكير بالأذكار',
-        'حان وقت قراءة الأذكار التي قمت بتأجيلها',
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _defaultChannelId,
-            'إشعارات الأذكار',
-            channelDescription: 'الإشعارات العامة للأذكار',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: payload,
+        title,
+        body,
+        notificationDetails,
+        payload: payload ?? id,
       );
       
-      // إشعار تأكيد التأجيل
-      await flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecondsSinceEpoch.remainder(90000),
-        'تم تأجيل الإشعار',
-        'سيتم تذكيرك بعد 30 دقيقة',
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _defaultChannelId,
-            'إشعارات الأذكار',
-            channelDescription: 'الإشعارات العامة للأذكار',
-            importance: Importance.low,
-            priority: Priority.low,
-          ),
-        ),
-      );
+      // التحقق من وضع عدم الإزعاج
+      if (bypassDnd && await _doNotDisturbService.isDndEnabled()) {
+        _errorLoggingService.logInfo('DND is enabled, notification sent with bypass: $id');
+      }
+      
+      // تتبع عرض الإشعار
+      await _trackNotificationShown(id);
+      
+      _errorLoggingService.logInfo('Notification shown: $id');
+      return true;
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error handling snooze notification', 
-        e
-      );
-    }
-  }
-  
-  /// جدولة إشعار لفئة أذكار محددة
-  Future<bool> scheduleNotification(AthkarCategory category, TimeOfDay time) async {
-    try {
-      // التحقق من تفعيل الإشعارات
-      if (!await isNotificationEnabled()) {
+      _errorLoggingService.logError('Error showing notification', e);
+      
+      // محاولة استخدام طريقة احتياطية إذا فشلت الطريقة الأساسية
+      try {
+        await _showBackupNotification(id, title, body, payload);
+        return true;
+      } catch (backupError) {
+        _errorLoggingService.logError('Error with backup notification', backupError);
         return false;
       }
-      
-      // الحصول على معرف فريد للإشعار
-      int notificationId = await _getNotificationId(category.id);
-      
-      // الحصول على وقت الإشعار المجدول
-      final tz.TZDateTime scheduledDate = _getScheduledDateTime(time);
-      
-      // إعداد تفاصيل الإشعار بناءً على نظام التشغيل
-      NotificationDetails? notificationDetails = await _getNotificationDetails(category);
-      
-      if (notificationDetails == null) {
-        throw Exception('فشل في إنشاء تفاصيل الإشعار');
+    }
+  }
+  
+  // عرض إشعار احتياطي
+  Future<void> _showBackupNotification(
+    String id, 
+    String title, 
+    String body, 
+    String? payload
+  ) async {
+    // استخدام إعدادات بسيطة للإشعار الاحتياطي
+    final androidDetails = AndroidNotificationDetails(
+      'backup_channel',
+      'Backup Channel',
+      channelDescription: 'For backup notifications when main channel fails',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: _iosNotificationService.getSimpleNotificationDetails(),
+    );
+    
+    // إنشاء معرف فريد للإشعار الاحتياطي
+    final notificationId = _generateUniqueId(id) + 100000;
+    
+    await flutterLocalNotificationsPlugin.show(
+      notificationId,
+      'تنبيه: $title',
+      body,
+      notificationDetails,
+      payload: payload ?? id,
+    );
+    
+    _errorLoggingService.logInfo('Backup notification shown for: $id');
+  }
+
+  /// جدولة إشعار لوقت محدد
+  Future<bool> scheduleNotification({
+    required NotificationData notification,
+    required TimeOfDay scheduledTime,
+  }) async {
+    try {
+      if (!_isInitialized) {
+        await initialize();
       }
       
-      // تحديد عنوان ونص الإشعار
-      final String title = category.notifyTitle ?? 'حان موعد ${category.title}';
-      final String body = category.notifyBody ?? 'اضغط هنا لقراءة الأذكار';
+      // إنشاء معرف فريد للإشعار
+      final notificationId = _generateUniqueId(notification.id);
+      
+      // الحصول على التاريخ المجدول
+      final tz.TZDateTime scheduledDate = _getScheduledDate(scheduledTime);
+
+      // إنشاء تفاصيل الإشعار
+      final androidDetails = AndroidNotificationDetails(
+        notification.channelId ?? (notification.isImportant ? 
+            (notification.bypassDnd ? criticalChannelId : importantChannelId) : 
+            defaultChannelId),
+        notification.channelName ?? (notification.isImportant ? 
+            (notification.bypassDnd ? criticalChannelName : importantChannelName) : 
+            defaultChannelName),
+        channelDescription: 'Scheduled notifications',
+        importance: notification.isImportant ? Importance.high : Importance.default_,
+        priority: notification.isImportant ? Priority.high : Priority.default_,
+        styleInformation: BigTextStyleInformation(notification.body),
+        color: notification.color,
+        ledColor: notification.ledColor,
+        ledOnMs: notification.ledColor != null ? 1000 : null,
+        ledOffMs: notification.ledColor != null ? 500 : null,
+        icon: notification.icon ?? '@mipmap/ic_launcher',
+        sound: notification.soundName != null ? 
+            RawResourceAndroidNotificationSound(notification.soundName!) : null,
+      );
+      
+      final iosDetails = _iosNotificationService.getNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        interruptionLevel: _getIOSInterruptionLevel(
+          notification.isImportant, 
+          notification.bypassDnd
+        ),
+        sound: notification.soundName,
+      );
+      
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // جدولة الإشعار
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        notificationId,
+        notification.title,
+        notification.body,
+        scheduledDate,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: notification.isRecurring 
+            ? DateTimeComponents.time 
+            : DateTimeComponents.dateAndTime,
+        payload: notification.payload ?? notification.id,
+      );
+
+      // جدولة إنذار في الخلفية للمزيد من الموثوقية (Android فقط)
+      if (Platform.isAndroid) {
+        await _scheduleBackgroundAlarm(notification, scheduledTime);
+      }
+
+      // حفظ بيانات الإشعار
+      await _saveNotificationData(notification, notificationId, scheduledTime);
+      
+      // جدولة الإشعارات الإضافية إذا كانت موجودة
+      if (notification.additionalTimes != null && notification.additionalTimes!.isNotEmpty) {
+        await _scheduleAdditionalNotifications(notification);
+      }
+      
+      // تتبع الجدولة
+      await _trackNotificationScheduled(notification.id, scheduledTime);
+      
+      _errorLoggingService.logInfo('Scheduled notification: ${notification.id} at ${scheduledTime.hour}:${scheduledTime.minute}');
+      return true;
+    } catch (e) {
+      _errorLoggingService.logError('Error scheduling notification', e);
+      
+      // محاولة جدولة احتياطية
+      try {
+        await _scheduleBackupNotification(notification, scheduledTime);
+        return true;
+      } catch (backupError) {
+        _errorLoggingService.logError('Error with backup scheduling', backupError);
+        return false;
+      }
+    }
+  }
+  
+  // جدولة إشعار احتياطي
+  Future<void> _scheduleBackupNotification(
+    NotificationData notification,
+    TimeOfDay scheduledTime,
+  ) async {
+    try {
+      // إنشاء معرف فريد للإشعار الاحتياطي
+      final notificationId = _generateUniqueId(notification.id) + 200000;
+      
+      // الحصول على التاريخ المجدول
+      final tz.TZDateTime scheduledDate = _getScheduledDate(scheduledTime);
+      
+      // إنشاء تفاصيل الإشعار البسيطة
+      final androidDetails = AndroidNotificationDetails(
+        'backup_channel',
+        'Backup Channel',
+        channelDescription: 'For backup scheduled notifications',
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: _iosNotificationService.getSimpleNotificationDetails(),
+      );
       
       // جدولة الإشعار
       await flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
-        title,
-        body,
+        notification.title,
+        notification.body,
         scheduledDate,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
-        payload: category.id,
+        matchDateTimeComponents: notification.isRecurring 
+            ? DateTimeComponents.time 
+            : DateTimeComponents.dateAndTime,
+        payload: notification.payload ?? notification.id,
       );
       
-      // حفظ الإشعار في الإعدادات
-      await _saveScheduledNotification(
-        category.id, 
-        notificationId, 
-        time.hour, 
-        time.minute
+      // حفظ معرف الإشعار الاحتياطي
+      await _saveBackupNotificationId(notification.id, notificationId);
+      
+      // جدولة إنذار احتياطي إذا كان Android
+      if (Platform.isAndroid) {
+        final backupAlarmId = backupAlarmBaseId + notificationId % 10000;
+        
+        // حساب وقت الإنذار
+        final now = DateTime.now();
+        DateTime scheduledDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          scheduledTime.hour,
+          scheduledTime.minute,
+        );
+        
+        // إذا كان الوقت قد مر اليوم، فقم بالجدولة ليوم غد
+        if (scheduledDateTime.isBefore(now)) {
+          scheduledDateTime = scheduledDateTime.add(const Duration(days: 1));
+        }
+        
+        // جدولة الإنذار
+        await AndroidAlarmManager.periodic(
+          const Duration(days: 1),
+          backupAlarmId,
+          _showNotificationCallback,
+          startAt: scheduledDateTime,
+          exact: true,
+          wakeup: true,
+          rescheduleOnReboot: true,
+          params: {
+            'id': notification.id,
+            'notificationId': notificationId,
+            'title': notification.title,
+            'body': notification.body,
+            'payload': notification.payload ?? notification.id,
+            'isBackup': true,
+          },
+        );
+        
+        // حفظ معرف الإنذار الاحتياطي
+        await _saveAlarmId(notification.id, backupAlarmId, true);
+      }
+      
+      _errorLoggingService.logInfo('Backup notification scheduled for: ${notification.id}');
+    } catch (e) {
+      _errorLoggingService.logError('Error scheduling backup notification', e);
+      throw e;
+    }
+  }
+  
+  // جدولة إنذار في الخلفية (للأندرويد)
+  Future<void> _scheduleBackgroundAlarm(
+    NotificationData notification,
+    TimeOfDay scheduledTime,
+  ) async {
+    try {
+      // تحديد نوع الإنذار ومعرفه
+      int alarmId = dailyAlarmBaseId;
+      if (notification.extraData != null) {
+        if (notification.extraData!['type'] == 'weekly') {
+          alarmId = weeklyAlarmBaseId;
+        } else if (notification.extraData!['type'] == 'monthly') {
+          alarmId = monthlyAlarmBaseId;
+        }
+      }
+      
+      // إضافة معرف فريد
+      alarmId += _generateUniqueId(notification.id) % 10000;
+      
+      // حساب وقت الإنذار
+      final now = DateTime.now();
+      DateTime scheduledDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        scheduledTime.hour,
+        scheduledTime.minute,
       );
       
+      // إذا كان الوقت قد مر اليوم، فقم بالجدولة ليوم غد
+      if (scheduledDateTime.isBefore(now)) {
+        scheduledDateTime = scheduledDateTime.add(const Duration(days: 1));
+      }
+      
+      // جدولة الإنذار
+      await AndroidAlarmManager.periodic(
+        const Duration(days: 1),
+        alarmId,
+        _showNotificationCallback,
+        startAt: scheduledDateTime,
+        exact: true,
+        wakeup: true,
+        rescheduleOnReboot: true,
+        params: {
+          'id': notification.id,
+          'notificationId': _generateUniqueId(notification.id),
+          'title': notification.title,
+          'body': notification.body,
+          'payload': notification.payload ?? notification.id,
+          'isImportant': notification.isImportant,
+          'channelId': notification.channelId,
+          'channelName': notification.channelName,
+        },
+      );
+      
+      // حفظ معرف الإنذار
+      await _saveAlarmId(notification.id, alarmId, false);
+      
+      _errorLoggingService.logInfo('Background alarm scheduled for: ${notification.id} (AlarmId: $alarmId)');
+    } catch (e) {
+      _errorLoggingService.logError('Error scheduling background alarm', e);
+    }
+  }
+  
+  // جدولة إشعارات إضافية
+  Future<void> _scheduleAdditionalNotifications(NotificationData notification) async {
+    if (notification.additionalTimes == null || notification.additionalTimes!.isEmpty) {
+      return;
+    }
+    
+    try {
+      List<int> additionalNotificationIds = [];
+      
+      for (int i = 0; i < notification.additionalTimes!.length; i++) {
+        final timeString = notification.additionalTimes![i];
+        final timeParts = timeString.split(':');
+        if (timeParts.length == 2) {
+          final hour = int.tryParse(timeParts[0]);
+          final minute = int.tryParse(timeParts[1]);
+          
+          if (hour != null && minute != null) {
+            final additionalTime = TimeOfDay(hour: hour, minute: minute);
+            
+            // إنشاء معرف فريد للإشعار الإضافي
+            final int notificationId = _generateUniqueId(notification.id) + (i + 1) * 1000;
+            additionalNotificationIds.add(notificationId);
+            
+            // الحصول على الوقت المجدول
+            final tz.TZDateTime scheduledDate = _getScheduledDate(additionalTime);
+            
+            // إنشاء تفاصيل الإشعار
+            // تخصيص الإشعارات الإضافية بمجموعة
+            final androidDetails = AndroidNotificationDetails(
+              notification.channelId ?? defaultChannelId,
+              notification.channelName ?? defaultChannelName,
+              channelDescription: 'Additional scheduled notifications',
+              importance: notification.isImportant ? Importance.high : Importance.default_,
+              priority: notification.isImportant ? Priority.high : Priority.default_,
+              groupKey: 'group_${notification.id}',
+              setAsGroupSummary: i == 0, // أول إشعار إضافي هو ملخص المجموعة
+            );
+            
+            final iosDetails = _iosNotificationService.getNotificationDetails(
+              threadIdentifier: 'thread_${notification.id}',
+            );
+            
+            final notificationDetails = NotificationDetails(
+              android: androidDetails,
+              iOS: iosDetails,
+            );
+            
+            // جدولة الإشعار
+            await flutterLocalNotificationsPlugin.zonedSchedule(
+              notificationId,
+              notification.title,
+              notification.body,
+              scheduledDate,
+              notificationDetails,
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              matchDateTimeComponents: notification.isRecurring 
+                  ? DateTimeComponents.time 
+                  : DateTimeComponents.dateAndTime,
+              payload: '${notification.id}:additional_$i',
+            );
+            
+            // جدولة إنذار إضافي للأندرويد
+            if (Platform.isAndroid) {
+              final additionalAlarmId = notificationId + 100000;
+              
+              final now = DateTime.now();
+              DateTime scheduledDateTime = DateTime(
+                now.year,
+                now.month,
+                now.day,
+                additionalTime.hour,
+                additionalTime.minute,
+              );
+              
+              if (scheduledDateTime.isBefore(now)) {
+                scheduledDateTime = scheduledDateTime.add(const Duration(days: 1));
+              }
+              
+              await AndroidAlarmManager.periodic(
+                const Duration(days: 1),
+                additionalAlarmId,
+                _showNotificationCallback,
+                startAt: scheduledDateTime,
+                exact: true,
+                wakeup: true,
+                rescheduleOnReboot: true,
+                params: {
+                  'id': '${notification.id}:additional_$i',
+                  'notificationId': notificationId,
+                  'title': notification.title,
+                  'body': notification.body,
+                  'payload': '${notification.id}:additional_$i',
+                },
+              );
+              
+              // حفظ معرف الإنذار الإضافي
+              await _saveAlarmId('${notification.id}_additional_$i', additionalAlarmId, false);
+            }
+          }
+        }
+      }
+      
+      // حفظ جميع معرفات الإشعارات الإضافية لهذا الإشعار
+      await _saveAdditionalNotificationIds(notification.id, additionalNotificationIds);
+      
+      _errorLoggingService.logInfo('Additional notifications scheduled for: ${notification.id} (Count: ${additionalNotificationIds.length})');
+    } catch (e) {
+      _errorLoggingService.logError('Error scheduling additional notifications', e);
+    }
+  }
+  
+  // دالة استدعاء الإنذار لعرض الإشعارات
+  @pragma('vm:entry-point')
+  static Future<void> _showNotificationCallback(int id, Map<String, dynamic>? params) async {
+    if (params == null) return;
+    
+    try {
+      // تهيئة plugin الإشعارات بتهيئة مناسبة
+      final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+          FlutterLocalNotificationsPlugin();
+      
+      // تحتاج إلى تهيئة الـ plugin قبل عرض الإشعارات
+      await flutterLocalNotificationsPlugin.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(),
+        ),
+      );
+      
+      // استخراج بيانات الإشعار
+      final notificationId = params['notificationId'] as int;
+      final notificationTitle = params['title'] as String;
+      final notificationBody = params['body'] as String;
+      final payload = params['payload'] as String;
+      final isImportant = params['isImportant'] as bool? ?? false;
+      final isBackup = params['isBackup'] as bool? ?? false;
+      final channelId = params['channelId'] as String? ?? (isImportant ? 'important_channel' : 'default_channel');
+      final channelName = params['channelName'] as String? ?? (isImportant ? 'Important Notifications' : 'Default Notifications');
+      
+      // تحسين تفاصيل الإشعار لرؤية أفضل
+      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        isBackup ? 'backup_channel' : channelId,
+        isBackup ? 'Backup Channel' : channelName,
+        channelDescription: 'Notifications from background alarm',
+        importance: Importance.high,
+        priority: Priority.high,
+        category: isImportant ? AndroidNotificationCategory.alarm : AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        fullScreenIntent: isImportant,
+      );
+      
+      final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+      );
+      
+      // حفظ للتنقل إذا تم النقر
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_notification_payload', payload);
+      await prefs.setBool('opened_from_notification', true);
+      await prefs.setString('notification_payload', payload);
+      
+      // عرض الإشعار
+      await flutterLocalNotificationsPlugin.show(
+        notificationId,
+        notificationTitle,
+        notificationBody,
+        notificationDetails,
+        payload: payload,
+      );
+      
+      // تتبع أن الإشعار تم عرضه
+      await _trackNotificationShown(payload, isBackup);
+      
+      print('Background notification showed successfully for: $payload');
+    } catch (e) {
+      print('Error in background notification callback: $e');
+    }
+  }
+  
+  // تتبع عندما يتم عرض إشعار
+  @pragma('vm:entry-point')
+  static Future<void> _trackNotificationShown(String id, bool isBackup) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // حفظ وقت عرض هذا الإشعار
+      final key = 'notification_shown_${id}_${DateTime.now().day}';
+      await prefs.setString(key, DateTime.now().toIso8601String());
+      
+      // تتبع إذا كان إشعارًا احتياطيًا
+      if (isBackup) {
+        final backupKey = 'backup_notification_shown_$id';
+        final int count = prefs.getInt(backupKey) ?? 0;
+        await prefs.setInt(backupKey, count + 1);
+      }
+      
+      // زيادة إجمالي عدد المعروض
+      final countKey = 'notification_shown_count_$id';
+      final int currentCount = prefs.getInt(countKey) ?? 0;
+      await prefs.setInt(countKey, currentCount + 1);
+      
+    } catch (e) {
+      print('Error tracking notification shown: $e');
+    }
+  }
+  
+  /// إلغاء إشعار محدد
+  Future<bool> cancelNotification(String id) async {
+    try {
+      // الحصول على جميع معرفات الإشعارات لهذا الإشعار
+      final int primaryId = await _getSavedNotificationId(id);
+      final int backupId = await _getBackupNotificationId(id);
+      final List<int> additionalIds = await _getAdditionalNotificationIds(id);
+      
+      // إلغاء الإشعار الرئيسي
+      if (primaryId > 0) {
+        await flutterLocalNotificationsPlugin.cancel(primaryId);
+      }
+      
+      // إلغاء الإشعار الاحتياطي
+      if (backupId > 0) {
+        await flutterLocalNotificationsPlugin.cancel(backupId);
+      }
+      
+      // إلغاء الإشعارات الإضافية
+      for (final additionalId in additionalIds) {
+        await flutterLocalNotificationsPlugin.cancel(additionalId);
+      }
+      
+      // إلغاء الإنذارات الخلفية على Android
+      if (Platform.isAndroid) {
+        // إلغاء الإنذار الرئيسي
+        final alarmId = await _getSavedAlarmId(id);
+        if (alarmId > 0) {
+          await AndroidAlarmManager.cancel(alarmId);
+        }
+        
+        // إلغاء الإنذار الاحتياطي
+        final backupAlarmId = await _getSavedAlarmId(id, true);
+        if (backupAlarmId > 0) {
+          await AndroidAlarmManager.cancel(backupAlarmId);
+        }
+        
+        // إلغاء الإنذارات الإضافية
+        final additionalAlarmIds = await _getAdditionalAlarmIds(id);
+        for (final additionalAlarmId in additionalAlarmIds) {
+          await AndroidAlarmManager.cancel(additionalAlarmId);
+        }
+      }
+      
+      // مسح البيانات المحفوظة
+      await _clearNotificationData(id);
+      
+      // تتبع الإلغاء
+      await _trackNotificationCancelled(id);
+      
+      _errorLoggingService.logInfo('Notification cancelled: $id');
       return true;
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error scheduling notification for ${category.id}', 
-        e
-      );
+      _errorLoggingService.logError('Error canceling notification', e);
       return false;
     }
   }
   
-  /// جدولة إشعارات متعددة لفئة أذكار
-  Future<bool> scheduleMultipleNotifications(
-    AthkarCategory category, 
-    List<TimeOfDay> times,
-  ) async {
-    // استخدام خدمة تجميع الإشعارات إذا كان هناك أكثر من إشعار
-    if (times.length > 1) {
-      final List<String> timeStrings = times.map((time) => '${time.hour}:${time.minute}').toList();
-      return await _notificationGroupingService.scheduleMultipleNotifications(
-        category, 
-        timeStrings.sublist(1), // استثناء الوقت الرئيسي
-        times.first, // الوقت الرئيسي
-      );
-    } else if (times.length == 1) {
-      // جدولة إشعار واحد
-      return await scheduleNotification(category, times.first);
-    }
-    
-    return false;
-  }
-  
-  /// الحصول على تفاصيل الإشعار بناءً على نظام التشغيل وفئة الأذكار
-  Future<NotificationDetails?> _getNotificationDetails(AthkarCategory category) async {
+  /// إلغاء جميع الإشعارات
+  Future<bool> cancelAllNotifications() async {
     try {
+      await flutterLocalNotificationsPlugin.cancelAll();
+      
       if (Platform.isAndroid) {
-        // إعداد تفاصيل الإشعار لنظام أندرويد
-        String channelId = _getChannelIdForCategory(category.id);
+        // الحصول على جميع معرفات الإنذارات المحفوظة
+        final allAlarmIds = await _getAllSavedAlarmIds();
         
-        AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-          channelId,
-          _getChannelNameForCategory(category.id),
-          channelDescription: _getChannelDescriptionForCategory(category.id),
-          importance: Importance.high,
-          priority: Priority.high,
-          ticker: 'حان وقت ${category.title}',
-          color: _getCategoryColor(category.id),
-          ledColor: _getCategoryColor(category.id),
-          ledOnMs: 1000,
-          ledOffMs: 500,
-          enableLights: true,
-          enableVibration: true,
-          sound: _getCategorySound(category.id),
-          category: AndroidNotificationCategory.alarm,
-          fullScreenIntent: false, // تعيين إلى true للإشعارات المهمة جدًا
-          visibility: NotificationVisibility.public,
-          actions: [
-            AndroidNotificationAction(
-              'MARK_READ',
-              'تم القراءة',
-              showsUserInterface: true,
-              cancelNotification: true,
-            ),
-            AndroidNotificationAction(
-              'SNOOZE',
-              'تأجيل',
-              showsUserInterface: true,
-              cancelNotification: true,
-            ),
-          ],
-        );
-        
-        return NotificationDetails(android: androidDetails);
-      } else if (Platform.isIOS) {
-        // استخدام خدمة إشعارات iOS المحسنة
-        DarwinNotificationDetails iosDetails = _iosNotificationService.createIOSNotificationDetails(category);
-        return NotificationDetails(iOS: iosDetails);
+        // إلغاء جميع الإنذارات المعروفة
+        for (final alarmId in allAlarmIds) {
+          await AndroidAlarmManager.cancel(alarmId);
+        }
       }
       
-      // للأنظمة الأخرى، استخدم إعدادات إشعار عامة
-      return const NotificationDetails();
+      // مسح جميع البيانات المحفوظة
+      await _clearAllNotificationData();
+      
+      // تتبع إعادة التعيين
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('notifications_reset', DateTime.now().toIso8601String());
+      
+      _errorLoggingService.logInfo('All notifications cancelled');
+      return true;
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error getting notification details', 
-        e
+      _errorLoggingService.logError('Error canceling all notifications', e);
+      return false;
+    }
+  }
+  
+  /// الحصول على جميع الإشعارات المجدولة
+  Future<List<PendingNotificationRequest>> getScheduledNotifications() async {
+    try {
+      return await flutterLocalNotificationsPlugin.pendingNotificationRequests();
+    } catch (e) {
+      _errorLoggingService.logError('Error getting scheduled notifications', e);
+      return [];
+    }
+  }
+  
+  /// الحصول على جميع معرفات الإشعارات المجدولة
+  Future<List<String>> getAllScheduledNotificationIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final allIdsKey = 'all_notification_ids';
+      return prefs.getStringList(allIdsKey) ?? <String>[];
+    } catch (e) {
+      _errorLoggingService.logError('Error getting all notification IDs', e);
+      return [];
+    }
+  }
+  
+  /// التحقق مما إذا كان إشعار مجدول
+  Future<bool> isNotificationScheduled(String id) async {
+    final notificationId = await _getSavedNotificationId(id);
+    return notificationId > 0;
+  }
+  
+  /// جدولة جميع الإشعارات المحفوظة
+  Future<void> _rescheduleAllSavedNotifications() async {
+    try {
+      // الحصول على جميع الإشعارات المحفوظة
+      final savedNotifications = await _getAllSavedNotifications();
+      
+      int successCount = 0;
+      int failureCount = 0;
+      
+      for (final id in savedNotifications.keys) {
+        try {
+          final notificationData = savedNotifications[id]!;
+          final timeString = await _getSavedNotificationTime(id);
+          
+          if (timeString != null) {
+            final timeParts = timeString.split(':');
+            if (timeParts.length == 2) {
+              final hour = int.tryParse(timeParts[0]);
+              final minute = int.tryParse(timeParts[1]);
+              
+              if (hour != null && minute != null) {
+                final scheduledTime = TimeOfDay(hour: hour, minute: minute);
+                
+                // جدولة الإشعار
+                final success = await scheduleNotification(
+                  notification: notificationData,
+                  scheduledTime: scheduledTime,
+                );
+                
+                if (success) {
+                  successCount++;
+                } else {
+                  failureCount++;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          _errorLoggingService.logError('Error rescheduling notification: $id', e);
+          failureCount++;
+        }
+      }
+      
+      _errorLoggingService.logInfo('Rescheduled $successCount notifications (Failed: $failureCount)');
+    } catch (e) {
+      _errorLoggingService.logError('Error rescheduling saved notifications', e);
+    }
+  }
+  
+  /// اختبار إشعار فوري
+  Future<bool> testNotification() async {
+    try {
+      final androidDetails = AndroidNotificationDetails(
+        'test_channel',
+        'Test Channel',
+        channelDescription: 'For testing notifications',
+        importance: Importance.max,
+        priority: Priority.high,
       );
-      return null;
+      
+      final iosDetails = _iosNotificationService.getNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+      
+      await flutterLocalNotificationsPlugin.show(
+        0,
+        'اختبار الإشعارات',
+        'هذا إشعار تجريبي للتأكد من عمل نظام الإشعارات',
+        notificationDetails,
+        payload: 'test',
+      );
+      
+      // تتبع إشعار الاختبار
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('test_notification_sent', DateTime.now().toIso8601String());
+      
+      _errorLoggingService.logInfo('Test notification sent successfully');
+      return true;
+    } catch (e) {
+      _errorLoggingService.logError('Error showing test notification', e);
+      return false;
     }
   }
   
-  /// الحصول على معرف قناة الإشعارات بناءً على فئة الأذكار
-  String _getChannelIdForCategory(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return 'athkar_morning_channel';
-      case 'evening':
-        return 'athkar_evening_channel';
-      case 'sleep':
-        return 'athkar_sleep_channel';
-      case 'wake':
-        return 'athkar_wake_channel';
-      default:
-        return _defaultChannelId;
+  /// الحصول على إحصائيات الإشعارات
+  Future<Map<String, dynamic>> getNotificationStatistics() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // الحصول على جميع الإشعارات المجدولة
+      final pendingNotifications = await getScheduledNotifications();
+      
+      // الحصول على جميع معرفات الإشعارات
+      final allIdsKey = 'all_notification_ids';
+      final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
+      
+      // حساب متريكس التفاعل
+      int totalInteractions = 0;
+      int totalShown = 0;
+      Map<String, int> interactionsByType = {};
+      
+      for (final id in allIds) {
+        final countKey = 'notification_interaction_count_$id';
+        final interactions = prefs.getInt(countKey) ?? 0;
+        totalInteractions += interactions;
+        
+        final shownKey = 'notification_shown_count_$id';
+        totalShown += prefs.getInt(shownKey) ?? 0;
+        
+        // تصنيف حسب النوع
+        final type = _getCategoryFromId(id);
+        interactionsByType[type] = (interactionsByType[type] ?? 0) + interactions;
+      }
+      
+      return {
+        'total_scheduled': allIds.length,
+        'pending_count': pendingNotifications.length,
+        'total_shown': totalShown,
+        'total_interactions': totalInteractions,
+        'interactions_by_type': interactionsByType,
+        'last_reset': prefs.getString('notifications_reset') ?? 'Never',
+        'test_notification_sent': prefs.getString('test_notification_sent'),
+      };
+    } catch (e) {
+      _errorLoggingService.logError('Error getting notification statistics', e);
+      return {
+        'error': e.toString(),
+        'total_scheduled': 0,
+        'pending_count': 0,
+      };
     }
   }
   
-  /// الحصول على اسم قناة الإشعارات بناءً على فئة الأذكار
-  String _getChannelNameForCategory(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return 'أذكار الصباح';
-      case 'evening':
-        return 'أذكار المساء';
-      case 'sleep':
-        return 'أذكار النوم';
-      case 'wake':
-        return 'أذكار الاستيقاظ';
-      default:
-        return 'إشعارات الأذكار';
+  /// الحصول على حالة تحسين البطارية
+  Future<bool> needsBatteryOptimization() async {
+    try {
+      if (!Platform.isAndroid) return false;
+      
+      return await _batteryOptimizationService.isBatteryOptimizationEnabled();
+    } catch (e) {
+      _errorLoggingService.logError('Error checking battery optimization', e);
+      return false;
     }
   }
   
-  /// الحصول على وصف قناة الإشعارات بناءً على فئة الأذكار
-  String _getChannelDescriptionForCategory(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return 'إشعارات أذكار الصباح';
-      case 'evening':
-        return 'إشعارات أذكار المساء';
-      case 'sleep':
-        return 'إشعارات أذكار النوم';
-      case 'wake':
-        return 'إشعارات أذكار الاستيقاظ';
-      default:
-        return 'الإشعارات العامة للأذكار';
+  /// فتح إعدادات تحسين البطارية
+  Future<bool> openBatteryOptimizationSettings() async {
+    try {
+      if (!Platform.isAndroid) return false;
+      
+      return await _batteryOptimizationService.openBatteryOptimizationSettings();
+    } catch (e) {
+      _errorLoggingService.logError('Error opening battery settings', e);
+      return false;
     }
   }
   
-  /// الحصول على لون الإشعار بناءً على فئة الأذكار
-  Color _getCategoryColor(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return const Color(0xFFFFD54F); // أصفر
-      case 'evening':
-        return const Color(0xFFAB47BC); // بنفسجي
-      case 'sleep':
-        return const Color(0xFF5C6BC0); // أزرق
-      case 'wake':
-        return const Color(0xFFFFB74D); // برتقالي
-      case 'prayer':
-        return const Color(0xFF4DB6AC); // أزرق فاتح
-      default:
-        return const Color(0xFF447055); // اللون الافتراضي للتطبيق
+  /// الحصول على حالة عدم الإزعاج
+  Future<bool> isDndEnabled() async {
+    try {
+      return await _doNotDisturbService.isDndEnabled();
+    } catch (e) {
+      _errorLoggingService.logError('Error checking DND status', e);
+      return false;
     }
   }
   
-  /// إضافة جديدة: الحصول على أيقونة الفئة بناءً على المعرف
-  IconData _getCategoryIcon(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return Icons.wb_sunny;
-      case 'evening':
-        return Icons.nightlight_round;
-      case 'sleep':
-        return Icons.bedtime;
-      case 'wake':
-        return Icons.alarm;
-      case 'prayer':
-        return Icons.mosque;
-      default:
-        return Icons.notifications;
+  // دوال المساعدة للتعامل مع الإشعارات والإنذارات
+  
+  // إنشاء معرف فريد للإشعار
+  int _generateUniqueId(String id) {
+    return id.hashCode.abs() % 100000;
+  }
+  
+  // الحصول على فئة الإشعار المناسبة
+  AndroidNotificationCategory _getNotificationCategory(bool isImportant) {
+    return isImportant ? 
+        AndroidNotificationCategory.alarm : 
+        AndroidNotificationCategory.reminder;
+  }
+  
+  // الحصول على مستوى المقاطعة المناسب لنظام iOS
+  InterruptionLevel _getIOSInterruptionLevel(bool isImportant, bool bypassDnd) {
+    if (bypassDnd) {
+      return InterruptionLevel.critical; // أعلى مستوى - تجاوز وضع عدم الإزعاج
+    } else if (isImportant) {
+      return InterruptionLevel.timeSensitive; // مهم ولكن لا يتجاوز وضع عدم الإزعاج
+    } else {
+      return InterruptionLevel.active; // مستوى عادي
     }
   }
   
-  /// الحصول على صوت الإشعار بناءً على فئة الأذكار
-  AndroidNotificationSound? _getCategorySound(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return const RawResourceAndroidNotificationSound('morning_notification');
-      case 'evening':
-        return const RawResourceAndroidNotificationSound('evening_notification');
-      case 'sleep':
-        return const RawResourceAndroidNotificationSound('sleep_notification');
-      case 'wake':
-        return const RawResourceAndroidNotificationSound('wake_notification');
-      default:
-        return null; // استخدام الصوت الافتراضي للنظام
-    }
-  }
-  
-  /// الحصول على وقت الإشعار المجدول
-  tz.TZDateTime _getScheduledDateTime(TimeOfDay time) {
+  // تحويل TimeOfDay إلى TZDateTime مجدول
+  tz.TZDateTime _getScheduledDate(TimeOfDay time) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
       tz.local,
@@ -610,7 +1237,7 @@ class NotificationService {
       time.minute,
     );
     
-    // إذا كان الوقت قد مر اليوم، قم بالجدولة لليوم التالي
+    // إذا كان الوقت قد مر اليوم، فقم بالجدولة ليوم غد
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
@@ -618,724 +1245,349 @@ class NotificationService {
     return scheduledDate;
   }
   
-  /// الحصول على معرف فريد للإشعار
-  Future<int> _getNotificationId(String categoryId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      Map<String, dynamic> idsMapping = {};
-      
-      // قراءة معرفات الإشعارات المحفوظة
-      final String? savedMapping = prefs.getString(_keyNotificationIdsMapping);
-      if (savedMapping != null) {
-        idsMapping = Map<String, dynamic>.from(json.decode(savedMapping));
-      }
-      
-      // إعادة استخدام المعرف إذا كان موجودًا
-      if (idsMapping.containsKey(categoryId)) {
-        return idsMapping[categoryId] as int;
-      }
-      
-      // إنشاء معرف جديد فريد
-      final int newId = DateTime.now().millisecondsSinceEpoch.remainder(100000) + categoryId.hashCode.abs();
-      idsMapping[categoryId] = newId;
-      
-      // حفظ المعرف الجديد
-      await prefs.setString(_keyNotificationIdsMapping, json.encode(idsMapping));
-      
-      return newId;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error getting notification id for $categoryId', 
-        e
-      );
-      // إرجاع معرف عشوائي في حالة الخطأ
-      return DateTime.now().millisecondsSinceEpoch.remainder(100000);
-    }
-  }
-  
-  /// حفظ معلومات الإشعار المجدول
-  Future<void> _saveScheduledNotification(
-    String categoryId, 
+  // حفظ بيانات الإشعار ومعرف الإشعار
+  Future<void> _saveNotificationData(
+    NotificationData notification,
     int notificationId, 
-    int hour, 
-    int minute
+    TimeOfDay scheduledTime,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // قراءة الإشعارات المحفوظة
-      Map<String, dynamic> savedNotifications = {};
-      final String? savedData = prefs.getString(_keySavedNotifications);
+      // حفظ تعيين معرف الإشعار
+      final idKey = 'notification_id_${notification.id}';
+      await prefs.setInt(idKey, notificationId);
       
-      if (savedData != null) {
-        savedNotifications = Map<String, dynamic>.from(json.decode(savedData));
+      // حفظ بيانات الإشعار
+      final dataKey = 'notification_data_${notification.id}';
+      await prefs.setString(dataKey, jsonEncode(notification.toJson()));
+      
+      // حفظ الوقت المجدول
+      final timeKey = 'notification_time_${notification.id}';
+      await prefs.setString(timeKey, '${scheduledTime.hour}:${scheduledTime.minute}');
+      
+      // إضافة إلى قائمة معرفات الإشعارات الرئيسية
+      final allIdsKey = 'all_notification_ids';
+      final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
+      
+      if (!allIds.contains(notification.id)) {
+        allIds.add(notification.id);
+        await prefs.setStringList(allIdsKey, allIds);
       }
       
-      // حفظ معلومات الإشعار الجديد
-      savedNotifications[categoryId] = {
-        'id': notificationId,
-        'hour': hour,
-        'minute': minute,
-        'enabled': true,
-      };
-      
-      // حفظ البيانات المحدثة
-      await prefs.setString(_keySavedNotifications, json.encode(savedNotifications));
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics(
-        'save', 
-        'Saved notification for $categoryId at $hour:$minute'
-      );
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error saving scheduled notification', 
-        e
-      );
-    }
-  }
-
-  /// تحديث إحصائيات الإشعارات
-  Future<void> _updateNotificationStatistics(String action, String details) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      Map<String, dynamic> stats = {};
-      
-      // قراءة الإحصائيات المحفوظة
-      final String? savedStats = prefs.getString(_keyNotificationStats);
-      if (savedStats != null) {
-        stats = Map<String, dynamic>.from(json.decode(savedStats));
-      }
-      
-      // تحديث العدادات
-      int totalCount = stats['total_notifications'] ?? 0;
-      stats['total_notifications'] = totalCount + 1;
-      
-      // تحديث تفاصيل آخر عملية
-      stats['last_action'] = action;
-      stats['last_action_details'] = details;
-      stats['last_action_time'] = DateTime.now().toIso8601String();
-      
-      // إذا كانت عملية جدولة
-      if (action == 'save') {
-        int scheduledCount = stats['scheduled_count'] ?? 0;
-        stats['scheduled_count'] = scheduledCount + 1;
-        stats['last_scheduled'] = DateTime.now().toIso8601String();
-      }
-      
-      // حفظ عدد الإشعارات المعلقة
-      final pendingNotifications = await getPendingNotifications();
-      stats['pending_count'] = pendingNotifications.length;
-      
-      // حفظ الإحصائيات المحدثة
-      await prefs.setString(_keyNotificationStats, json.encode(stats));
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error updating notification statistics', 
-        e
-      );
+      _errorLoggingService.logError('Error saving notification data', e);
     }
   }
   
-  /// الحصول على إحصائيات الإشعارات
-  Future<Map<String, dynamic>> getNotificationStatistics() async {
+  // حفظ معرف الإشعار الاحتياطي
+  Future<void> _saveBackupNotificationId(String id, int notificationId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? savedStats = prefs.getString(_keyNotificationStats);
-      
-      if (savedStats != null) {
-        return Map<String, dynamic>.from(json.decode(savedStats));
-      }
-      
-      return {
-        'total_notifications': 0,
-        'scheduled_count': 0,
-        'pending_count': 0,
-        'last_action': 'none',
-        'last_scheduled': DateTime.now().toIso8601String(),
-      };
+      final idKey = 'notification_backup_id_$id';
+      await prefs.setInt(idKey, notificationId);
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error getting notification statistics', 
-        e
-      );
-      return {
-        'total_notifications': 0,
-        'scheduled_count': 0,
-        'pending_count': 0,
-        'last_action': 'error',
-        'error': e.toString(),
-      };
+      _errorLoggingService.logError('Error saving backup notification ID', e);
     }
   }
   
-  /// إلغاء إشعار لفئة محددة
-  Future<bool> cancelNotification(String categoryId) async {
+  // حفظ معرف الإنذار
+  Future<void> _saveAlarmId(String id, int alarmId, bool isBackup) async {
     try {
-      // التحقق مما إذا كان هذا ينتمي إلى مجموعة إشعارات
-      final notificationIds = await _notificationGroupingService.getGroupedNotificationIds(categoryId);
-      
-      if (notificationIds.isNotEmpty) {
-        // إلغاء مجموعة الإشعارات
-        await _notificationGroupingService.cancelGroupedNotifications(categoryId);
-      } else {
-        // الحصول على معرف الإشعار
-        final notificationId = await _getNotificationId(categoryId);
-        
-        // إلغاء الإشعار
-        await flutterLocalNotificationsPlugin.cancel(notificationId);
-      }
-      
-      // حذف معلومات الإشعار المحفوظة
       final prefs = await SharedPreferences.getInstance();
-      Map<String, dynamic> savedNotifications = {};
-      final String? savedData = prefs.getString(_keySavedNotifications);
+      final idKey = isBackup ? 'alarm_backup_id_$id' : 'alarm_id_$id';
+      await prefs.setInt(idKey, alarmId);
       
-      if (savedData != null) {
-        savedNotifications = Map<String, dynamic>.from(json.decode(savedData));
-        
-        // حذف الإشعار من القائمة المحفوظة
-        savedNotifications.remove(categoryId);
-        
-        // حفظ البيانات المحدثة
-        await prefs.setString(_keySavedNotifications, json.encode(savedNotifications));
+      // إضافة إلى قائمة جميع معرفات الإنذارات
+      final allAlarmsKey = 'all_alarm_ids';
+      final allAlarms = prefs.getStringList(allAlarmsKey) ?? <String>[];
+      
+      final alarmKey = isBackup ? 'backup_$id' : id;
+      if (!allAlarms.contains(alarmKey)) {
+        allAlarms.add(alarmKey);
+        await prefs.setStringList(allAlarmsKey, allAlarms);
       }
-      
-      // إلغاء تفعيل الإشعار للفئة
-      await prefs.setBool(_keyCategoryEnabled + categoryId, false);
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics('cancel', 'Canceled notification for $categoryId');
-      
-      return true;
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error canceling notification for $categoryId', 
-        e
-      );
-      return false;
+      _errorLoggingService.logError('Error saving alarm ID', e);
     }
   }
   
-  /// إلغاء جميع الإشعارات
-  Future<bool> cancelAllNotifications() async {
+  // حفظ معرفات الإشعارات الإضافية
+  Future<void> _saveAdditionalNotificationIds(String id, List<int> ids) async {
     try {
-      await flutterLocalNotificationsPlugin.cancelAll();
-      
-      // حذف جميع المعلومات المحفوظة
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_keySavedNotifications);
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics('reset', 'Canceled all notifications');
-      
-      return true;
+      final idsKey = 'additional_notification_ids_$id';
+      await prefs.setString(idsKey, ids.join(','));
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error canceling all notifications', 
-        e
-      );
-      return false;
+      _errorLoggingService.logError('Error saving additional notification IDs', e);
     }
   }
   
-  /// إعادة جدولة جميع الإشعارات المحفوظة
-  Future<bool> scheduleAllSavedNotifications() async {
+  // الحصول على معرف الإشعار المحفوظ
+  Future<int> _getSavedNotificationId(String id) async {
     try {
-      // التحقق من تفعيل الإشعارات
-      if (!await isNotificationEnabled()) {
-        return false;
-      }
-      
       final prefs = await SharedPreferences.getInstance();
-      final String? savedData = prefs.getString(_keySavedNotifications);
+      final idKey = 'notification_id_$id';
+      return prefs.getInt(idKey) ?? 0;
+    } catch (e) {
+      _errorLoggingService.logError('Error getting saved notification ID', e);
+      return 0;
+    }
+  }
+  
+  // الحصول على معرف الإشعار الاحتياطي
+  Future<int> _getBackupNotificationId(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final idKey = 'notification_backup_id_$id';
+      return prefs.getInt(idKey) ?? 0;
+    } catch (e) {
+      _errorLoggingService.logError('Error getting backup notification ID', e);
+      return 0;
+    }
+  }
+  
+  // الحصول على معرف الإنذار المحفوظ
+  Future<int> _getSavedAlarmId(String id, [bool isBackup = false]) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final idKey = isBackup ? 'alarm_backup_id_$id' : 'alarm_id_$id';
+      return prefs.getInt(idKey) ?? 0;
+    } catch (e) {
+      _errorLoggingService.logError('Error getting saved alarm ID', e);
+      return 0;
+    }
+  }
+  
+  // الحصول على جميع معرفات الإنذارات المحفوظة
+  Future<List<int>> _getAllSavedAlarmIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final allAlarmsKey = 'all_alarm_ids';
+      final alarmKeys = prefs.getStringList(allAlarmsKey) ?? <String>[];
       
-      if (savedData == null) {
-        return false; // لا توجد إشعارات محفوظة
-      }
+      List<int> alarmIds = [];
       
-      Map<String, dynamic> savedNotifications = Map<String, dynamic>.from(json.decode(savedData));
-      
-      // تتبع النجاح والفشل
-      int successCount = 0;
-      int failureCount = 0;
-      
-      // إعادة جدولة كل إشعار
-      for (final entry in savedNotifications.entries) {
-        final categoryId = entry.key;
-        final notificationData = entry.value;
+      for (final key in alarmKeys) {
+        // استخراج معرف الإنذار
+        int? alarmId;
         
-        if (notificationData['enabled'] == true) {
-          try {
-            // الحصول على وقت الإشعار
-            final hour = notificationData['hour'] as int;
-            final minute = notificationData['minute'] as int;
-            final time = TimeOfDay(hour: hour, minute: minute);
-            
-            // الحصول على فئة الأذكار
-            final categoryData = await _getCategoryData(categoryId);
-            
-            if (categoryData != null) {
-              // إعادة جدولة الإشعار
-              final success = await scheduleNotification(categoryData, time);
-              
-              if (success) {
-                successCount++;
-              } else {
-                failureCount++;
-              }
-            }
-          } catch (e) {
-            failureCount++;
-            await _errorLoggingService.logError(
-              'NotificationService', 
-              'Error rescheduling notification for $categoryId', 
-              e
-            );
-          }
+        if (key.startsWith('backup_')) {
+          final id = key.replaceFirst('backup_', '');
+          alarmId = await _getSavedAlarmId(id, true);
+        } else {
+          alarmId = await _getSavedAlarmId(key);
+        }
+        
+        if (alarmId > 0) {
+          alarmIds.add(alarmId);
         }
       }
       
-      print('Rescheduled notifications: $successCount success, $failureCount failures');
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics(
-        'reschedule', 
-        'Rescheduled $successCount notifications ($failureCount failures)'
-      );
-      
-      return successCount > 0;
+      return alarmIds;
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error rescheduling all notifications', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// الحصول على بيانات فئة الأذكار
-  Future<AthkarCategory?> _getCategoryData(String categoryId) async {
-    try {
-      // تنفيذ منطق للحصول على بيانات فئة الأذكار
-      // يمكن تعديل هذا لاستخدام خدمة الأذكار الحقيقية
-      
-      String title;
-      IconData icon;
-      Color color;
-      
-      switch (categoryId) {
-        case 'morning':
-          title = 'أذكار الصباح';
-          icon = Icons.wb_sunny;
-          color = const Color(0xFFFFD54F);
-          break;
-        case 'evening':
-          title = 'أذكار المساء';
-          icon = Icons.nightlight_round;
-          color = const Color(0xFFAB47BC);
-          break;
-        case 'sleep':
-          title = 'أذكار النوم';
-          icon = Icons.bedtime;
-          color = const Color(0xFF5C6BC0);
-          break;
-        case 'wake':
-          title = 'أذكار الاستيقاظ';
-          icon = Icons.alarm;
-          color = const Color(0xFFFFB74D);
-          break;
-        case 'prayer':
-          title = 'أذكار الصلاة';
-          icon = Icons.mosque;
-          color = const Color(0xFF4DB6AC);
-          break;
-        case 'home':
-          title = 'أذكار المنزل';
-          icon = Icons.home;
-          color = const Color(0xFF66BB6A);
-          break;
-        case 'food':
-          title = 'أذكار الطعام';
-          icon = Icons.restaurant;
-          color = const Color(0xFFE57373);
-          break;
-        default:
-          title = 'أذكار $categoryId';
-          icon = Icons.notifications;
-          color = const Color(0xFF447055);
-      }
-      
-      return AthkarCategory(
-        id: categoryId,
-        title: title,
-        icon: icon,
-        color: color,
-        notifyTitle: 'حان موعد $title',
-        notifyBody: 'اضغط هنا لقراءة الأذكار',
-        athkar: [], // يمكن تعديل هذا لاستخدام أذكار حقيقية
-      );
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error getting category data for $categoryId', 
-        e
-      );
-      return null;
-    }
-  }
-  
-  /// الحصول على المنطقة الزمنية الحالية للجهاز
-  String getCurrentTimezoneName() {
-    try {
-      return tz.local.name;
-    } catch (e) {
-      return 'Unknown';
-    }
-  }
-
-  /// التحقق من تفعيل الإشعارات (العامة أو لفئة محددة)
-  Future<bool> isNotificationEnabled([String? categoryId]) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // التحقق من تفعيل الإشعارات العامة أولاً
-      final globalEnabled = prefs.getBool(_keyNotificationEnabled) ?? true;
-      
-      // إذا كانت الإشعارات العامة معطلة أو لم يتم تحديد فئة
-      if (!globalEnabled || categoryId == null) {
-        return globalEnabled;
-      }
-      
-      // التحقق من تفعيل إشعارات الفئة المحددة
-      return prefs.getBool(_keyCategoryEnabled + categoryId) ?? false;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error checking if notification is enabled' + (categoryId != null ? ' for $categoryId' : ''), 
-        e
-      );
-      return categoryId == null ? true : false; // افتراض أن الإشعارات العامة مفعلة ولكن الفئات المحددة معطلة افتراضيًا
-    }
-  }
-  
-  /// تحديث حالة تفعيل الإشعارات العامة
-  Future<bool> setNotificationEnabled(bool enabled) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyNotificationEnabled, enabled);
-      
-      if (enabled) {
-        // إعادة جدولة الإشعارات إذا تم تفعيلها
-        await scheduleAllSavedNotifications();
-      } else {
-        // إلغاء جميع الإشعارات إذا تم تعطيلها
-        await flutterLocalNotificationsPlugin.cancelAll();
-      }
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics(
-        'toggle_global', 
-        'Notifications ' + (enabled ? 'enabled' : 'disabled')
-      );
-      
-      return true;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error setting notification enabled: $enabled', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// الحصول على الإشعارات المعلقة
-  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
-    try {
-      return await flutterLocalNotificationsPlugin.pendingNotificationRequests();
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error getting pending notifications', 
-        e
-      );
+      _errorLoggingService.logError('Error getting all saved alarm IDs', e);
       return [];
     }
   }
   
-  /// الحصول على الإشعارات المحفوظة
-  Future<Map<String, dynamic>> getSavedNotifications() async {
+  // الحصول على معرفات الإشعارات الإضافية
+  Future<List<int>> _getAdditionalNotificationIds(String id) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? savedData = prefs.getString(_keySavedNotifications);
+      final idsKey = 'additional_notification_ids_$id';
+      final idsString = prefs.getString(idsKey);
       
-      if (savedData == null) {
-        return {};
+      if (idsString != null && idsString.isNotEmpty) {
+        return idsString
+            .split(',')
+            .map((idStr) => int.tryParse(idStr) ?? 0)
+            .where((id) => id > 0)
+            .toList();
       }
       
-      return Map<String, dynamic>.from(json.decode(savedData));
+      return [];
     } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error getting saved notifications', 
-        e
-      );
+      _errorLoggingService.logError('Error getting additional notification IDs', e);
+      return [];
+    }
+  }
+  
+  // الحصول على معرفات الإنذارات الإضافية
+  Future<List<int>> _getAdditionalAlarmIds(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final allAlarmsKey = 'all_alarm_ids';
+      final allAlarms = prefs.getStringList(allAlarmsKey) ?? <String>[];
+      
+      List<int> additionalAlarmIds = [];
+      
+      // البحث عن الإنذارات المرتبطة بهذا المعرف
+      for (final key in allAlarms) {
+        if (key.startsWith('${id}_additional_')) {
+          final alarmId = await _getSavedAlarmId(key);
+          if (alarmId > 0) {
+            additionalAlarmIds.add(alarmId);
+          }
+        }
+      }
+      
+      return additionalAlarmIds;
+    } catch (e) {
+      _errorLoggingService.logError('Error getting additional alarm IDs', e);
+      return [];
+    }
+  }
+  
+  // مسح بيانات الإشعار
+  Future<void> _clearNotificationData(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // إزالة تعيين المعرف
+      await prefs.remove('notification_id_$id');
+      await prefs.remove('notification_backup_id_$id');
+      
+      // إزالة بيانات الإشعار
+      await prefs.remove('notification_data_$id');
+      
+      // إزالة الوقت المجدول
+      await prefs.remove('notification_time_$id');
+      
+      // إزالة معرفات الإشعارات الإضافية
+      await prefs.remove('additional_notification_ids_$id');
+      
+      // إزالة معرفات الإنذارات
+      await prefs.remove('alarm_id_$id');
+      await prefs.remove('alarm_backup_id_$id');
+      
+      // تحديث القائمة الرئيسية
+      final allIdsKey = 'all_notification_ids';
+      final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
+      
+      if (allIds.contains(id)) {
+        allIds.remove(id);
+        await prefs.setStringList(allIdsKey, allIds);
+      }
+      
+      // تحديث قائمة الإنذارات
+      final allAlarmsKey = 'all_alarm_ids';
+      final allAlarms = prefs.getStringList(allAlarmsKey) ?? <String>[];
+      
+      // إزالة جميع الإنذارات المرتبطة بهذا المعرف
+      allAlarms.removeWhere((key) => key == id || key == 'backup_$id' || key.startsWith('${id}_additional_'));
+      await prefs.setStringList(allAlarmsKey, allAlarms);
+    } catch (e) {
+      _errorLoggingService.logError('Error clearing notification data', e);
+    }
+  }
+  
+  // مسح جميع بيانات الإشعارات
+  Future<void> _clearAllNotificationData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // الحصول على جميع معرفات الإشعارات
+      final allIdsKey = 'all_notification_ids';
+      final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
+      
+      // مسح بيانات كل إشعار
+      for (final id in allIds) {
+        await _clearNotificationData(id);
+      }
+      
+      // إزالة القائمة الرئيسية
+      await prefs.remove(allIdsKey);
+      
+      // إزالة قائمة الإنذارات
+      await prefs.remove('all_alarm_ids');
+      
+      _errorLoggingService.logInfo('All notification data cleared');
+    } catch (e) {
+      _errorLoggingService.logError('Error clearing all notification data', e);
+    }
+  }
+  
+  // تتبع عندما يتم جدولة إشعار
+  Future<void> _trackNotificationScheduled(String id, TimeOfDay time) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'notification_scheduled_$id';
+      final data = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'time': '${time.hour}:${time.minute}',
+      };
+      await prefs.setString(key, jsonEncode(data));
+    } catch (e) {
+      _errorLoggingService.logError('Error tracking notification scheduled', e);
+    }
+  }
+  
+  // تتبع عندما يتم إلغاء إشعار
+  Future<void> _trackNotificationCancelled(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'notification_cancelled_$id';
+      await prefs.setString(key, DateTime.now().toIso8601String());
+    } catch (e) {
+      _errorLoggingService.logError('Error tracking notification cancellation', e);
+    }
+  }
+  
+  // الحصول على الوقت المحفوظ للإشعار
+  Future<String?> _getSavedNotificationTime(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timeKey = 'notification_time_$id';
+      return prefs.getString(timeKey);
+    } catch (e) {
+      _errorLoggingService.logError('Error getting saved notification time', e);
+      return null;
+    }
+  }
+  
+  // الحصول على جميع الإشعارات المحفوظة
+  Future<Map<String, NotificationData>> _getAllSavedNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final allIdsKey = 'all_notification_ids';
+      final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
+      
+      Map<String, NotificationData> savedNotifications = {};
+      
+      for (final id in allIds) {
+        final dataKey = 'notification_data_$id';
+        final dataJson = prefs.getString(dataKey);
+        
+        if (dataJson != null) {
+          try {
+            final data = NotificationData.fromJson(jsonDecode(dataJson));
+            savedNotifications[id] = data;
+          } catch (e) {
+            _errorLoggingService.logError('Error parsing notification data for: $id', e);
+          }
+        }
+      }
+      
+      return savedNotifications;
+    } catch (e) {
+      _errorLoggingService.logError('Error getting all saved notifications', e);
       return {};
     }
   }
   
-  /// اقتراح وقت مناسب لفئة الأذكار
-  TimeOfDay getSuggestedTimeForCategory(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return TimeOfDay(hour: 7, minute: 0); // 7:00 صباحًا
-      case 'evening':
-        return TimeOfDay(hour: 17, minute: 0); // 5:00 مساءً
-      case 'sleep':
-        return TimeOfDay(hour: 22, minute: 0); // 10:00 مساءً
-      case 'wake':
-        return TimeOfDay(hour: 6, minute: 0); // 6:00 صباحًا
-      case 'prayer':
-        return TimeOfDay(hour: 12, minute: 0); // 12:00 ظهرًا
-      case 'home':
-        return TimeOfDay(hour: 18, minute: 0); // 6:00 مساءً
-      case 'food':
-        return TimeOfDay(hour: 8, minute: 0); // 8:00 صباحًا
-      default:
-        return TimeOfDay(hour: 9, minute: 0); // 9:00 صباحًا افتراضيًا
+  // الحصول على الفئة من المعرف
+  String _getCategoryFromId(String id) {
+    // استخراج الفئة من المعرف (مثال: "morning_123" -> "morning")
+    final parts = id.split('_');
+    if (parts.isNotEmpty) {
+      return parts[0];
     }
+    return 'unknown';
   }
   
-  /// حفظ وقت الإشعار لفئة محددة
-  Future<bool> setNotificationTime(String categoryId, TimeOfDay time) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String timeString = '${time.hour}:${time.minute}';
-      await prefs.setString(_keyCategoryTime + categoryId, timeString);
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics(
-        'set_time', 
-        'Set notification time for $categoryId to ${time.hour}:${time.minute}'
-      );
-      
-      return true;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error setting notification time for $categoryId', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// الحصول على وقت الإشعار المحفوظ لفئة محددة
-  Future<TimeOfDay?> getNotificationTime(String categoryId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? timeString = prefs.getString(_keyCategoryTime + categoryId);
-      
-      if (timeString == null) {
-        return null;
-      }
-      
-      final parts = timeString.split(':');
-      if (parts.length == 2) {
-        final hour = int.tryParse(parts[0]);
-        final minute = int.tryParse(parts[1]);
-        
-        if (hour != null && minute != null) {
-          return TimeOfDay(hour: hour, minute: minute);
-        }
-      }
-      
-      return null;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error getting notification time for $categoryId', 
-        e
-      );
-      return null;
-    }
-  }
-  
-  /// إرسال إشعار اختباري
-  Future<bool> testImmediateNotification() async {
-    try {
-      // إنشاء معرف فريد للإشعار
-      final int notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
-      
-      // إنشاء تفاصيل الإشعار
-      const NotificationDetails notificationDetails = NotificationDetails(
-        android: AndroidNotificationDetails(
-          _defaultChannelId,
-          'إشعارات الأذكار',
-          channelDescription: 'الإشعارات العامة للأذكار',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-      );
-      
-      // إرسال الإشعار
-      await flutterLocalNotificationsPlugin.show(
-        notificationId,
-        'إشعار اختباري',
-        'هذا إشعار اختباري للتحقق من عمل نظام الإشعارات',
-        notificationDetails,
-        payload: 'test',
-      );
-      
-      // تحديث إحصائيات الإشعارات
-      await _updateNotificationStatistics('test', 'Sent test notification');
-      
-      return true;
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error sending test notification', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// جدولة إشعار للأذكار
-  Future<bool> scheduleAthkarNotification(AthkarCategory category, TimeOfDay time) async {
-    try {
-      // تحديث وقت الإشعار المحفوظ للفئة
-      await setNotificationTime(category.id, time);
-      
-      // تفعيل الإشعارات للفئة
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyCategoryEnabled + category.id, true);
-      
-      // التحقق مما إذا كانت هناك أوقات إضافية
-      if (category.hasMultipleReminders && category.additionalNotifyTimes != null && category.additionalNotifyTimes!.isNotEmpty) {
-        // تحويل الأوقات الإضافية إلى كائنات TimeOfDay
-        List<TimeOfDay> allTimes = [time]; // بدء بالوقت الرئيسي
-        
-        for (final timeStr in category.additionalNotifyTimes!) {
-          try {
-            final parts = timeStr.split(':');
-            if (parts.length == 2) {
-              final hour = int.tryParse(parts[0]);
-              final minute = int.tryParse(parts[1]);
-              
-              if (hour != null && minute != null) {
-                allTimes.add(TimeOfDay(hour: hour, minute: minute));
-              }
-            }
-          } catch (e) {
-            print('Error parsing time string: $timeStr - $e');
-          }
-        }
-        
-        // جدولة الإشعارات المتعددة
-        return await scheduleMultipleNotifications(category, allTimes);
-      }
-      
-      // جدولة إشعار واحد
-      return await scheduleNotification(category, time);
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error scheduling athkar notification for ${category.id}', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// جدولة الإشعارات الإضافية
-  Future<bool> scheduleAdditionalNotifications(AthkarCategory category) async {
-    try {
-      if (!category.hasMultipleReminders || category.additionalNotifyTimes == null || category.additionalNotifyTimes!.isEmpty) {
-        return false;
-      }
-      
-      // الحصول على الوقت الرئيسي المحفوظ
-      final mainTime = await getNotificationTime(category.id);
-      if (mainTime == null) {
-        return false;
-      }
-      
-      // تحويل الأوقات الإضافية إلى كائنات TimeOfDay
-      List<TimeOfDay> allTimes = [mainTime]; // بدء بالوقت الرئيسي
-      
-      for (final timeStr in category.additionalNotifyTimes!) {
-        try {
-          final parts = timeStr.split(':');
-          if (parts.length == 2) {
-            final hour = int.tryParse(parts[0]);
-            final minute = int.tryParse(parts[1]);
-            
-            if (hour != null && minute != null) {
-              allTimes.add(TimeOfDay(hour: hour, minute: minute));
-            }
-          }
-        } catch (e) {
-          print('Error parsing time string: $timeStr - $e');
-        }
-      }
-      
-      // جدولة الإشعارات المتعددة
-      return await scheduleMultipleNotifications(category, allTimes);
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error scheduling additional notifications for ${category.id}', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// إلغاء إشعار لفئة أذكار محددة
-  Future<bool> cancelAthkarNotification(String categoryId) async {
-    try {
-      // إلغاء تفعيل إشعارات الفئة
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyCategoryEnabled + categoryId, false);
-      
-      // إلغاء الإشعار
-      return await cancelNotification(categoryId);
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error canceling athkar notification for $categoryId', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  /// دالة لفحص وطلب تفعيل الإشعارات
-  Future<void> checkNotificationOptimizations(BuildContext context) async {
-    try {
-      // فحص وطلب تعطيل تحسين البطارية
-      await _batteryOptimizationService.checkAndRequestBatteryOptimization(context);
-      
-      // فحص وضع عدم الإزعاج
-      final shouldPrompt = await _doNotDisturbService.shouldPromptAboutDoNotDisturb();
-      if (shouldPrompt) {
-        await _doNotDisturbService.showDoNotDisturbDialog(context);
-      }
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'NotificationService', 
-        'Error checking notification optimizations', 
-        e
-      );
-    }
+  // الحصول على اسم المنطقة الزمنية الحالية
+  String getCurrentTimezoneName() {
+    return _deviceTimeZone;
   }
 }
