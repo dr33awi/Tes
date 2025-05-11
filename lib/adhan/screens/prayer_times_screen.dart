@@ -40,12 +40,20 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   // للتأثيرات اللمسية
   int? _pressedIndex;
   bool _isPressed = false;
+  
+  // منع استدعاءات متكررة
+  bool _isInitializing = false;
+  bool _isLoadingPrayerTimes = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initService();
+    
+    // تأخير استدعاء _initService للتأكد من اكتمال بناء Widget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initService();
+    });
   }
   
   @override
@@ -67,7 +75,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _prayerService.setContext(context);
+    
+    // Only update context in service if needed
+    if (mounted && context != null) {
+      _prayerService.setContext(context);
+    }
   }
   
   // التحقق من إذن الموقع
@@ -118,6 +130,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   
   // تهيئة الخدمة
   Future<void> _initService() async {
+    // منع الاستدعاءات المتكررة
+    if (_isInitializing) return;
+    _isInitializing = true;
+    
     try {
       // تهيئة خدمة مواقيت الصلاة
       await _prayerService.initialize();
@@ -134,6 +150,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
       _loadCachedData();
       _loadPrayerTimes();
     } catch (e) {
+      debugPrint('خطأ في تهيئة خدمة مواقيت الصلاة: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -141,6 +158,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           _errorMessage = 'خطأ في تهيئة خدمة مواقيت الصلاة';
         });
       }
+    } finally {
+      _isInitializing = false;
     }
   }
   
@@ -166,6 +185,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
 
   // تحميل مواقيت الصلاة
   Future<void> _loadPrayerTimes({bool forceRefresh = false}) async {
+    // منع الاستدعاءات المتكررة
+    if (_isLoadingPrayerTimes) return;
     if (_isLoading && !_hasCache) return;
     
     if (!forceRefresh && _hasCache && _lastLoadTime != null && 
@@ -173,21 +194,25 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
       return;
     }
     
-    setState(() {
-      if (forceRefresh) {
-        _isLoading = true;
-        _hasCache = false;
-      } else {
-        if (_hasCache) {
-          _isRefreshing = true;
-        } else {
-          _isLoading = true;
-        }
-      }
-      _hasError = false;
-    });
-
+    _isLoadingPrayerTimes = true;
+    
     try {
+      if (mounted) {
+        setState(() {
+          if (forceRefresh) {
+            _isLoading = true;
+            _hasCache = false;
+          } else {
+            if (_hasCache) {
+              _isRefreshing = true;
+            } else {
+              _isLoading = true;
+            }
+          }
+          _hasError = false;
+        });
+      }
+
       _hasLocationPermission = await _checkLocationPermission();
       
       if (!_hasLocationPermission) {
@@ -239,6 +264,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
         debugPrint('خطأ في جدولة الإشعارات: $notifError');
       }
     } catch (e) {
+      debugPrint('تفاصيل الخطأ أثناء تحميل مواقيت الصلاة: $e');
+      
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -247,12 +274,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           _errorMessage = 'حدث خطأ أثناء تحميل أوقات الصلاة';
         });
         
-        debugPrint('تفاصيل الخطأ أثناء تحميل مواقيت الصلاة: $e');
-        
         if (_hasCache) {
           _showErrorSnackBar('حدث خطأ أثناء تحديث البيانات. جارٍ استخدام البيانات المخزنة.');
         }
       }
+    } finally {
+      _isLoadingPrayerTimes = false;
     }
   }
   
@@ -391,9 +418,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
     
     if (result == true) {
-      setState(() {
-        _isLoading = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
       
       try {
         await _loadPrayerTimes(forceRefresh: true);
@@ -569,7 +598,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
           ),
           const SizedBox(height: 8),
           Text(
-            'يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى',
+            'يرجى التحقق من اتصال الإنترنت الخاص بك والمحاولة مرة أخرى',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey.shade600,
@@ -992,10 +1021,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     }
   }
   
-  // تم إلغاء الأزرار التي كانت في الأسفل
-  // يمكن استخدام أزرار القائمة العلوية فقط
-  
-  // بناء قائمة أقسام الصلوات (مشابه لشاشة الأذكار)
+  // بناء قائمة أقسام الصلوات
   Widget _buildPrayerCategoriesList() {
     if (_prayerTimes == null || _prayerTimes!.isEmpty) {
       return const SizedBox.shrink();
@@ -1028,7 +1054,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
     );
   }
   
-  // بناء بطاقة قسم الصلاة (مشابه لشاشة الأذكار)
+  // بناء بطاقة قسم الصلاة
   Widget _buildPrayerCategoryCard(PrayerTimeModel prayer, int index, bool isPressed) {
     return GestureDetector(
       onTapDown: (_) {
@@ -1245,7 +1271,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> with WidgetsBindi
   // استخدام الموقع الافتراضي
   void _useDefaultLocation() {
     try {
-      _prayerService.setDefaultLocation(); // Removed await since this returns void
+      _prayerService.setDefaultLocation();
       final prayerTimes = _prayerService.getPrayerTimesLocally();
       
       setState(() {

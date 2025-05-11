@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
-import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:permission_handler/permission_handler.dart';
@@ -21,7 +20,6 @@ class EnhancedPrayerNotificationService {
 
   // Flutter Local Notifications Plugin
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
-  final PrayerTimesService _prayerService = PrayerTimesService();
   
   // Notification settings
   bool _isNotificationEnabled = true;
@@ -57,6 +55,9 @@ class EnhancedPrayerNotificationService {
   
   bool _isInitialized = false;
   BuildContext? _context;
+  
+  // Flag to prevent recursion
+  bool _isSchedulingInProgress = false;
 
   // Initialize the service
   Future<bool> initialize() async {
@@ -266,7 +267,10 @@ class EnhancedPrayerNotificationService {
   }
   
   void setContext(BuildContext context) {
-    _context = context;
+    // Only update if different to avoid potential setState loops
+    if (_context != context) {
+      _context = context;
+    }
   }
   
   void _onNotificationTapped(NotificationResponse response) {
@@ -575,7 +579,7 @@ class EnhancedPrayerNotificationService {
         return const Color(0xFFFF8A65);
       case 'المغرب':
         return const Color(0xFF5C6BC0);
-      case 'العشاء':
+case 'العشاء':
         return const Color(0xFF1A237E);
       default:
         return const Color(0xFF4DB6AC);
@@ -584,100 +588,115 @@ class EnhancedPrayerNotificationService {
   
   // جدولة جميع إشعارات الصلوات
   Future<int> schedulePrayerTimes(List<PrayerTimeModel> prayerTimes) async {
-    if (!_isInitialized) {
-      debugPrint('Initializing notification service before scheduling prayer notifications');
-      await initialize();
+    // Prevent recursive calls
+    if (_isSchedulingInProgress) {
+      debugPrint('Already scheduling prayer times, returning');
+      return 0;
     }
     
-    // إلغاء الإشعارات السابقة
-    debugPrint('Cancelling previous prayer notifications before scheduling new ones');
-    await cancelAllNotifications();
+    _isSchedulingInProgress = true;
     
-    // التحقق من أذونات الإشعارات
-    final hasPermission = await checkNotificationPermission();
-    if (!hasPermission) {
-      debugPrint('Notification permission not granted - Requesting permission');
-      final permissionRequested = await requestNotificationPermission();
-      if (!permissionRequested) {
-        debugPrint('Failed to get notification permission - Cannot schedule prayer notifications');
-        return 0;
-      }
-    }
-    
-    int scheduledCount = 0;
-    int notificationId = 2000; // بداية بمعرف كبير لتجنب التعارض
-    
-    debugPrint('Starting to schedule notifications for ${prayerTimes.length} prayer times');
-    
-    // تحضير قائمة أوقات الصلوات القادمة فقط
-    final now = DateTime.now();
-    final futurePrayers = prayerTimes.where((prayer) {
-      final prayerTime = prayer.time;
-      // اضافة تحقق إضافي
-      return prayerTime.isAfter(now.subtract(const Duration(minutes: 1))); // أضفنا هامش دقيقة
-    }).toList();
-    
-    debugPrint('Found ${futurePrayers.length} future prayers to schedule notifications for');
-    
-    // جدولة الإشعارات الجديدة لكل صلاة
-    for (final prayer in futurePrayers) {
-      final prayerName = prayer.name;
-      final prayerTime = prayer.time;
-      
-      // تخطي صلاة الشروق إذا كانت غير مفعلة في الإعدادات
-      if (prayerName == 'الشروق' && !_prayerNotificationSettings['الشروق']!) {
-        debugPrint('Skipping notifications for $prayerName as it is disabled in settings');
-        continue;
+    try {
+      if (!_isInitialized) {
+        debugPrint('Initializing notification service before scheduling prayer notifications');
+        await initialize();
       }
       
-      debugPrint('Processing prayer: $prayerName at ${prayerTime.toString()}');
+      // إلغاء الإشعارات السابقة
+      debugPrint('Cancelling previous prayer notifications before scheduling new ones');
+      await cancelAllNotifications();
       
-      // جدولة التذكير المسبق (قبل وقت الصلاة)
-      if (_prayerNotificationSettings[prayerName] == true) {
-        final reminderMinutes = _prayerReminderTimes[prayerName] ?? 10;
-        final reminderTime = prayerTime.subtract(Duration(minutes: reminderMinutes));
-        
-        // تأكد من أن وقت التذكير لم يمر بعد
-        if (reminderTime.isAfter(now)) {
-          debugPrint('Scheduling reminder for $prayerName, ${reminderMinutes}min before prayer time');
-          final success = await schedulePrayerNotification(
-            prayerName: prayerName,
-            prayerTime: reminderTime,
-            notificationId: notificationId++,
-            isReminder: true,
-          );
-          
-          if (success) {
-            scheduledCount++;
-            debugPrint('Reminder for $prayerName scheduled successfully');
-          }
-        } else {
-          debugPrint('Reminder time for $prayerName has already passed');
+      // التحقق من أذونات الإشعارات
+      final hasPermission = await checkNotificationPermission();
+      if (!hasPermission) {
+        debugPrint('Notification permission not granted - Requesting permission');
+        final permissionRequested = await requestNotificationPermission();
+        if (!permissionRequested) {
+          debugPrint('Failed to get notification permission - Cannot schedule prayer notifications');
+          return 0;
         }
       }
       
-      // جدولة إشعار دخول وقت الصلاة
-      final success = await schedulePrayerNotification(
-        prayerName: prayerName,
-        prayerTime: prayerTime,
-        notificationId: notificationId++,
-      );
+      int scheduledCount = 0;
+      int notificationId = 2000; // بداية بمعرف كبير لتجنب التعارض
       
-      if (success) {
-        scheduledCount++;
-        debugPrint('Notification for $prayerName scheduled successfully');
+      debugPrint('Starting to schedule notifications for ${prayerTimes.length} prayer times');
+      
+      // تحضير قائمة أوقات الصلوات القادمة فقط
+      final now = DateTime.now();
+      final futurePrayers = prayerTimes.where((prayer) {
+        final prayerTime = prayer.time;
+        // اضافة تحقق إضافي
+        return prayerTime.isAfter(now.subtract(const Duration(minutes: 1))); // أضفنا هامش دقيقة
+      }).toList();
+      
+      debugPrint('Found ${futurePrayers.length} future prayers to schedule notifications for');
+      
+      // جدولة الإشعارات الجديدة لكل صلاة
+      for (final prayer in futurePrayers) {
+        final prayerName = prayer.name;
+        final prayerTime = prayer.time;
+        
+        // تخطي صلاة الشروق إذا كانت غير مفعلة في الإعدادات
+        if (prayerName == 'الشروق' && !_prayerNotificationSettings['الشروق']!) {
+          debugPrint('Skipping notifications for $prayerName as it is disabled in settings');
+          continue;
+        }
+        
+        debugPrint('Processing prayer: $prayerName at ${prayerTime.toString()}');
+        
+        // جدولة التذكير المسبق (قبل وقت الصلاة)
+        if (_prayerNotificationSettings[prayerName] == true) {
+          final reminderMinutes = _prayerReminderTimes[prayerName] ?? 10;
+          final reminderTime = prayerTime.subtract(Duration(minutes: reminderMinutes));
+          
+          // تأكد من أن وقت التذكير لم يمر بعد
+          if (reminderTime.isAfter(now)) {
+            debugPrint('Scheduling reminder for $prayerName, ${reminderMinutes}min before prayer time');
+            final success = await schedulePrayerNotification(
+              prayerName: prayerName,
+              prayerTime: reminderTime,
+              notificationId: notificationId++,
+              isReminder: true,
+            );
+            
+            if (success) {
+              scheduledCount++;
+              debugPrint('Reminder for $prayerName scheduled successfully');
+            }
+          } else {
+            debugPrint('Reminder time for $prayerName has already passed');
+          }
+        }
+        
+        // جدولة إشعار دخول وقت الصلاة
+        final success = await schedulePrayerNotification(
+          prayerName: prayerName,
+          prayerTime: prayerTime,
+          notificationId: notificationId++,
+        );
+        
+        if (success) {
+          scheduledCount++;
+          debugPrint('Notification for $prayerName scheduled successfully');
+        }
       }
+      
+      // حفظ تاريخ آخر جدولة
+      await saveLastScheduleDate();
+      
+      // التحقق من الإشعارات المجدولة
+      final pendingNotifications = await getPendingNotifications();
+      debugPrint('Total pending notifications after scheduling: ${pendingNotifications.length}');
+      
+      debugPrint('Finished scheduling prayer notifications. Total scheduled: $scheduledCount');
+      return scheduledCount;
+    } catch (e) {
+      debugPrint('Error scheduling prayer notifications: $e');
+      return 0;
+    } finally {
+      _isSchedulingInProgress = false;
     }
-    
-    // حفظ تاريخ آخر جدولة
-    await saveLastScheduleDate();
-    
-    // التحقق من الإشعارات المجدولة
-    final pendingNotifications = await getPendingNotifications();
-    debugPrint('Total pending notifications after scheduling: ${pendingNotifications.length}');
-    
-    debugPrint('Finished scheduling prayer notifications. Total scheduled: $scheduledCount');
-    return scheduledCount;
   }
   
   // إلغاء جميع إشعارات الصلوات
@@ -812,11 +831,6 @@ class EnhancedPrayerNotificationService {
     if (_prayerNotificationSettings.containsKey(prayerName)) {
       _prayerNotificationSettings[prayerName] = enabled;
       await saveNotificationSettings();
-      
-      // إعادة جدولة الإشعارات إذا تم تفعيل الإشعارات
-      if (enabled) {
-        await _prayerService.schedulePrayerNotifications();
-      }
     }
   }
   
@@ -830,11 +844,6 @@ class EnhancedPrayerNotificationService {
     if (_prayerReminderTimes.containsKey(prayerName)) {
       _prayerReminderTimes[prayerName] = minutes;
       await saveNotificationSettings();
-      
-      // إعادة جدولة الإشعارات لتطبيق المهلة الجديدة
-      if (_prayerNotificationSettings[prayerName] == true) {
-        await _prayerService.schedulePrayerNotifications();
-      }
     }
   }
   
@@ -846,10 +855,7 @@ class EnhancedPrayerNotificationService {
     _isNotificationEnabled = value;
     saveNotificationSettings();
     
-    if (value) {
-      // إعادة جدولة الإشعارات إذا تم تفعيل الإشعارات
-      _prayerService.schedulePrayerNotifications();
-    } else {
+    if (!value) {
       // إلغاء جميع الإشعارات إذا تم تعطيل الإشعارات
       cancelAllNotifications();
     }

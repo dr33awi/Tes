@@ -74,69 +74,66 @@ class PrayerTimeModel {
     final now = DateTime.now();
     final List<PrayerTimeModel> prayers = [];
     
-    try {
-      final prayerDefinitions = [
-        {
-          'name': 'الفجر',
-          'time': prayerTimes.fajr,
-          'icon': Icons.brightness_2,
-          'color': const Color(0xFF5B68D9),
-        },
-        {
-          'name': 'الشروق',
-          'time': prayerTimes.sunrise,
-          'icon': Icons.wb_sunny_outlined,
-          'color': const Color(0xFFFF9E0D),
-        },
-        {
-          'name': 'الظهر',
-          'time': prayerTimes.dhuhr,
-          'icon': Icons.wb_sunny,
-          'color': const Color(0xFFFFB746),
-        },
-        {
-          'name': 'العصر',
-          'time': prayerTimes.asr,
-          'icon': Icons.wb_twighlight,
-          'color': const Color(0xFFFF8A65),
-        },
-        {
-          'name': 'المغرب',
-          'time': prayerTimes.maghrib,
-          'icon': Icons.nights_stay_outlined,
-          'color': const Color(0xFF5C6BC0),
-        },
-        {
-          'name': 'العشاء',
-          'time': prayerTimes.isha,
-          'icon': Icons.nightlight_round,
-          'color': const Color(0xFF1A237E),
-        },
-      ];
-      
-      for (final prayerDef in prayerDefinitions) {
-        try {
-          final time = prayerDef['time'] as DateTime;
-          
-          prayers.add(PrayerTimeModel(
-            name: prayerDef['name'] as String,
-            time: time,
-            icon: prayerDef['icon'] as IconData,
-            color: prayerDef['color'] as Color,
-          ));
-        } catch (e) {
-          debugPrint('Error processing ${prayerDef['name']} time: $e');
-        }
+    // Use safe approach to avoid deep recursion
+    final prayerDefinitions = [
+      {
+        'name': 'الفجر',
+        'time': prayerTimes.fajr,
+        'icon': Icons.brightness_2,
+        'color': const Color(0xFF5B68D9),
+      },
+      {
+        'name': 'الشروق',
+        'time': prayerTimes.sunrise,
+        'icon': Icons.wb_sunny_outlined,
+        'color': const Color(0xFFFF9E0D),
+      },
+      {
+        'name': 'الظهر',
+        'time': prayerTimes.dhuhr,
+        'icon': Icons.wb_sunny,
+        'color': const Color(0xFFFFB746),
+      },
+      {
+        'name': 'العصر',
+        'time': prayerTimes.asr,
+        'icon': Icons.wb_twighlight,
+        'color': const Color(0xFFFF8A65),
+      },
+      {
+        'name': 'المغرب',
+        'time': prayerTimes.maghrib,
+        'icon': Icons.nights_stay_outlined,
+        'color': const Color(0xFF5C6BC0),
+      },
+      {
+        'name': 'العشاء',
+        'time': prayerTimes.isha,
+        'icon': Icons.nightlight_round,
+        'color': const Color(0xFF1A237E),
+      },
+    ];
+    
+    // Simplified error handling to avoid nested try-catch
+    for (final prayerDef in prayerDefinitions) {
+      try {
+        final time = prayerDef['time'] as DateTime;
+        
+        prayers.add(PrayerTimeModel(
+          name: prayerDef['name'] as String,
+          time: time,
+          icon: prayerDef['icon'] as IconData,
+          color: prayerDef['color'] as Color,
+        ));
+      } catch (e) {
+        debugPrint('Error processing ${prayerDef['name']} time: $e');
       }
-
-      // Mark next prayer
-      _markNextPrayer(prayers);
-
-      return prayers;
-    } catch (e) {
-      debugPrint('General error processing prayer times: $e');
-      return _createDefaultPrayerTimes(now);
     }
+
+    // Mark next prayer
+    _markNextPrayer(prayers);
+
+    return prayers;
   }
   
   static void _markNextPrayer(List<PrayerTimeModel> prayers) {
