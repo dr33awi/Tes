@@ -1,7 +1,7 @@
 // lib/screens/athkarscreen/services/app_initializer.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/notification_navigation.dart';
+import 'package:test_athkar_app/services/notification_navigation.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
 
 
