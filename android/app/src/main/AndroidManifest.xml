@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <!-- أذونات الإشعارات والتنبيهات -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+  <!-- أذونات الإشعارات والتنبيهات (محسّنة) -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <uses-permission android:name="android.permission.VIBRATE" />
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
@@ -8,6 +9,9 @@
   <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+  <!-- إضافة إذن جديد لأندرويد 12 وما فوق -->
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
   
   <!-- أذونات الإنترنت والموقع (لمواقيت الصلاة) -->
   <uses-permission android:name="android.permission.INTERNET" />
@@ -17,7 +21,9 @@
   <application
       android:label="تطبيق الأذكار"
       android:name="${applicationName}"
-      android:icon="@mipmap/ic_launcher">
+      android:icon="@mipmap/ic_launcher"
+      android:allowBackup="true"
+      android:fullBackupContent="true">
 
       <!-- مستقبلات وخدمات الإشعارات المحلية -->
       <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
@@ -39,9 +45,16 @@
           android:permission="android.permission.BIND_JOB_SERVICE"
           android:exported="false"/>
           
+      <!-- مستقبل الإنذارات محسن -->
       <receiver
           android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmBroadcastReceiver"
-          android:exported="false"/>
+          android:enabled="true"
+          android:exported="false"
+          android:process=":athkar_alarm_process">
+          <intent-filter>
+              <action android:name="android.intent.action.BOOT_COMPLETED"/>
+          </intent-filter>
+      </receiver>
           
       <receiver
           android:name="dev.fluttercommunity.plus.androidalarmmanager.RebootBroadcastReceiver"
@@ -54,6 +67,14 @@
           </intent-filter>
       </receiver>
 
+      <!-- خدمة الإشعارات المتقدمة للبقاء في الخلفية -->
+      <service
+        android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+        android:exported="false"
+        android:stopWithTask="false"
+        android:foregroundServiceType="dataSync"/>
+
+      <!-- النشاط الرئيسي للتطبيق -->
       <activity
           android:name=".MainActivity"
           android:exported="true"
@@ -65,6 +86,11 @@
           android:showWhenLocked="true"
           android:turnScreenOn="true">
           
+          <!-- مُحسّن للأجهزة ذات الشاشات الكبيرة -->
+          <meta-data
+            android:name="io.flutter.embedding.android.DefaultFlutterActivity"
+            android:value="true" />
+            
           <!-- تكوين شاشة البداية -->
           <meta-data
             android:name="io.flutter.embedding.android.SplashScreenDrawable"
@@ -80,6 +106,12 @@
           <intent-filter>
               <action android:name="android.intent.action.MAIN"/>
               <category android:name="android.intent.category.LAUNCHER"/>
+          </intent-filter>
+          
+          <!-- إضافة معالجة أهمية عالية للإشعارات -->
+          <intent-filter>
+              <action android:name="FLUTTER_NOTIFICATION_CLICK" />
+              <category android:name="android.intent.category.DEFAULT" />
           </intent-filter>
       </activity>
       

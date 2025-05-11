@@ -78,7 +78,9 @@ dependencies:
 
 
   sensors_plus: ^6.1.1
+  awesome_notifications: ^0.10.1
 
+  battery_plus: ^6.2.1
 
 
 
