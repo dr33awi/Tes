@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/services/enhanced_prayer_notification_service.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
+import 'package:test_athkar_app/adhan/screens/notification_diagnostics_screen.dart';
+import 'package:test_athkar_app/services/battery_optimization_service.dart';
+import 'package:test_athkar_app/services/do_not_disturb_service.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kPrimaryLight, kSurface;
@@ -15,13 +18,26 @@ class NotificationSettingsScreen extends StatefulWidget {
 }
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNotificationService();
+  final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNotificationService();
   final PrayerTimesService _prayerService = PrayerTimesService();
+  final BatteryOptimizationService _batteryService = BatteryOptimizationService();
+  final DoNotDisturbService _dndService = DoNotDisturbService();
   
   bool _isLoading = true;
   bool _notificationsEnabled = true;
   bool _hasPermissions = false;
+  bool _isBatteryOptimizationIgnored = false;
+  bool _isDNDActive = false;
+  
   Map<String, bool> _prayerSettings = {};
+  Map<String, int> _reminderTimes = {};
+  
+  // الإعدادات المتقدمة
+  bool _bypassDND = false;
+  bool _useHighPriority = true;
+  bool _showReminderNotifications = true;
+  bool _usePersistentNotifications = false;
+  bool _groupNotifications = true;
   
   @override
   void initState() {
@@ -41,6 +57,20 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
       // تحميل الإعدادات من الخدمة
       _notificationsEnabled = _notificationService.isNotificationEnabled;
       _prayerSettings = Map.from(_notificationService.prayerNotificationSettings);
+      _reminderTimes = Map.from(_notificationService.prayerReminderTimes);
+      
+      // تحميل الإعدادات المتقدمة
+      _bypassDND = _notificationService.bypassDND;
+      _useHighPriority = _notificationService.useHighPriority;
+      _showReminderNotifications = _notificationService.showReminderNotifications;
+      _usePersistentNotifications = _notificationService.usePersistentNotifications;
+      _groupNotifications = _notificationService.groupNotifications;
+      
+      // التحقق من تحسين استهلاك البطارية
+      _isBatteryOptimizationIgnored = await _batteryService.isIgnoringBatteryOptimizations();
+      
+      // التحقق من وضع عدم الإزعاج
+      _isDNDActive = await _dndService.isDNDActive();
     } catch (e) {
       debugPrint('خطأ أثناء تحميل الإعدادات: $e');
       _showErrorSnackBar('حدث خطأ أثناء تحميل الإعدادات');
@@ -84,7 +114,32 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
     }
   }
   
+  Future<void> _requestIgnoreBatteryOptimization() async {
+    try {
+      final result = await _batteryService.requestIgnoreBatteryOptimizations();
+      
+      if (result) {
+        _showSuccessSnackBar('تم طلب استثناء التطبيق من قيود البطارية بنجاح');
+        
+        // إعادة التحقق
+        _isBatteryOptimizationIgnored = await _batteryService.isIgnoringBatteryOptimizations();
+        setState(() {});
+      } else {
+        _showWarningSnackBar('فشل طلب استثناء التطبيق من قيود البطارية');
+      }
+    } catch (e) {
+      debugPrint('خطأ أثناء طلب استثناء قيود البطارية: $e');
+      _showErrorSnackBar('حدث خطأ أثناء طلب استثناء قيود البطارية');
+    }
+  }
+  
   void _showPermissionsGuideDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إذن الإشعارات مطلوب'),
+        content: const Text(
+          'void _showPermissionsGuideDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -119,17 +174,10 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
   }
   
   // وظيفة فتح إعدادات التطبيق
-  void openAppSettings() {
+  void openAppSettings() async {
     try {
-      // استخدام الطريقة القياسية لفتح إعدادات التطبيق في فلاتر
-      debugPrint('جاري فتح إعدادات التطبيق...');
-      // إخطار المستخدم
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى تمكين الإشعارات في إعدادات التطبيق'),
-          duration: Duration(seconds: 5),
-        ),
-      );
+      await _batteryService.openAppSettings();
+      _showInfoSnackBar('يرجى تمكين الإشعارات في إعدادات التطبيق');
     } catch (e) {
       debugPrint('خطأ أثناء فتح الإعدادات: $e');
     }
@@ -171,6 +219,42 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
     );
   }
   
+  void _showWarningSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.orange.shade800,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+  
+  void _showInfoSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.info_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: kPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -194,6 +278,24 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          // زر تشخيص الإشعارات
+          IconButton(
+            icon: const Icon(
+              Icons.bug_report,
+              color: kPrimary,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PrayerNotificationDiagnosticsScreen(),
+                ),
+              ).then((_) => _loadSettings());
+            },
+            tooltip: 'تشخيص الإشعارات',
+          ),
+        ],
       ),
       body: _isLoading 
         ? _buildLoader()
@@ -220,6 +322,10 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
                         // عرض شريط الأذونات إذا لم يتم منحها
                         if (!_hasPermissions)
                           _buildPermissionBanner(),
+                        
+                        // عرض شريط تحذير تحسين استهلاك البطارية
+                        if (!_isBatteryOptimizationIgnored)
+                          _buildBatteryOptimizationBanner(),
                         
                         // بطاقة تفعيل الإشعارات
                         _buildMasterSwitchCard(),
@@ -250,6 +356,33 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
                         
                         // إعدادات كل صلاة على حدة 
                         _buildPrayerSettingsCard(),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // عنوان الإعدادات المتقدمة
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.settings_applications,
+                              color: kPrimary,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'الإعدادات المتقدمة',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: kPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // بطاقة الإعدادات المتقدمة
+                        _buildAdvancedSettingsCard(),
                         
                         const SizedBox(height: 24),
                         
@@ -368,8 +501,10 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
                   ),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: _requestNotificationPermission,
+                  icon: const Icon(Icons.notifications_active, size: 18),
+                  label: const Text('منح إذن الإشعارات'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.orange.shade800,
@@ -379,22 +514,104 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.notifications_active,
-                        color: Colors.orange.shade800,
-                        size: 20,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // شريط تحذير تحسين استهلاك البطارية
+  Widget _buildBatteryOptimizationBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.amber.shade800,
+            Colors.amber.shade600,
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // أيقونة الخلفية
+          Positioned(
+            bottom: -15,
+            right: -15,
+            child: Icon(
+              Icons.battery_alert,
+              size: 100,
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'منح إذن الإشعارات',
+                      child: const Icon(
+                        Icons.battery_alert,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'تحسين استهلاك البطارية مفعل',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 18,
                         ),
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'قد يؤدي تحسين استهلاك البطارية إلى تأخير الإشعارات أو منعها. يرجى استثناء التطبيق من قيود البطارية للحصول على إشعارات موثوقة.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _requestIgnoreBatteryOptimization,
+                  icon: const Icon(Icons.battery_charging_full, size: 18),
+                  label: const Text('استثناء من قيود البطارية'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.amber.shade800,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ],
@@ -562,6 +779,7 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
   // عنصر إعداد الصلاة
   Widget _buildPrayerSettingItem(String prayer, bool isEnabled, int index) {
     Color cardColor = _getPrayerColor(prayer).withOpacity(isEnabled ? 1.0 : 0.6);
+    final reminderTime = _reminderTimes[prayer] ?? 10;
     
     return Card(
       elevation: isEnabled ? 4 : 2,
@@ -581,49 +799,57 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
           ),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Stack(
-          children: [
-            // أيقونة الخلفية
-            Positioned(
-              right: -15,
-              bottom: -15,
-              child: Icon(
-                _getPrayerIcon(prayer),
-                size: 70,
-                color: Colors.white.withOpacity(0.1),
-              ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
             ),
-            
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
+            child: Icon(
+              _getPrayerIcon(prayer),
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          title: Text(
+            prayer,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.white,
+            ),
+          ),
+          subtitle: Text(
+            _getPrayerDescription(prayer),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withOpacity(0.8),
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // عرض الوقت المسبق للتذكير
+              if (isEnabled && _showReminderNotifications)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'تذكير: $reminderTime د',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-                child: Icon(
-                  _getPrayerIcon(prayer),
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              title: Text(
-                prayer,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
-              ),
-              subtitle: Text(
-                _getPrayerDescription(prayer),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withOpacity(0.8),
-                ),
-              ),
-              trailing: Transform.scale(
+              const SizedBox(width: 8),
+              Transform.scale(
                 scale: 1.1,
                 child: Switch(
                   value: isEnabled,
@@ -636,7 +862,85 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
                   inactiveTrackColor: Colors.white30,
                 ),
               ),
-            ),
+            ],
+          ),
+          childrenPadding: const EdgeInsets.all(16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          // الإعدادات الإضافية للصلاة
+          children: [
+            if (isEnabled && _showReminderNotifications) ...[
+              const Text(
+                'وقت التذكير المسبق (بالدقائق):',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // شريط تمرير لضبط وقت التذكير
+              SliderTheme(
+                data: SliderThemeData(
+                  activeTrackColor: Colors.white.withOpacity(0.7),
+                  inactiveTrackColor: Colors.white.withOpacity(0.3),
+                  thumbColor: Colors.white,
+                  overlayColor: Colors.white.withOpacity(0.2),
+                  valueIndicatorColor: Colors.white,
+                  valueIndicatorTextStyle: TextStyle(
+                    color: cardColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 10,
+                  ),
+                  trackHeight: 4,
+                ),
+                child: Slider(
+                  value: reminderTime.toDouble(),
+                  min: 1,
+                  max: 60,
+                  divisions: 59,
+                  label: '$reminderTime دقيقة',
+                  onChanged: (double value) {
+                    setState(() {
+                      _reminderTimes[prayer] = value.round();
+                      _notificationService.setPrayerReminderTime(prayer, value.round());
+                    });
+                  },
+                ),
+              ),
+              // مؤشرات القيم
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '1',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                    Text(
+                      '30',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                    Text(
+                      '60',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -660,6 +964,188 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
       debugPrint('خطأ أثناء تغيير إعدادات $prayer: $e');
       _showErrorSnackBar('حدث خطأ أثناء تغيير إعدادات الإشعار');
     }
+  }
+  
+  // بطاقة الإعدادات المتقدمة
+  Widget _buildAdvancedSettingsCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // إعداد تجاوز وضع عدم الإزعاج
+            _buildAdvancedSwitchTile(
+              'تجاوز وضع عدم الإزعاج',
+              'يتيح للإشعارات الظهور حتى عند تفعيل وضع عدم الإزعاج',
+              Icons.do_not_disturb_off,
+              _bypassDND,
+              (value) {
+                setState(() {
+                  _bypassDND = value;
+                  _notificationService.bypassDND = value;
+                });
+              },
+              warning: _isDNDActive && !_bypassDND ? 'وضع عدم الإزعاج مفعل حاليًا' : null,
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // إعداد استخدام أولوية عالية
+            _buildAdvancedSwitchTile(
+              'أولوية عالية للإشعارات',
+              'إظهار الإشعارات بأعلى أولوية ممكنة',
+              Icons.priority_high,
+              _useHighPriority,
+              (value) {
+                setState(() {
+                  _useHighPriority = value;
+                  _notificationService.useHighPriority = value;
+                });
+              },
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // إعداد إشعارات التذكير
+            _buildAdvancedSwitchTile(
+              'إشعارات التذكير',
+              'إرسال إشعار تذكير قبل وقت الصلاة',
+              Icons.alarm,
+              _showReminderNotifications,
+              (value) {
+                setState(() {
+                  _showReminderNotifications = value;
+                  _notificationService.showReminderNotifications = value;
+                });
+              },
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // إعداد الإشعارات الدائمة
+            _buildAdvancedSwitchTile(
+              'إشعارات دائمة',
+              'إبقاء إشعارات الصلاة في مركز الإشعارات حتى إغلاقها يدويًا',
+              Icons.push_pin,
+              _usePersistentNotifications,
+              (value) {
+                setState(() {
+                  _usePersistentNotifications = value;
+                  _notificationService.usePersistentNotifications = value;
+                });
+              },
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // إعداد تجميع الإشعارات
+            _buildAdvancedSwitchTile(
+              'تجميع الإشعارات',
+              'تجميع إشعارات الصلاة معًا في مركز الإشعارات',
+              Icons.folder,
+              _groupNotifications,
+              (value) {
+                setState(() {
+                  _groupNotifications = value;
+                  _notificationService.groupNotifications = value;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // عنصر إعداد متقدم
+  Widget _buildAdvancedSwitchTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    bool value,
+    ValueChanged<bool> onChanged, {
+    String? warning,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: value ? kPrimary.withOpacity(0.1) : Colors.grey.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: value ? kPrimary.withOpacity(0.3) : Colors.grey.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: SwitchListTile.adaptive(
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: value ? kPrimary : Colors.grey.shade800,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            if (warning != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    warning,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        secondary: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: value ? kPrimary.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: value ? kPrimary : Colors.grey.shade600,
+            size: 20,
+          ),
+        ),
+        value: value,
+        onChanged: _notificationsEnabled && _hasPermissions
+            ? onChanged
+            : null,
+        activeColor: kPrimary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
   }
   
   // أيقونات لكل صلاة
@@ -785,6 +1271,11 @@ final EnhancedPrayerNotificationService _notificationService = EnhancedPrayerNot
             _buildInfoItem(
               Icons.settings,
               'يمكنك تخصيص إعدادات الإشعارات لكل صلاة على حدة حسب احتياجاتك اليومية.'
+            ),
+            const SizedBox(height: 12),
+            _buildInfoItem(
+              Icons.bug_report,
+              'إذا واجهت مشاكل في استلام الإشعارات، استخدم أداة التشخيص من زر البق في الزاوية العلوية.'
             ),
           ],
         ),

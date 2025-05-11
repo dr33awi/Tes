@@ -4,8 +4,8 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:test_athkar_app/screens/home_screen/widgets/common/app_loading_indicator.dart';
-import 'package:test_athkar_app/adhan/screens/prayer_settings_screen.dart';
 import 'package:test_athkar_app/adhan/screens/notification_settings_screen.dart';
+import 'package:test_athkar_app/adhan/screens/advanced_notification_settings_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
