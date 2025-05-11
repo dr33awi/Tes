@@ -1,6 +1,5 @@
 // lib/main.dart
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:test_athkar_app/services/app_initializer.dart';
@@ -26,24 +25,24 @@ void _handleError(Object error, StackTrace stack) {
   );
 }
 
-Future<void> main() async {
-  // التأكد من تهيئة Flutter
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // إعداد اتجاه الشاشة
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-  
-  // إعداد معالجة الأخطاء العامة
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    _handleError(details.exception, details.stack ?? StackTrace.current);
-  };
-  
+void main() {
   // التقاط جميع الأخطاء غير المعالجة
   runZonedGuarded<Future<void>>(() async {
+    // تهيئة Flutter (داخل نفس المنطقة)
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // إعداد اتجاه الشاشة
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    
+    // إعداد معالجة الأخطاء العامة
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      _handleError(details.exception, details.stack ?? StackTrace.current);
+    };
+    
     // تهيئة خدمات التطبيق قبل تشغيل التطبيق
     await AppInitializer.initialize();
     
