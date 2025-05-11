@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/error_logging_service.dart';
+import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 /// Service to handle iOS specific notification features

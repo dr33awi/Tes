@@ -6,7 +6,7 @@ import 'package:test_athkar_app/screens/tasbih_screen.dart';
 import '../../hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary; // للحصول على الألوان الأساسية
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_screen.dart';
-import 'package:test_athkar_app/adhan/screens/prayer_times_screen.dart';
+
 
 
 class CategoryGrid extends StatefulWidget {
@@ -72,13 +72,6 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       color: Color(0xFFFF8F00),
       gradientColors: [Color(0xFFFF8F00), Color(0xFFFFB74D)],
       screen: TasbihScreen(),
-    ),
-    Category(
-      title: 'مواقيت الصلاة',
-      icon: Icons.access_time,
-      color: Color(0xFF388E3C),
-      gradientColors: [Color(0xFF388E3C), Color(0xFF4CAF50)],
-      screen: PrayerTimesScreen(),
     ),
     // Add the new Qibla compass category
     Category(

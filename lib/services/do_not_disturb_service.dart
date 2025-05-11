@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/error_logging_service.dart';
+import 'package:test_athkar_app/services/error_logging_service.dart';
 
 /// Service to handle Do Not Disturb mode and ensure notifications get through
 class DoNotDisturbService {

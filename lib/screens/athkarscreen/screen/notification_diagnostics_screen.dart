@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/error_logging_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/battery_optimization_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/do_not_disturb_service.dart';
+import 'package:test_athkar_app/services/error_logging_service.dart';
+import 'package:test_athkar_app/services/battery_optimization_service.dart';
+import 'package:test_athkar_app/services/do_not_disturb_service.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';

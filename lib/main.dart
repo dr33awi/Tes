@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import 'package:test_athkar_app/screens/athkarscreen/services/app_initializer.dart';
+import 'package:test_athkar_app/services/app_initializer.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 
