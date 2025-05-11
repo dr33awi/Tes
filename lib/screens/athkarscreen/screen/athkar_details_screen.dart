@@ -37,6 +37,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   // متغيرات للتأثيرات البصرية
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
+  // ignore: unused_field
   int? _tappedIndex;
   bool _isPressed = false;
   int? _pressedIndex;
@@ -44,6 +45,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   // متغيرات للأزرار
   bool _isCopyPressed = false;
   bool _isSharePressed = false;
+  // ignore: unused_field
   bool _isFavoritePressed = false;
   bool _isReadAgainPressed = false; // إضافة متغير لزر القراءة مرة أخرى
   bool _isFadlPressed = false; // إضافة متغير لزر فضل الذكر

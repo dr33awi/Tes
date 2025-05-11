@@ -42,8 +42,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   // Animation controllers
   late AnimationController _animationController;
-  int? _pressedIndex;
-  bool _isPressed = false;
 
   @override
   void initState() {
@@ -283,7 +281,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         }
         
         // Schedule notification
-        await _notificationService.scheduleAthkarNotification(category, selectedTime!);
+        await _notificationService.scheduleAthkarNotification(category, selectedTime);
         
         // Schedule additional notifications if category has multiple reminders
         if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
@@ -926,6 +924,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                               final category = _categories[index];
                               final bool isNotificationEnabled = _notificationsEnabled[category.id] ?? false;
                               final TimeOfDay? notificationTime = _notificationTimes[category.id];
+                              // ignore: unused_local_variable
                               final bool hasMultipleReminders = _hasMultipleReminders[category.id] ?? false;
                               final int additionalCount = _additionalRemindersCount[category.id] ?? 0;
                               final Color color1 = _getCategoryColorWithId(category.id);

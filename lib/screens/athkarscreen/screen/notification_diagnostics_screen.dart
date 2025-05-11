@@ -12,7 +12,6 @@ import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_h
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
 class NotificationDiagnosticsScreen extends StatefulWidget {
@@ -335,17 +334,17 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
   }
   
   // Open notification settings
-  Future<void> _openNotificationSettings() async {
-    try {
-      await AppSettings.openNotificationSettings();
-    } catch (e) {
-      _errorLoggingService.logError(
-        'NotificationDiagnosticsScreen', 
-        'Error opening notification settings', 
-        e
-      );
-    }
+Future<void> _openNotificationSettings() async {
+  try {
+    await AppSettings.openAppSettings(type: AppSettingsType.notification);
+  } catch (e) {
+    _errorLoggingService.logError(
+      'NotificationDiagnosticsScreen',
+      'Error opening notification settings',
+      e
+    );
   }
+}
   
   // Open battery settings
   Future<void> _openBatterySettings() async {

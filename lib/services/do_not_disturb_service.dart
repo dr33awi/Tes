@@ -65,21 +65,23 @@ class DoNotDisturbService {
   
   // Open Do Not Disturb settings for the user to configure
   Future<void> openDoNotDisturbSettings() async {
-    try {
-      if (Platform.isAndroid) {
-        await AppSettings.openNotificationSettings();
-      } else if (Platform.isIOS) {
-        await AppSettings.openAppSettings();
-      }
-    } catch (e) {
-      _errorLoggingService.logError(
-        'DoNotDisturbService', 
-        'Error opening Do Not Disturb settings', 
-        e
-      );
+  try {
+    if (Platform.isAndroid) {
+      // استخدم الطريقة الصحيحة من حزمة AppSettings
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+      // أو استخدم هذا إذا كان الإصدار القديم:
+      // await AppSettings.openSettings(AppSettingsType.NOTIFICATION);
+    } else if (Platform.isIOS) {
+      await AppSettings.openAppSettings();
     }
+  } catch (e) {
+    _errorLoggingService.logError(
+      'DoNotDisturbService', 
+      'Error opening Do Not Disturb settings', 
+      e
+    );
   }
-  
+}
   // Check if the app should prompt the user about Do Not Disturb settings
   Future<bool> shouldPromptAboutDoNotDisturb() async {
     try {
