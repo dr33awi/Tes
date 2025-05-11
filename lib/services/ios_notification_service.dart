@@ -282,7 +282,6 @@ class IOSNotificationService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
       
@@ -380,7 +379,6 @@ class IOSNotificationService {
         adjustedDate,
         NotificationDetails(iOS: iosDetails),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
         payload: category.id,
       );
@@ -428,3 +426,4 @@ class IOSNotificationService {
       return false;
     }
   }
+}

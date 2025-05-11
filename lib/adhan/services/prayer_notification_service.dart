@@ -415,8 +415,6 @@ class PrayerNotificationService {
         scheduledDate,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: 
-            UILocalNotificationDateInterpretation.absoluteTime,
         payload: '$prayerName:${prayerTime.millisecondsSinceEpoch}',
       );
       
@@ -481,8 +479,6 @@ class PrayerNotificationService {
         scheduledDate,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: 
-            UILocalNotificationDateInterpretation.absoluteTime,
         payload: '$prayerName:backup:${prayerTime.millisecondsSinceEpoch}',
       );
       

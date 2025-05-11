@@ -93,8 +93,8 @@ class BatteryOptimizationService {
         );
       }
       
-      // فتح إعدادات تحسين البطارية
-      await AppSettings.openAppSettings(type: AppSettingsType.battery);
+      // فتح إعدادات تحسين البطارية - تم التصحيح هنا
+      await AppSettings.openAppSettings(type: AppSettingsType.settings);
       await _saveLastCheckTime();
       
       return true;

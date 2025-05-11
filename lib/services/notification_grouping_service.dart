@@ -130,7 +130,6 @@ class NotificationGroupingService {
           adjustedDate,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
           payload: isSummary ? category.id : '${category.id}:${groupIndex}',
         );
@@ -158,7 +157,6 @@ class NotificationGroupingService {
           adjustedDate,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
           payload: isSummary ? category.id : '${category.id}:${groupIndex}',
         );
@@ -173,7 +171,6 @@ class NotificationGroupingService {
           adjustedDate,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
           payload: isSummary ? category.id : '${category.id}:${groupIndex}',
         );

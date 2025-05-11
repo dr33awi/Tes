@@ -1,5 +1,6 @@
 // lib/services/notification_service.dart
 import 'dart:io';
+import 'dart:convert'; // إضافة import للتعامل مع json
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -11,6 +12,8 @@ import 'package:test_athkar_app/services/do_not_disturb_service.dart';
 import 'package:test_athkar_app/services/ios_notification_service.dart';
 import 'package:test_athkar_app/services/notification_grouping_service.dart';
 import 'package:test_athkar_app/services/battery_optimization_service.dart';
+
+
 
 /// خدمة موحدة للإشعارات في التطبيق
 class NotificationService {
@@ -87,7 +90,8 @@ class NotificationService {
       // إعدادات تهيئة الإشعارات لنظام iOS
       final DarwinInitializationSettings iosInitializationSettings =
           DarwinInitializationSettings(
-            onDidReceiveLocalNotification: _onDidReceiveLocalNotification,
+            // حذف المعلمة غير الموجودة
+            // onDidReceiveLocalNotification: _onDidReceiveLocalNotification,
             requestAlertPermission: true,
             requestBadgePermission: true,
             requestSoundPermission: true,
@@ -263,7 +267,7 @@ class NotificationService {
     }
   }
   
-  /// معالجة إشعارات iOS القديمة
+  /// معالجة إشعارات iOS القديمة - تم الاحتفاظ بها للتوافقية
   void _onDidReceiveLocalNotification(int id, String? title, String? body, String? payload) async {
     print('iOS local notification: $id, $title, $payload');
     // هذه الدالة مطلوبة للأجهزة القديمة، ولكن معظم المنطق موجود في _onNotificationResponse
@@ -335,7 +339,6 @@ class NotificationService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
       
@@ -389,17 +392,17 @@ class NotificationService {
       final String body = category.notifyBody ?? 'اضغط هنا لقراءة الأذكار';
       
       // جدولة الإشعار
-      await flutterLocalNotificationsPlugin.zonedSchedule(
-        notificationId,
-        title,
-        body,
-        scheduledDate,
-        notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time, // للتكرار اليومي
-        payload: category.id,
-      );
+// Schedule notification
+await flutterLocalNotificationsPlugin.zonedSchedule(
+  notificationId,
+  title,
+  body,
+  scheduledDate,
+  notificationDetails,
+  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  matchDateTimeComponents: DateTimeComponents.time, // Daily repeat at same time
+  payload: category.id,
+);
       
       // حفظ الإشعار في الإعدادات
       await _saveScheduledNotification(
@@ -566,6 +569,24 @@ class NotificationService {
     }
   }
   
+  /// إضافة جديدة: الحصول على أيقونة الفئة بناءً على المعرف
+  IconData _getCategoryIcon(String categoryId) {
+    switch (categoryId) {
+      case 'morning':
+        return Icons.wb_sunny;
+      case 'evening':
+        return Icons.nightlight_round;
+      case 'sleep':
+        return Icons.bedtime;
+      case 'wake':
+        return Icons.alarm;
+      case 'prayer':
+        return Icons.mosque;
+      default:
+        return Icons.notifications;
+    }
+  }
+  
   /// الحصول على صوت الإشعار بناءً على فئة الأذكار
   AndroidNotificationSound? _getCategorySound(String categoryId) {
     switch (categoryId) {
@@ -612,8 +633,7 @@ class NotificationService {
       final String? savedMapping = prefs.getString(_keyNotificationIdsMapping);
       if (savedMapping != null) {
         idsMapping = Map<String, dynamic>.from(
-          // ignore: deprecated_member_use
-          const JsonDecoder().convert(savedMapping)
+          json.decode(savedMapping) // تم التصحيح هنا
         );
       }
       
@@ -629,8 +649,7 @@ class NotificationService {
       // حفظ المعرف الجديد
       await prefs.setString(
         _keyNotificationIdsMapping,
-        // ignore: deprecated_member_use
-        const JsonEncoder().convert(idsMapping)
+        json.encode(idsMapping) // تم التصحيح هنا
       );
       
       return newId;
@@ -661,8 +680,7 @@ class NotificationService {
       
       if (savedData != null) {
         savedNotifications = Map<String, dynamic>.from(
-          // ignore: deprecated_member_use
-          const JsonDecoder().convert(savedData)
+          json.decode(savedData) // تم التصحيح هنا
         );
       }
       
@@ -677,8 +695,7 @@ class NotificationService {
       // حفظ البيانات المحدثة
       await prefs.setString(
         _keySavedNotifications,
-        // ignore: deprecated_member_use
-        const JsonEncoder().convert(savedNotifications)
+        json.encode(savedNotifications) // تم التصحيح هنا
       );
     } catch (e) {
       await _errorLoggingService.logError(
@@ -713,8 +730,7 @@ class NotificationService {
       
       if (savedData != null) {
         savedNotifications = Map<String, dynamic>.from(
-          // ignore: deprecated_member_use
-          const JsonDecoder().convert(savedData)
+          json.decode(savedData) // تم التصحيح هنا
         );
         
         // حذف الإشعار من القائمة المحفوظة
@@ -723,8 +739,7 @@ class NotificationService {
         // حفظ البيانات المحدثة
         await prefs.setString(
           _keySavedNotifications,
-          // ignore: deprecated_member_use
-          const JsonEncoder().convert(savedNotifications)
+          json.encode(savedNotifications) // تم التصحيح هنا
         );
       }
       
@@ -775,8 +790,7 @@ class NotificationService {
       }
       
       Map<String, dynamic> savedNotifications = Map<String, dynamic>.from(
-        // ignore: deprecated_member_use
-        const JsonDecoder().convert(savedData)
+        json.decode(savedData) // تم التصحيح هنا
       );
       
       // تتبع النجاح والفشل
@@ -854,13 +868,6 @@ class NotificationService {
         default:
           title = 'أذكار $categoryId';
       }
-      
-      return AthkarCategory(
-        id: categoryId,
-        title: title,
-        notifyTitle: 'حان موعد $title',
-        notifyBody: 'اضغط هنا لقراءة الأذكار',
-      );
     } catch (e) {
       await _errorLoggingService.logError(
         'NotificationService', 
@@ -882,8 +889,7 @@ class NotificationService {
       }
       
       return Map<String, dynamic>.from(
-        // ignore: deprecated_member_use
-        const JsonDecoder().convert(savedData)
+        json.decode(savedData) // تم التصحيح هنا
       );
     } catch (e) {
       await _errorLoggingService.logError(
