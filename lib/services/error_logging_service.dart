@@ -1,27 +1,27 @@
-// lib/screens/athkarscreen/services/error_logging_service.dart
+// lib/services/error_logging_service.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
 
-/// Service to handle error logging and tracking
+/// خدمة للتعامل مع تسجيل الأخطاء وتتبعها
 class ErrorLoggingService {
-  // Singleton implementation
+  // تنفيذ نمط Singleton
   static final ErrorLoggingService _instance = ErrorLoggingService._internal();
   factory ErrorLoggingService() => _instance;
   ErrorLoggingService._internal() {
     _initLogger();
   }
 
-  // Keys for SharedPreferences
+  // مفاتيح SharedPreferences
   static const String _keyErrorLog = 'error_log';
   static const String _keyErrorStats = 'error_stats';
-  static const int _maxErrors = 100; // Maximum number of errors to store
+  static const int _maxErrors = 100; // الحد الأقصى لعدد الأخطاء للتخزين
   
-  // Logger instance
+  // كائن Logger
   late Logger _logger;
   
-  // Initialize logger
+  // تهيئة Logger
   void _initLogger() {
     _logger = Logger(
       printer: PrettyPrinter(
@@ -36,39 +36,38 @@ class ErrorLoggingService {
     );
   }
   
-  // Log an error with context
-// Log an error with context
+  /// تسجيل خطأ مع السياق
   Future<void> logError(String source, String message, dynamic error, {StackTrace? stackTrace}) async {
-    // Print to console - fix the _logger.e call
-    _logger.e("$source: $message\nError: $error\nStackTrace: ${stackTrace ?? 'No stack trace'}");
+    // الطباعة في وحدة التحكم
+    _logger.e("$source: $message\nError: $error\nStackTrace: ${stackTrace ?? 'لا توجد آثار المكدس'}");
     
     try {
-      // Create error object
+      // إنشاء كائن الخطأ
       final errorObj = {
         'timestamp': DateTime.now().toIso8601String(),
         'source': source,
         'message': message,
         'error': error.toString(),
-        'stackTrace': stackTrace?.toString() ?? 'No stack trace',
+        'stackTrace': stackTrace?.toString() ?? 'لا توجد آثار المكدس',
       };
       
-      // Save to SharedPreferences
+      // الحفظ في SharedPreferences
       await _saveError(errorObj);
       
-      // Update error statistics
+      // تحديث إحصائيات الأخطاء
       await _updateErrorStats(source);
     } catch (e) {
-      // If error logging fails, at least print to console
-      print('Error logging failed: $e');
+      // إذا فشل تسجيل الأخطاء، على الأقل الطباعة في وحدة التحكم
+      print('فشل تسجيل الأخطاء: $e');
     }
   }
   
-  // Save error to persistent storage
+  /// حفظ الخطأ في التخزين الدائم
   Future<void> _saveError(Map<String, dynamic> errorObj) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Get existing errors
+      // الحصول على الأخطاء الموجودة
       List<dynamic> errors = [];
       final String? storedErrors = prefs.getString(_keyErrorLog);
       
@@ -76,25 +75,25 @@ class ErrorLoggingService {
         errors = jsonDecode(storedErrors);
       }
       
-      // Add new error and limit the number of stored errors
+      // إضافة خطأ جديد وتحديد عدد الأخطاء المخزنة
       errors.add(errorObj);
       if (errors.length > _maxErrors) {
         errors = errors.sublist(errors.length - _maxErrors);
       }
       
-      // Save back to SharedPreferences
+      // الحفظ في SharedPreferences
       await prefs.setString(_keyErrorLog, jsonEncode(errors));
     } catch (e) {
-      print('Error saving error log: $e');
+      print('خطأ في حفظ سجل الأخطاء: $e');
     }
   }
   
-  // Update error statistics
+  /// تحديث إحصائيات الأخطاء
   Future<void> _updateErrorStats(String source) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Get existing stats
+      // الحصول على الإحصائيات الموجودة
       Map<String, dynamic> stats = {};
       final String? storedStats = prefs.getString(_keyErrorStats);
       
@@ -102,7 +101,7 @@ class ErrorLoggingService {
         stats = jsonDecode(storedStats);
       }
       
-      // Update stats for this source
+      // تحديث الإحصائيات لهذا المصدر
       if (!stats.containsKey(source)) {
         stats[source] = {
           'count': 1,
@@ -114,14 +113,14 @@ class ErrorLoggingService {
         stats[source]['lastSeen'] = DateTime.now().toIso8601String();
       }
       
-      // Save back to SharedPreferences
+      // الحفظ في SharedPreferences
       await prefs.setString(_keyErrorStats, jsonEncode(stats));
     } catch (e) {
-      print('Error updating error stats: $e');
+      print('خطأ في تحديث إحصائيات الأخطاء: $e');
     }
   }
   
-  // Get all logged errors
+  /// الحصول على جميع الأخطاء المسجلة
   Future<List<Map<String, dynamic>>> getErrors() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -134,12 +133,12 @@ class ErrorLoggingService {
       
       return [];
     } catch (e) {
-      print('Error getting errors: $e');
+      print('خطأ في الحصول على الأخطاء: $e');
       return [];
     }
   }
   
-  // Get error statistics
+  /// الحصول على إحصائيات الأخطاء
   Future<Map<String, dynamic>> getErrorStats() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -151,22 +150,22 @@ class ErrorLoggingService {
       
       return {};
     } catch (e) {
-      print('Error getting error stats: $e');
+      print('خطأ في الحصول على إحصائيات الأخطاء: $e');
       return {};
     }
   }
   
-  // Clear all error logs
+  /// مسح جميع سجلات الأخطاء
   Future<void> clearErrors() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyErrorLog);
     } catch (e) {
-      print('Error clearing errors: $e');
+      print('خطأ في مسح الأخطاء: $e');
     }
   }
   
-  // Check if there are any critical errors
+  /// التحقق مما إذا كانت هناك أي أخطاء حرجة
   Future<bool> hasCriticalErrors() async {
     try {
       final errors = await getErrors();
@@ -178,18 +177,18 @@ class ErrorLoggingService {
           source.toLowerCase().contains(criticalSource.toLowerCase()));
       });
     } catch (e) {
-      print('Error checking for critical errors: $e');
+      print('خطأ في التحقق من الأخطاء الحرجة: $e');
       return false;
     }
   }
   
-  // Get a diagnostic report
+  /// الحصول على تقرير تشخيصي
   Future<String> getDiagnosticReport() async {
     try {
       final errors = await getErrors();
       final stats = await getErrorStats();
       
-      // Generate a report
+      // إنشاء تقرير
       StringBuffer report = StringBuffer();
       report.writeln('===== تقرير تشخيص التطبيق =====');
       report.writeln('وقت التقرير: ${DateTime.now().toIso8601String()}');
@@ -214,12 +213,12 @@ class ErrorLoggingService {
       
       return report.toString();
     } catch (e) {
-      print('Error generating diagnostic report: $e');
+      print('خطأ في إنشاء تقرير تشخيصي: $e');
       return 'حدث خطأ أثناء إنشاء التقرير: $e';
     }
   }
   
-  // Show error dialog with recovery options
+  /// عرض حوار خطأ مع خيارات الاسترداد
   void showErrorDialog(BuildContext context, String title, String message, {VoidCallback? onRetry}) {
     showDialog(
       context: context,

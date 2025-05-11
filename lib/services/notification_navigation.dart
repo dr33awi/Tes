@@ -1,87 +1,112 @@
-// lib/screens/athkarscreen/services/notification_navigation.dart
+// lib/services/notification_navigation.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
+import 'package:test_athkar_app/services/error_logging_service.dart';
 
-/// Helper class for handling navigation from notifications
+/// فئة مساعدة للتعامل مع التنقل من الإشعارات
 class NotificationNavigation {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   
-  /// Initialize notification navigation
+  /// تهيئة التنقل من الإشعارات
   static Future<void> initialize() async {
     try {
-      // Check if app was opened from notification
+      // التحقق مما إذا تم فتح التطبيق من إشعار
       final isFromNotification = await checkNotificationOpen();
       if (isFromNotification) {
         final payload = await getNotificationPayload();
         if (payload != null && payload.isNotEmpty) {
-          // Delay navigation to ensure app is fully loaded
+          // تأخير التنقل للتأكد من تحميل التطبيق بالكامل
           Future.delayed(const Duration(milliseconds: 500), () {
             handleNotificationNavigation(payload);
           });
         }
         
-        // Clear notification data
+        // مسح بيانات الإشعار
         await clearNotificationData();
       }
     } catch (e) {
-      print('Error initializing notification navigation: $e');
+      await _errorLoggingService.logError(
+        'NotificationNavigation', 
+        'خطأ في تهيئة التنقل من الإشعارات', 
+        e
+      );
     }
   }
   
-  /// Check if the app was opened from a notification
+  /// التحقق مما إذا تم فتح التطبيق من إشعار
   static Future<bool> checkNotificationOpen() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool('opened_from_notification') ?? false;
     } catch (e) {
-      print('Error checking notification open: $e');
+      await _errorLoggingService.logError(
+        'NotificationNavigation', 
+        'خطأ في التحقق من فتح الإشعار', 
+        e
+      );
       return false;
     }
   }
   
-  /// Get the notification payload that opened the app
+  /// الحصول على بيانات الإشعار الذي فتح التطبيق
   static Future<String?> getNotificationPayload() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString('notification_payload');
     } catch (e) {
-      print('Error getting notification payload: $e');
+      await _errorLoggingService.logError(
+        'NotificationNavigation', 
+        'خطأ في الحصول على بيانات الإشعار', 
+        e
+      );
       return null;
     }
   }
   
-  /// Clear notification open data
+  /// مسح بيانات فتح الإشعار
   static Future<void> clearNotificationData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('opened_from_notification', false);
       await prefs.remove('notification_payload');
     } catch (e) {
-      print('Error clearing notification data: $e');
+      await _errorLoggingService.logError(
+        'NotificationNavigation', 
+        'خطأ في مسح بيانات الإشعار', 
+        e
+      );
     }
   }
 
-  /// Navigate to the appropriate screen based on notification payload
+  /// التنقل إلى الشاشة المناسبة بناءً على بيانات الإشعار
   static Future<void> handleNotificationNavigation(String payload) async {
     if (payload.isEmpty) return;
     
     try {
-      // Extract category ID and any additional parameters
+      // استخراج معرف الفئة وأي معلمات إضافية
       final parts = payload.split(':');
       final categoryId = parts[0];
       
-      // Get navigator context
+      // الحصول على سياق التنقل
       final context = navigatorKey.currentState?.context;
-      if (context == null) return;
+      if (context == null) {
+        await _errorLoggingService.logError(
+          'NotificationNavigation', 
+          'تعذر الحصول على سياق التنقل', 
+          Exception('Navigator context is null')
+        );
+        return;
+      }
       
-      // Load the Athkar category
+      // تحميل فئة الأذكار
       final AthkarService athkarService = AthkarService();
       final category = await athkarService.getAthkarCategory(categoryId);
       
       if (category != null) {
-        // Navigate to Athkar details screen
+        // التنقل إلى شاشة تفاصيل الأذكار
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -89,14 +114,22 @@ class NotificationNavigation {
           ),
         );
       } else {
-        print('Could not find category: $categoryId');
+        await _errorLoggingService.logError(
+          'NotificationNavigation', 
+          'تعذر العثور على الفئة: $categoryId', 
+          Exception('Category not found')
+        );
       }
     } catch (e) {
-      print('Error handling notification navigation: $e');
+      await _errorLoggingService.logError(
+        'NotificationNavigation', 
+        'خطأ في معالجة التنقل من الإشعار: $payload', 
+        e
+      );
     }
   }
   
-  /// Get the Athkar category icon based on ID
+  /// الحصول على أيقونة فئة الأذكار بناءً على المعرف
   static IconData getCategoryIcon(String categoryId) {
     switch (categoryId) {
       case 'morning':
@@ -120,27 +153,73 @@ class NotificationNavigation {
     }
   }
   
-  /// Get the Athkar category color based on ID
+  /// الحصول على لون فئة الأذكار بناءً على المعرف
   static Color getCategoryColor(String categoryId) {
     switch (categoryId) {
       case 'morning':
-        return const Color(0xFFFFD54F); // Yellow for morning
+        return const Color(0xFFFFD54F); // أصفر للصباح
       case 'evening':
-        return const Color(0xFFAB47BC); // Purple for evening
+        return const Color(0xFFAB47BC); // بنفسجي للمساء
       case 'sleep':
-        return const Color(0xFF5C6BC0); // Blue for sleep
+        return const Color(0xFF5C6BC0); // أزرق للنوم
       case 'wake':
-        return const Color(0xFFFFB74D); // Orange for wake
+        return const Color(0xFFFFB74D); // برتقالي للاستيقاظ
       case 'prayer':
-        return const Color(0xFF4DB6AC); // Teal for prayer
+        return const Color(0xFF4DB6AC); // أزرق فاتح للصلاة
       case 'home':
-        return const Color(0xFF66BB6A); // Green for home
+        return const Color(0xFF66BB6A); // أخضر للمنزل
       case 'food':
-        return const Color(0xFFE57373); // Red for food
+        return const Color(0xFFE57373); // أحمر للطعام
       case 'quran':
-        return const Color(0xFF9575CD); // Light purple for Quran
+        return const Color(0xFF9575CD); // بنفسجي فاتح للقرآن
       default:
-        return const Color(0xFF447055); // Default app color
+        return const Color(0xFF447055); // اللون الافتراضي للتطبيق
+    }
+  }
+  
+  /// تنفيذ التنقل المخصص من الإشعار
+  static Future<void> navigateFromNotification(BuildContext context, String categoryId, {Map<String, dynamic>? extraData}) async {
+    try {
+      // تحميل فئة الأذكار
+      final AthkarService athkarService = AthkarService();
+      final category = await athkarService.getAthkarCategory(categoryId);
+      
+      if (category != null) {
+        // التنقل إلى شاشة تفاصيل الأذكار
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AthkarDetailsScreen(category: category),
+          ),
+        );
+      } else {
+        await _errorLoggingService.logError(
+          'NotificationNavigation', 
+          'تعذر العثور على الفئة أثناء التنقل المخصص: $categoryId', 
+          Exception('Category not found')
+        );
+      }
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationNavigation', 
+        'خطأ في التنقل المخصص من الإشعار: $categoryId', 
+        e
+      );
+    }
+  }
+  
+  /// تخزين البيانات للتنقل من الإشعار
+  static Future<void> setNotificationNavigationData(String payload) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('opened_from_notification', true);
+      await prefs.setString('notification_payload', payload);
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationNavigation', 
+        'خطأ في تخزين بيانات التنقل من الإشعار', 
+        e
+      );
     }
   }
 }

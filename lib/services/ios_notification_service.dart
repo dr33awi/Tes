@@ -1,4 +1,4 @@
-// lib/screens/athkarscreen/services/ios_notification_service.dart
+// lib/services/ios_notification_service.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -6,33 +6,35 @@ import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 
-/// Service to handle iOS specific notification features
+/// خدمة للتعامل مع ميزات الإشعارات الخاصة بنظام iOS
 class IOSNotificationService {
-  // Singleton pattern implementation
+  // نمط Singleton للتنفيذ
   static final IOSNotificationService _instance = IOSNotificationService._internal();
   factory IOSNotificationService() => _instance;
-  IOSNotificationService._internal();
   
-  // Error logging service
+  // التبعية المعكوسة
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   
-  // Flutter Local Notifications Plugin
+  // كائن Flutter Local Notifications Plugin
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   
-  // iOS Notification Categories
+  // فئات الإشعارات في iOS
   static const String categoryAthkar = 'athkar_category';
   static const String categoryMorning = 'morning_category';
   static const String categoryEvening = 'evening_category';
   static const String categorySleep = 'sleep_category';
   static const String categoryWake = 'wake_category';
   
-  // Initialize iOS specific notification settings
+  // المنشئ الداخلي
+  IOSNotificationService._internal();
+  
+  /// تهيئة إعدادات الإشعارات الخاصة بنظام iOS
   Future<void> initializeIOSNotifications() async {
     if (!Platform.isIOS) return;
     
     try {
-      // Request permissions with critical alert option
+      // طلب الأذونات مع خيار الإشعارات الحرجة
       final bool? result = await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
               IOSFlutterLocalNotificationsPlugin>()
@@ -40,35 +42,35 @@ class IOSNotificationService {
             alert: true,
             badge: true,
             sound: true,
-            critical: true, // Enable critical notifications (bypass Do Not Disturb)
+            critical: true, // تمكين الإشعارات الحرجة (تجاوز وضع عدم الإزعاج)
           );
       
-      print('iOS notification permission result: $result');
+      print('نتيجة إذن إشعارات iOS: $result');
       
-      // Set up notification categories for iOS
+      // إعداد فئات الإشعارات لنظام iOS
       await _setupNotificationCategories();
       
     } catch (e) {
-      _errorLoggingService.logError(
+      await _errorLoggingService.logError(
         'IOSNotificationService', 
-        'Error initializing iOS notifications', 
+        'خطأ في تهيئة إشعارات iOS', 
         e
       );
     }
   }
   
-  // Setup notification categories for iOS
+  /// إعداد فئات الإشعارات لنظام iOS
   Future<void> _setupNotificationCategories() async {
     if (!Platform.isIOS) return;
     
     try {
-      // Define notification categories
+      // تعريف فئات الإشعارات
       final List<DarwinNotificationCategory> darwinNotificationCategories = [
-        // General Athkar category
+        // فئة الأذكار العامة
         DarwinNotificationCategory(
           categoryAthkar,
           actions: [
-            // Action to mark as read
+            // إجراء لتمييز كمقروء
             DarwinNotificationAction.plain(
               'MARK_READ',
               'تم القراءة',
@@ -76,7 +78,7 @@ class IOSNotificationService {
                 DarwinNotificationActionOption.foreground,
               },
             ),
-            // Action to snooze
+            // إجراء للتأجيل
             DarwinNotificationAction.plain(
               'SNOOZE',
               'تأجيل',
@@ -90,7 +92,7 @@ class IOSNotificationService {
           }
         ),
         
-        // Category for morning athkar
+        // فئة أذكار الصباح
         DarwinNotificationCategory(
           categoryMorning,
           actions: [
@@ -111,7 +113,7 @@ class IOSNotificationService {
           ],
         ),
         
-        // Category for evening athkar
+        // فئة أذكار المساء
         DarwinNotificationCategory(
           categoryEvening,
           actions: [
@@ -131,9 +133,37 @@ class IOSNotificationService {
             ),
           ],
         ),
+        
+        // فئة أذكار النوم
+        DarwinNotificationCategory(
+          categorySleep,
+          actions: [
+            DarwinNotificationAction.plain(
+              'MARK_READ',
+              'تم القراءة',
+              options: {
+                DarwinNotificationActionOption.foreground,
+              },
+            ),
+          ],
+        ),
+        
+        // فئة أذكار الاستيقاظ
+        DarwinNotificationCategory(
+          categoryWake,
+          actions: [
+            DarwinNotificationAction.plain(
+              'MARK_READ',
+              'تم القراءة',
+              options: {
+                DarwinNotificationActionOption.foreground,
+              },
+            ),
+          ],
+        ),
       ];
       
-      // Set the categories
+      // تعيين الفئات
       final darwinNotificationSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -142,7 +172,7 @@ class IOSNotificationService {
         notificationCategories: darwinNotificationCategories,
       );
       
-      // Initialize iOS settings
+      // تهيئة إعدادات iOS
       final initializationSettings = InitializationSettings(
         iOS: darwinNotificationSettings,
       );
@@ -153,17 +183,17 @@ class IOSNotificationService {
         onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationResponse,
       );
       
-      print('iOS notification categories initialized');
+      print('تم تهيئة فئات الإشعارات في iOS');
     } catch (e) {
-      _errorLoggingService.logError(
+      await _errorLoggingService.logError(
         'IOSNotificationService', 
-        'Error setting up notification categories', 
+        'خطأ في إعداد فئات الإشعارات', 
         e
       );
     }
   }
   
-  // Handle notification action response
+  /// معالجة استجابة إجراء الإشعار
   void _onNotificationResponse(NotificationResponse response) {
     if (!Platform.isIOS) return;
     
@@ -171,42 +201,42 @@ class IOSNotificationService {
       final String? payload = response.payload;
       final String? actionId = response.actionId;
       
-      print('Notification response: action=$actionId, payload=$payload');
+      print('استجابة الإشعار: action=$actionId, payload=$payload');
       
       if (actionId == 'MARK_READ') {
-        // Handle mark as read action
-        // This could update a counter or mark the athkar as completed
+        // معالجة إجراء تمييز كمقروء
+        // يمكن تحديث عداد أو تمييز الأذكار كمكتملة
         _handleMarkAsRead(payload);
       } else if (actionId == 'SNOOZE' || actionId == 'REMIND_LATER') {
-        // Handle snooze/remind later action
+        // معالجة إجراء تأجيل/تذكير لاحقًا
         _handleSnoozeNotification(payload);
       }
     } catch (e) {
       _errorLoggingService.logError(
         'IOSNotificationService', 
-        'Error handling notification response', 
+        'خطأ في معالجة استجابة الإشعار', 
         e
       );
     }
   }
   
-  // Handle background notification response
+  /// معالجة استجابة الإشعار في الخلفية
   @pragma('vm:entry-point')
   static void _onBackgroundNotificationResponse(NotificationResponse response) {
-    // This is a static method that will be called when the app is in the background
-    // We can only do minimal processing here
-    print('Background notification response: ${response.actionId}, ${response.payload}');
+    // هذه طريقة ثابتة سيتم استدعاؤها عندما يكون التطبيق في الخلفية
+    // يمكننا القيام بمعالجة الحد الأدنى هنا
+    print('استجابة الإشعار في الخلفية: ${response.actionId}, ${response.payload}');
   }
   
-  // Handle mark as read action
+  /// معالجة إجراء تمييز كمقروء
   Future<void> _handleMarkAsRead(String? payload) async {
     if (payload == null) return;
     
     try {
-      // We could update a counter or mark the athkar as completed in SharedPreferences
-      print('Marking as read: $payload');
+      // يمكننا تحديث عداد أو تمييز الأذكار كمكتملة في SharedPreferences
+      print('تمييز كمقروء: $payload');
       
-      // For now, just send a confirmation notification
+      // لالآن، فقط إرسال إشعار تأكيد
       await flutterLocalNotificationsPlugin.show(
         10000,
         'تم تسجيل قراءة الأذكار',
@@ -221,20 +251,20 @@ class IOSNotificationService {
         ),
       );
     } catch (e) {
-      _errorLoggingService.logError(
+      await _errorLoggingService.logError(
         'IOSNotificationService', 
-        'Error handling mark as read', 
+        'خطأ في معالجة تمييز كمقروء', 
         e
       );
     }
   }
   
-  // Handle snooze notification action
+  /// معالجة إجراء تأجيل الإشعار
   Future<void> _handleSnoozeNotification(String? payload) async {
     if (payload == null) return;
     
     try {
-      // Schedule a reminder after 30 minutes
+      // جدولة تذكير بعد 30 دقيقة
       final tz.TZDateTime scheduledDate = tz.TZDateTime.now(tz.local).add(Duration(minutes: 30));
       
       await flutterLocalNotificationsPlugin.zonedSchedule(
@@ -252,11 +282,11 @@ class IOSNotificationService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
       
-      // Show confirmation
+      // عرض تأكيد
       await flutterLocalNotificationsPlugin.show(
         10001,
         'تم تأجيل الإشعار',
@@ -270,17 +300,17 @@ class IOSNotificationService {
         ),
       );
     } catch (e) {
-      _errorLoggingService.logError(
+      await _errorLoggingService.logError(
         'IOSNotificationService', 
-        'Error handling snooze notification', 
+        'خطأ في معالجة تأجيل الإشعار', 
         e
       );
     }
   }
   
-  // Create enhanced iOS notification details for a category
+  /// إنشاء تفاصيل إشعار iOS محسنة لفئة معينة
   DarwinNotificationDetails createIOSNotificationDetails(AthkarCategory category) {
-    // Get the appropriate category identifier
+    // الحصول على معرف الفئة المناسب
     String categoryIdentifier = categoryAthkar;
     
     switch (category.id) {
@@ -303,15 +333,15 @@ class IOSNotificationService {
       presentBadge: true,
       presentSound: true,
       sound: 'default',
-      interruptionLevel: InterruptionLevel.active, // Override Do Not Disturb
+      interruptionLevel: InterruptionLevel.active, // تجاوز وضع عدم الإزعاج
       categoryIdentifier: categoryIdentifier,
-      threadIdentifier: 'athkar_${category.id}', // Group by category
-      attachments: null, // Could add image attachments here
-      subtitle: category.title, // Add subtitle
+      threadIdentifier: 'athkar_${category.id}', // تجميع حسب الفئة
+      attachments: null, // يمكن إضافة مرفقات الصور هنا
+      subtitle: category.title, // إضافة عنوان فرعي
     );
   }
   
-  // Schedule an enhanced iOS notification
+  /// جدولة إشعار iOS محسن
   Future<bool> scheduleEnhancedNotification(
     AthkarCategory category, 
     TimeOfDay notificationTime, 
@@ -320,7 +350,7 @@ class IOSNotificationService {
     if (!Platform.isIOS) return false;
     
     try {
-      // Get scheduled datetime
+      // الحصول على وقت الجدولة
       final tz.TZDateTime scheduledDate = tz.TZDateTime(
         tz.local,
         tz.TZDateTime.now(tz.local).year,
@@ -330,19 +360,19 @@ class IOSNotificationService {
         notificationTime.minute,
       );
       
-      // If time already passed today, schedule for tomorrow
+      // إذا كان الوقت قد مر اليوم، قم بالجدولة للغد
       final tz.TZDateTime adjustedDate = scheduledDate.isBefore(tz.TZDateTime.now(tz.local))
           ? scheduledDate.add(Duration(days: 1))
           : scheduledDate;
       
-      // Create iOS notification details
+      // إنشاء تفاصيل إشعار iOS
       final iosDetails = createIOSNotificationDetails(category);
       
-      // Set notification content
+      // تعيين محتوى الإشعار
       final String title = category.notifyTitle ?? 'حان موعد ${category.title}';
       final String body = category.notifyBody ?? 'اضغط هنا لقراءة الأذكار';
       
-      // Schedule notification
+      // جدولة الإشعار
       await flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
         title,
@@ -350,24 +380,25 @@ class IOSNotificationService {
         adjustedDate,
         NotificationDetails(iOS: iosDetails),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time, // Daily repeat
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
         payload: category.id,
       );
       
       return true;
     } catch (e) {
-      _errorLoggingService.logError(
+      await _errorLoggingService.logError(
         'IOSNotificationService', 
-        'Error scheduling enhanced iOS notification', 
+        'خطأ في جدولة إشعار iOS محسن', 
         e
       );
       return false;
     }
   }
   
-  // Send a test notification with iOS-specific features
-  Future<void> sendTestNotification() async {
-    if (!Platform.isIOS) return;
+  /// إرسال إشعار اختباري بميزات iOS الخاصة
+  Future<bool> sendTestNotification() async {
+    if (!Platform.isIOS) return false;
     
     try {
       final iosDetails = DarwinNotificationDetails(
@@ -376,7 +407,7 @@ class IOSNotificationService {
         presentSound: true,
         interruptionLevel: InterruptionLevel.active,
         categoryIdentifier: categoryAthkar,
-        subtitle: 'اختبار الإشعارات', // iOS subtitle
+        subtitle: 'اختبار الإشعارات', // عنوان فرعي لنظام iOS
       );
       
       await flutterLocalNotificationsPlugin.show(
@@ -386,12 +417,14 @@ class IOSNotificationService {
         NotificationDetails(iOS: iosDetails),
         payload: 'test',
       );
+      
+      return true;
     } catch (e) {
-      _errorLoggingService.logError(
+      await _errorLoggingService.logError(
         'IOSNotificationService', 
-        'Error sending iOS test notification', 
+        'خطأ في إرسال إشعار اختباري لنظام iOS', 
         e
       );
+      return false;
     }
   }
-}

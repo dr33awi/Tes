@@ -1,90 +1,119 @@
-// lib/screens/athkarscreen/services/battery_optimization_service.dart
+// lib/services/battery_optimization_service.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:test_athkar_app/services/error_logging_service.dart';
 
+/// خدمة لإدارة إعدادات تحسين البطارية التي قد تؤثر على الإشعارات
 class BatteryOptimizationService {
-  // Singleton implementation
+  // تنفيذ نمط Singleton مع التبعية المعكوسة
   static final BatteryOptimizationService _instance = BatteryOptimizationService._internal();
-  factory BatteryOptimizationService() => _instance;
+  
+  factory BatteryOptimizationService({
+    ErrorLoggingService? errorLoggingService,
+  }) {
+    _instance._errorLoggingService = errorLoggingService ?? ErrorLoggingService();
+    return _instance;
+  }
+  
   BatteryOptimizationService._internal();
-
-  // Keys for shared preferences
+  
+  // التبعية المعكوسة
+  late ErrorLoggingService _errorLoggingService;
+  
+  // مفاتيح التخزين المحلي
   static const String _keyBatteryOptimizationChecked = 'battery_optimization_checked';
   static const String _keyNeedsBatteryOptimization = 'needs_battery_optimization';
   static const String _keyLastCheckTime = 'battery_optimization_last_check';
   
-  // Method channel for custom platform code
+  // قناة الطريقة للكود المخصص للمنصة
   static const platform = MethodChannel('com.athkar.app/battery_optimization');
   
-  // Battery instance
+  // كائن البطارية
   final Battery _battery = Battery();
 
-  // Check if battery optimization is enabled for the app
+  /// التحقق مما إذا كان تحسين البطارية مفعلًا للتطبيق
   Future<bool> isBatteryOptimizationEnabled() async {
     if (!Platform.isAndroid) return false;
     
     try {
-      // Try to use method channel first
+      // محاولة استخدام قناة الطريقة أولاً
       try {
         final bool? result = await platform.invokeMethod<bool>('isBatteryOptimizationEnabled');
         if (result != null) return result;
       } catch (e) {
-        print('Method channel error: $e');
-        // Fall back to other methods
+        print('خطأ في قناة الطريقة: $e');
+        // الرجوع إلى طرق أخرى
+        await _errorLoggingService.logError(
+          'BatteryOptimizationService', 
+          'خطأ في التحقق من تحسين البطارية باستخدام قناة الطريقة', 
+          e
+        );
       }
       
-      // Check if we can detect power save mode as a fallback
-      // Note: getBatteryState() doesn't exist, using BatteryState.full as a default value
+      // التحقق مما إذا كان يمكننا اكتشاف وضع توفير الطاقة كبديل
       final isLowPowerMode = await _battery.isInBatterySaveMode;
       
-      // This is not perfect, but might give some indication
+      // هذا ليس مثاليًا، ولكن قد يعطي بعض المؤشرات
       final prefs = await SharedPreferences.getInstance();
       
-      // Save what we found
+      // حفظ ما وجدناه
       await prefs.setBool(_keyNeedsBatteryOptimization, isLowPowerMode ?? false);
       
       return isLowPowerMode ?? false;
     } catch (e) {
-      print('Error checking battery optimization: $e');
+      await _errorLoggingService.logError(
+        'BatteryOptimizationService', 
+        'خطأ في التحقق من تحسين البطارية', 
+        e
+      );
       return false;
     }
   }
 
-  // Request to disable battery optimization
+  /// طلب تعطيل تحسين البطارية
   Future<bool> requestDisableBatteryOptimization() async {
     if (!Platform.isAndroid) return true;
     
     try {
-      // Try to use method channel first
+      // محاولة استخدام قناة الطريقة أولاً
       try {
         final bool? result = await platform.invokeMethod<bool>('requestBatteryOptimizationDisable');
         if (result != null) return result;
       } catch (e) {
-        print('Method channel error: $e');
-        // Fall back to app settings
+        print('خطأ في قناة الطريقة: $e');
+        // الرجوع إلى إعدادات التطبيق
+        await _errorLoggingService.logError(
+          'BatteryOptimizationService', 
+          'خطأ في طلب تعطيل تحسين البطارية باستخدام قناة الطريقة', 
+          e
+        );
       }
       
-      // Open battery optimization settings - using AppSettings.openAppSettings() instead
-      await AppSettings.openAppSettings();
+      // فتح إعدادات تحسين البطارية
+      await AppSettings.openAppSettings(type: AppSettingsType.battery);
       await _saveLastCheckTime();
       
       return true;
     } catch (e) {
-      print('Error requesting battery optimization: $e');
+      await _errorLoggingService.logError(
+        'BatteryOptimizationService', 
+        'خطأ في طلب تعطيل تحسين البطارية', 
+        e
+      );
       return false;
     }
   }
   
-  // Check and open battery settings if needed
+  /// التحقق وفتح إعدادات البطارية إذا لزم الأمر
   Future<void> checkAndRequestBatteryOptimization(BuildContext context) async {
     if (!Platform.isAndroid) return;
     
     try {
-      // Only check periodically
+      // التحقق فقط بشكل دوري
       if (!await shouldCheckBatteryOptimization()) {
         return;
       }
@@ -94,11 +123,15 @@ class BatteryOptimizationService {
         showBatteryOptimizationDialog(context);
       }
     } catch (e) {
-      print('Error in checkAndRequestBatteryOptimization: $e');
+      await _errorLoggingService.logError(
+        'BatteryOptimizationService', 
+        'خطأ في checkAndRequestBatteryOptimization', 
+        e
+      );
     }
   }
   
-  // Show dialog about battery optimization
+  /// عرض حوار حول تحسين البطارية
   void showBatteryOptimizationDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -125,44 +158,56 @@ class BatteryOptimizationService {
     );
   }
   
-  // Open battery settings directly
+  /// فتح إعدادات البطارية مباشرة
   Future<void> _openBatterySettings() async {
     try {
       await requestDisableBatteryOptimization();
       await _saveLastCheckTime();
     } catch (e) {
-      print('Error opening battery settings: $e');
-      // Fallback to app settings
+      await _errorLoggingService.logError(
+        'BatteryOptimizationService', 
+        'خطأ في فتح إعدادات البطارية', 
+        e
+      );
+      // الرجوع إلى إعدادات التطبيق
       AppSettings.openAppSettings();
     }
   }
   
-  // Save when the last check was done
+  /// حفظ وقت آخر تحقق
   Future<void> _saveLastCheckTime() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_keyLastCheckTime, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
-      print('Error saving last battery check time: $e');
+      await _errorLoggingService.logError(
+        'BatteryOptimizationService', 
+        'خطأ في حفظ وقت آخر تحقق من البطارية', 
+        e
+      );
     }
   }
   
-  // Check if we need to prompt user again (not too frequent)
+  /// التحقق مما إذا كنا بحاجة لمطالبة المستخدم مرة أخرى (ليس بشكل متكرر جدًا)
   Future<bool> shouldCheckBatteryOptimization() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastCheckTime = prefs.getInt(_keyLastCheckTime) ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
       
-      // Only check once per week (604800000 ms)
+      // التحقق مرة واحدة فقط في الأسبوع (604800000 مللي ثانية)
       return (now - lastCheckTime) > 604800000;
     } catch (e) {
-      print('Error checking if should prompt battery optimization: $e');
+      await _errorLoggingService.logError(
+        'BatteryOptimizationService', 
+        'خطأ في التحقق مما إذا كان يجب مطالبة تحسين البطارية', 
+        e
+      );
       return false;
     }
   }
   
-  // Check additional battery restrictions that might affect notifications
+  /// التحقق من قيود البطارية الإضافية التي قد تؤثر على الإشعارات
   Future<void> checkForAdditionalBatteryRestrictions(BuildContext context) async {
     if (!Platform.isAndroid) return;
     
@@ -172,21 +217,26 @@ class BatteryOptimizationService {
         _showManufacturerSpecificBatteryDialog(context, manufacturer);
       }
     } catch (e) {
-      print('Error checking for additional battery restrictions: $e');
+      await _errorLoggingService.logError(
+        'BatteryOptimizationService', 
+        'خطأ في التحقق من قيود البطارية الإضافية', 
+        e
+      );
     }
   }
   
-  // Get device manufacturer (simplified)
+  /// الحصول على مصنع الجهاز (مبسط)
   Future<String> _getDeviceManufacturer() async {
     try {
-      // deviceInfo is not available in battery_plus, use platform channel or default to "unknown"
+      // deviceInfo غير متوفر في battery_plus، استخدم قناة platform أو الافتراضي "unknown"
+      // يمكن تحسين هذا باستخدام device_info_plus package
       return "unknown";
     } catch (e) {
       return "unknown";
     }
   }
   
-  // Check if manufacturer has special battery restrictions
+  /// التحقق مما إذا كان المصنع لديه قيود بطارية خاصة
   bool _isManufacturerWithSpecialRestrictions(String manufacturer) {
     final restrictiveManufacturers = [
       "xiaomi", "redmi", "poco", "huawei", "honor", "oppo", "vivo", "oneplus", "realme", "samsung"
@@ -197,7 +247,7 @@ class BatteryOptimizationService {
     );
   }
   
-  // Show dialog with manufacturer-specific instructions
+  /// عرض حوار بتعليمات خاصة بالمصنع
   void _showManufacturerSpecificBatteryDialog(BuildContext context, String manufacturer) {
     String instructions = _getManufacturerSpecificInstructions(manufacturer);
     
@@ -223,7 +273,7 @@ class BatteryOptimizationService {
     );
   }
   
-  // Get manufacturer-specific instructions
+  /// الحصول على تعليمات خاصة بالمصنع
   String _getManufacturerSpecificInstructions(String manufacturer) {
     if (manufacturer.toLowerCase().contains("xiaomi") || 
         manufacturer.toLowerCase().contains("redmi") || 
@@ -239,6 +289,22 @@ class BatteryOptimizationService {
              '2. اختر "البطارية" ثم "حدود استخدام البطارية في الخلفية"\n'
              '3. ابحث عن تطبيق الأذكار\n'
              '4. اختر "السماح بالاستخدام في الخلفية"';
+    } else if (manufacturer.toLowerCase().contains("huawei") || 
+               manufacturer.toLowerCase().contains("honor")) {
+      return 'أجهزة هواوي/أونور لديها إعدادات بطارية خاصة:\n\n'
+             '1. افتح "الإعدادات" ثم "البطارية"\n'
+             '2. اختر "إدارة تشغيل التطبيقات" أو "التشغيل التلقائي"\n'
+             '3. ابحث عن تطبيق الأذكار\n'
+             '4. فعّل "التشغيل التلقائي" و"تشغيل في الخلفية"';
+    } else if (manufacturer.toLowerCase().contains("oppo") || 
+               manufacturer.toLowerCase().contains("realme") || 
+               manufacturer.toLowerCase().contains("vivo") ||
+               manufacturer.toLowerCase().contains("oneplus")) {
+      return 'أجهزة أوبو/ريلمي/فيفو/ون بلس لديها إعدادات بطارية خاصة:\n\n'
+             '1. افتح "الإعدادات" ثم "البطارية"\n'
+             '2. اختر "تحسين البطارية" أو "توفير الطاقة للتطبيقات"\n'
+             '3. ابحث عن تطبيق الأذكار\n'
+             '4. اختر "لا تحسين" و"السماح بالتشغيل في الخلفية"';
     } else {
       return 'بعض أجهزة الأندرويد لديها إعدادات بطارية خاصة قد تؤثر على الإشعارات.\n\n'
              'يرجى التأكد من:\n'

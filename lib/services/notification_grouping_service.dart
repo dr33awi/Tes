@@ -1,4 +1,4 @@
-// lib/screens/athkarscreen/services/notification_grouping_service.dart
+// lib/services/notification_grouping_service.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -7,21 +7,29 @@ import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Service to handle grouping of notifications
+/// خدمة للتعامل مع تجميع الإشعارات
 class NotificationGroupingService {
-  // Singleton pattern implementation
+  // تنفيذ نمط Singleton مع التبعية المعكوسة
   static final NotificationGroupingService _instance = NotificationGroupingService._internal();
-  factory NotificationGroupingService() => _instance;
+  
+  factory NotificationGroupingService({
+    ErrorLoggingService? errorLoggingService,
+    FlutterLocalNotificationsPlugin? flutterLocalNotificationsPlugin,
+  }) {
+    _instance._errorLoggingService = errorLoggingService ?? ErrorLoggingService();
+    _instance._flutterLocalNotificationsPlugin = flutterLocalNotificationsPlugin ?? FlutterLocalNotificationsPlugin();
+    return _instance;
+  }
+  
   NotificationGroupingService._internal();
   
-  // Error logging service
-  final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
+  // التبعية المعكوسة
+  late ErrorLoggingService _errorLoggingService;
   
-  // Flutter Local Notifications Plugin
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  // كائن Flutter Local Notifications Plugin
+  late FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
   
-  // Group keys for different types of notifications
+  // مفاتيح المجموعات لأنواع مختلفة من الإشعارات
   static const String morningGroupKey = 'morning_athkar_group';
   static const String eveningGroupKey = 'evening_athkar_group';
   static const String sleepGroupKey = 'sleep_athkar_group';
@@ -31,7 +39,7 @@ class NotificationGroupingService {
   static const String foodGroupKey = 'food_athkar_group';
   static const String generalGroupKey = 'athkar_group';
   
-  // Get the appropriate group key for a category
+  /// الحصول على مفتاح المجموعة المناسب لفئة معينة
   String getGroupKeyForCategory(String categoryId) {
     switch (categoryId) {
       case 'morning':
@@ -53,7 +61,7 @@ class NotificationGroupingService {
     }
   }
   
-  // Schedule a grouped notification
+  /// جدولة إشعار مجمع
   Future<bool> scheduleGroupedNotification({
     required AthkarCategory category,
     required TimeOfDay notificationTime,
@@ -64,10 +72,10 @@ class NotificationGroupingService {
     int groupIndex = 0,
   }) async {
     try {
-      // Get the group key for this category
+      // الحصول على مفتاح المجموعة لهذه الفئة
       final String groupKey = getGroupKeyForCategory(category.id);
       
-      // Get scheduled datetime
+      // الحصول على وقت الجدولة
       final tz.TZDateTime scheduledDate = tz.TZDateTime(
         tz.local,
         tz.TZDateTime.now(tz.local).year,
@@ -77,13 +85,13 @@ class NotificationGroupingService {
         notificationTime.minute,
       );
       
-      // If time already passed today, schedule for tomorrow
+      // إذا كان الوقت قد مر اليوم، قم بالجدولة لغدًا
       final tz.TZDateTime adjustedDate = scheduledDate.isBefore(tz.TZDateTime.now(tz.local))
           ? scheduledDate.add(Duration(days: 1))
           : scheduledDate;
       
       if (Platform.isAndroid) {
-        // Create Android specific notification details with grouping
+        // إنشاء تفاصيل إشعار أندرويد محددة مع التجميع
         final androidDetails = AndroidNotificationDetails(
           'athkar_${category.id}_channel',
           '${category.title}',
@@ -93,15 +101,15 @@ class NotificationGroupingService {
           groupKey: groupKey,
           setAsGroupSummary: isSummary,
           category: AndroidNotificationCategory.reminder,
-          // Use colored lights based on category
+          // استخدام أضواء ملونة بناءً على الفئة
           color: _getCategoryColor(category.id),
           ledColor: _getCategoryColor(category.id),
           ledOnMs: 1000,
           ledOffMs: 500,
           visibility: NotificationVisibility.public,
-          // Don't use ticker for grouped notifications
+          // عدم استخدام ticker للإشعارات المجمعة
           ticker: isSummary ? null : 'حان وقت ${category.title}',
-          // Style for group summary
+          // نمط لملخص المجموعة
           styleInformation: isSummary 
               ? InboxStyleInformation(
                   ['إشعارات ${category.title}'],
@@ -111,64 +119,67 @@ class NotificationGroupingService {
               : BigTextStyleInformation(body),
         );
         
-        // Create notification details
+        // إنشاء تفاصيل الإشعار
         final notificationDetails = NotificationDetails(android: androidDetails);
         
-        // Schedule notification
-        await flutterLocalNotificationsPlugin.zonedSchedule(
+        // جدولة الإشعار
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
           notificationId,
           title,
           body,
           adjustedDate,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents: DateTimeComponents.time, // Daily repeat
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
           payload: isSummary ? category.id : '${category.id}:${groupIndex}',
         );
       } else if (Platform.isIOS) {
-        // Create iOS specific notification details with thread identifier
+        // إنشاء تفاصيل إشعار iOS محددة مع معرف المؤشر
         final iosDetails = DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
           sound: 'default',
           interruptionLevel: InterruptionLevel.active,
-          threadIdentifier: groupKey, // This groups notifications in iOS
+          threadIdentifier: groupKey, // هذا يجمع الإشعارات في iOS
           categoryIdentifier: 'athkar',
-          subtitle: category.title, // Add subtitle for better identification
+          subtitle: category.title, // إضافة عنوان فرعي لتعريف أفضل
         );
         
-        // Create notification details
+        // إنشاء تفاصيل الإشعار
         final notificationDetails = NotificationDetails(iOS: iosDetails);
         
-        // Schedule notification
-        await flutterLocalNotificationsPlugin.zonedSchedule(
+        // جدولة الإشعار
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
           notificationId,
           title,
           body,
           adjustedDate,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents: DateTimeComponents.time, // Daily repeat
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
           payload: isSummary ? category.id : '${category.id}:${groupIndex}',
         );
       } else {
-        // For other platforms, use generic notification
+        // للمنصات الأخرى، استخدم إشعارًا عامًا
         final notificationDetails = const NotificationDetails();
         
-        await flutterLocalNotificationsPlugin.zonedSchedule(
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
           notificationId,
           title,
           body,
           adjustedDate,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents: DateTimeComponents.time, // Daily repeat
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time, // تكرار يومي
           payload: isSummary ? category.id : '${category.id}:${groupIndex}',
         );
       }
       
-      // Save that we've scheduled this notification
+      // حفظ أننا قمنا بجدولة هذا الإشعار
       await _trackGroupedNotification(
         category.id, 
         notificationId, 
@@ -181,44 +192,44 @@ class NotificationGroupingService {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationGroupingService', 
-        'Error scheduling grouped notification', 
+        'خطأ في جدولة إشعار مجمع', 
         e
       );
       return false;
     }
   }
   
-  // Get category color based on ID
+  /// الحصول على لون الفئة بناءً على المعرف
   Color _getCategoryColor(String categoryId) {
     switch (categoryId) {
       case 'morning':
-        return const Color(0xFFFFD54F); // Yellow
+        return const Color(0xFFFFD54F); // أصفر
       case 'evening':
-        return const Color(0xFFAB47BC); // Purple
+        return const Color(0xFFAB47BC); // بنفسجي
       case 'sleep':
-        return const Color(0xFF5C6BC0); // Blue
+        return const Color(0xFF5C6BC0); // أزرق
       case 'wake':
-        return const Color(0xFFFFB74D); // Orange
+        return const Color(0xFFFFB74D); // برتقالي
       case 'prayer':
-        return const Color(0xFF4DB6AC); // Teal
+        return const Color(0xFF4DB6AC); // أزرق فاتح
       case 'home':
-        return const Color(0xFF66BB6A); // Green
+        return const Color(0xFF66BB6A); // أخضر
       case 'food':
-        return const Color(0xFFE57373); // Red
+        return const Color(0xFFE57373); // أحمر
       default:
-        return const Color(0xFF447055); // Default app color
+        return const Color(0xFF447055); // اللون الافتراضي للتطبيق
     }
   }
   
-  // Schedule multiple notifications for a category with grouping
+  /// جدولة عدة إشعارات لفئة مع التجميع
   Future<bool> scheduleMultipleNotifications(
     AthkarCategory category,
     List<String> timesStringList,
     TimeOfDay mainTime,
   ) async {
     try {
-      // First parse all time strings to TimeOfDay objects
-      List<TimeOfDay> times = [mainTime]; // Start with main time
+      // أولاً قم بتحليل جميع سلاسل الوقت إلى كائنات TimeOfDay
+      List<TimeOfDay> times = [mainTime]; // البدء بالوقت الرئيسي
       
       for (final timeString in timesStringList) {
         try {
@@ -232,31 +243,36 @@ class NotificationGroupingService {
             }
           }
         } catch (e) {
-          print('Error parsing time string $timeString: $e');
+          print('خطأ في تحليل سلسلة الوقت $timeString: $e');
+          await _errorLoggingService.logError(
+            'NotificationGroupingService', 
+            'خطأ في تحليل سلسلة الوقت $timeString', 
+            e
+          );
         }
       }
       
-      // Sort times chronologically
+      // ترتيب الأوقات زمنيًا
       times.sort((a, b) {
         final aMinutes = a.hour * 60 + a.minute;
         final bMinutes = b.hour * 60 + b.minute;
         return aMinutes.compareTo(bMinutes);
       });
       
-      // Now schedule all notifications
+      // الآن قم بجدولة جميع الإشعارات
       final baseId = category.id.hashCode.abs() % 100000;
       
-      // First create a summary notification
+      // أولاً إنشاء إشعار ملخص
       await scheduleGroupedNotification(
         category: category,
-        notificationTime: times.first, // Use first time for summary
+        notificationTime: times.first, // استخدام الوقت الأول للملخص
         notificationId: baseId,
         title: 'إشعارات ${category.title}',
         body: 'لديك عدة تذكيرات لـ ${category.title}',
         isSummary: true,
       );
       
-      // Then schedule individual notifications
+      // ثم جدولة الإشعارات الفردية
       int successCount = 0;
       
       for (int i = 0; i < times.length; i++) {
@@ -285,14 +301,14 @@ class NotificationGroupingService {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationGroupingService', 
-        'Error scheduling multiple notifications', 
+        'خطأ في جدولة إشعارات متعددة', 
         e
       );
       return false;
     }
   }
   
-  // Schedule individual notification for a category
+  /// جدولة إشعار فردي لفئة
   Future<bool> scheduleSingleNotification(
     AthkarCategory category,
     TimeOfDay notificationTime,
@@ -313,14 +329,14 @@ class NotificationGroupingService {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationGroupingService', 
-        'Error scheduling single notification', 
+        'خطأ في جدولة إشعار فردي', 
         e
       );
       return false;
     }
   }
   
-  // Track grouped notification
+  /// تتبع الإشعار المجمع
   Future<void> _trackGroupedNotification(
     String categoryId, 
     int notificationId, 
@@ -331,7 +347,7 @@ class NotificationGroupingService {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Save to the list of all notification IDs
+      // الحفظ في قائمة جميع معرفات الإشعارات
       final allIdsKey = 'grouped_notification_ids';
       final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
       
@@ -342,7 +358,7 @@ class NotificationGroupingService {
         await prefs.setStringList(allIdsKey, allIds);
       }
       
-      // Save details of this notification
+      // حفظ تفاصيل هذا الإشعار
       await prefs.setString(
         'notification_details_$notificationId',
         '${categoryId}:${time.hour}:${time.minute}:${isSummary ? 1 : 0}:$groupIndex'
@@ -350,34 +366,34 @@ class NotificationGroupingService {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationGroupingService', 
-        'Error tracking grouped notification', 
+        'خطأ في تتبع الإشعار المجمع', 
         e
       );
     }
   }
   
-  // Cancel all grouped notifications for a category
+  /// إلغاء جميع الإشعارات المجمعة لفئة
   Future<void> cancelGroupedNotifications(String categoryId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final allIdsKey = 'grouped_notification_ids';
       final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
       
-      // Find all notifications for this category
+      // البحث عن جميع الإشعارات لهذه الفئة
       final categoryIds = allIds.where((id) => id.startsWith('$categoryId:')).toList();
       
-      // Cancel each notification
+      // إلغاء كل إشعار
       for (final idString in categoryIds) {
         final parts = idString.split(':');
         if (parts.length >= 3) {
           final notificationId = int.tryParse(parts[2]);
           if (notificationId != null) {
-            await flutterLocalNotificationsPlugin.cancel(notificationId);
+            await _flutterLocalNotificationsPlugin.cancel(notificationId);
           }
         }
       }
       
-      // Remove from the list
+      // الإزالة من القائمة
       for (final id in categoryIds) {
         allIds.remove(id);
       }
@@ -386,23 +402,23 @@ class NotificationGroupingService {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationGroupingService', 
-        'Error canceling grouped notifications', 
+        'خطأ في إلغاء الإشعارات المجمعة', 
         e
       );
     }
   }
   
-  // Get all grouped notification IDs for a category
+  /// الحصول على جميع معرفات الإشعارات المجمعة لفئة
   Future<List<int>> getGroupedNotificationIds(String categoryId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final allIdsKey = 'grouped_notification_ids';
       final allIds = prefs.getStringList(allIdsKey) ?? <String>[];
       
-      // Find all notifications for this category
+      // البحث عن جميع الإشعارات لهذه الفئة
       final categoryIds = allIds.where((id) => id.startsWith('$categoryId:')).toList();
       
-      // Extract notification IDs
+      // استخراج معرفات الإشعارات
       List<int> notificationIds = [];
       for (final idString in categoryIds) {
         final parts = idString.split(':');
@@ -418,24 +434,24 @@ class NotificationGroupingService {
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationGroupingService', 
-        'Error getting grouped notification IDs', 
+        'خطأ في الحصول على معرفات الإشعارات المجمعة', 
         e
       );
       return [];
     }
   }
   
-  // Show a grouped notification immediately (for testing)
+  /// عرض إشعار مجمع فورًا (للاختبار)
   Future<void> showGroupedTestNotification(AthkarCategory category) async {
     try {
-      // Get the group key for this category
+      // الحصول على مفتاح المجموعة لهذه الفئة
       final String groupKey = getGroupKeyForCategory(category.id);
       
       if (Platform.isAndroid) {
-        // First show a summary notification
+        // أولاً عرض إشعار ملخص
         final summaryNotificationId = category.id.hashCode.abs() % 100000 + 50000;
         
-        // Create a summary notification
+        // إنشاء إشعار ملخص
         final androidSummaryDetails = AndroidNotificationDetails(
           'athkar_test_channel',
           'اختبار الأذكار',
@@ -454,8 +470,8 @@ class NotificationGroupingService {
           ),
         );
         
-        // Show the summary notification
-        await flutterLocalNotificationsPlugin.show(
+        // عرض إشعار الملخص
+        await _flutterLocalNotificationsPlugin.show(
           summaryNotificationId,
           'مجموعة إشعارات ${category.title}',
           'اضغط للاطلاع على الإشعارات',
@@ -463,7 +479,7 @@ class NotificationGroupingService {
           payload: '${category.id}:test_summary',
         );
         
-        // Show individual notifications in the group
+        // عرض إشعارات فردية في المجموعة
         for (int i = 1; i <= 3; i++) {
           final androidDetails = AndroidNotificationDetails(
             'athkar_test_channel',
@@ -478,7 +494,7 @@ class NotificationGroupingService {
             visibility: NotificationVisibility.public,
           );
           
-          await flutterLocalNotificationsPlugin.show(
+          await _flutterLocalNotificationsPlugin.show(
             summaryNotificationId + i,
             'اختبار ${category.title} $i',
             'هذا اختبار للإشعارات المجمعة. اضغط هنا.',
@@ -486,11 +502,11 @@ class NotificationGroupingService {
             payload: '${category.id}:test_$i',
           );
           
-          // Add a small delay to ensure notifications appear in correct order
+          // إضافة تأخير صغير لضمان ظهور الإشعارات بالترتيب الصحيح
           await Future.delayed(Duration(milliseconds: 200));
         }
       } else if (Platform.isIOS) {
-        // For iOS, just use thread identifier to group notifications
+        // لنظام iOS، فقط استخدم معرف المؤشر لتجميع الإشعارات
         for (int i = 0; i <= 3; i++) {
           final iosDetails = DarwinNotificationDetails(
             presentAlert: true,
@@ -501,7 +517,7 @@ class NotificationGroupingService {
             subtitle: i == 0 ? 'مجموعة الإشعارات' : 'إشعار $i',
           );
           
-          await flutterLocalNotificationsPlugin.show(
+          await _flutterLocalNotificationsPlugin.show(
             category.id.hashCode.abs() % 100000 + 50000 + i,
             i == 0 ? 'مجموعة إشعارات ${category.title}' : 'اختبار ${category.title} $i',
             i == 0 ? 'اختبار مجموعة الإشعارات' : 'هذا اختبار للإشعار رقم $i',
@@ -509,14 +525,14 @@ class NotificationGroupingService {
             payload: '${category.id}:test_$i',
           );
           
-          // Add a small delay to ensure notifications appear in correct order
+          // إضافة تأخير صغير لضمان ظهور الإشعارات بالترتيب الصحيح
           await Future.delayed(Duration(milliseconds: 200));
         }
       }
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationGroupingService', 
-        'Error showing grouped test notification', 
+        'خطأ في عرض إشعار اختبار مجمع', 
         e
       );
     }

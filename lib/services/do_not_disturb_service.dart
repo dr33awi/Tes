@@ -1,4 +1,4 @@
-// lib/screens/athkarscreen/services/do_not_disturb_service.dart
+// lib/services/do_not_disturb_service.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,49 +6,56 @@ import 'package:app_settings/app_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 
-/// Service to handle Do Not Disturb mode and ensure notifications get through
+/// خدمة للتعامل مع وضع عدم الإزعاج وضمان وصول الإشعارات
 class DoNotDisturbService {
-  // Singleton pattern implementation
+  // تنفيذ نمط Singleton مع التبعية المعكوسة
   static final DoNotDisturbService _instance = DoNotDisturbService._internal();
-  factory DoNotDisturbService() => _instance;
+  
+  factory DoNotDisturbService({
+    ErrorLoggingService? errorLoggingService,
+  }) {
+    _instance._errorLoggingService = errorLoggingService ?? ErrorLoggingService();
+    return _instance;
+  }
+  
   DoNotDisturbService._internal();
   
-  // Error logging service
-  final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
+  // التبعية المعكوسة
+  late ErrorLoggingService _errorLoggingService;
   
-  // Method channel for communicating with platform-specific code
+  // قناة الطريقة للتواصل مع كود خاص بالمنصة
   static const MethodChannel _channel = MethodChannel('com.athkar.app/do_not_disturb');
   
-  // Check if the device is currently in Do Not Disturb mode
+  /// التحقق مما إذا كان الجهاز حاليًا في وضع عدم الإزعاج
   Future<bool> isInDoNotDisturbMode() async {
     try {
       if (Platform.isAndroid) {
         final bool? result = await _channel.invokeMethod<bool>('isInDoNotDisturbMode');
         return result ?? false;
       } else if (Platform.isIOS) {
-        // iOS doesn't provide direct API to check this
-        // We could check notification settings instead
+        // iOS لا توفر واجهة برمجة تطبيقات مباشرة للتحقق من هذا
+        // يمكننا التحقق من إعدادات الإشعارات بدلاً من ذلك
         return false;
       }
       return false;
     } catch (e) {
       _errorLoggingService.logError(
         'DoNotDisturbService', 
-        'Error checking Do Not Disturb mode', 
+        'خطأ في التحقق من وضع عدم الإزعاج', 
         e
       );
       return false;
     }
   }
   
-  // Check if the app has permission to bypass Do Not Disturb
+  /// التحقق مما إذا كان التطبيق لديه إذن لتجاوز وضع عدم الإزعاج
   Future<bool> canBypassDoNotDisturb() async {
     try {
       if (Platform.isAndroid) {
         final bool? result = await _channel.invokeMethod<bool>('canBypassDoNotDisturb');
         return result ?? false;
       } else if (Platform.isIOS) {
-        // iOS uses critical alerts for this purpose
+        // iOS تستخدم التنبيهات الحرجة لهذا الغرض
         final bool? result = await _channel.invokeMethod<bool>('hasCriticalAlertPermission');
         return result ?? false;
       }
@@ -56,70 +63,69 @@ class DoNotDisturbService {
     } catch (e) {
       _errorLoggingService.logError(
         'DoNotDisturbService', 
-        'Error checking bypass permission', 
+        'خطأ في التحقق من إذن التجاوز', 
         e
       );
       return false;
     }
   }
   
-  // Open Do Not Disturb settings for the user to configure
+  /// فتح إعدادات عدم الإزعاج للمستخدم لتكوينها
   Future<void> openDoNotDisturbSettings() async {
-  try {
-    if (Platform.isAndroid) {
-      // استخدم الطريقة الصحيحة من حزمة AppSettings
-      await AppSettings.openAppSettings(type: AppSettingsType.notification);
-      // أو استخدم هذا إذا كان الإصدار القديم:
-      // await AppSettings.openSettings(AppSettingsType.NOTIFICATION);
-    } else if (Platform.isIOS) {
-      await AppSettings.openAppSettings();
+    try {
+      if (Platform.isAndroid) {
+        // استخدام الطريقة الصحيحة من حزمة AppSettings
+        await AppSettings.openAppSettings(type: AppSettingsType.notification);
+      } else if (Platform.isIOS) {
+        await AppSettings.openAppSettings();
+      }
+    } catch (e) {
+      _errorLoggingService.logError(
+        'DoNotDisturbService', 
+        'خطأ في فتح إعدادات عدم الإزعاج', 
+        e
+      );
     }
-  } catch (e) {
-    _errorLoggingService.logError(
-      'DoNotDisturbService', 
-      'Error opening Do Not Disturb settings', 
-      e
-    );
   }
-}
-  // Check if the app should prompt the user about Do Not Disturb settings
+  
+  /// التحقق مما إذا كان يجب مطالبة المستخدم بإعدادات وضع عدم الإزعاج
   Future<bool> shouldPromptAboutDoNotDisturb() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Check if we've already prompted the user
+      // التحقق مما إذا كنا قد طالبنا المستخدم بالفعل
       final bool hasPrompted = prefs.getBool('dnd_prompted') ?? false;
       if (hasPrompted) {
-        // Don't prompt again if we've already done so in the last week
+        // لا تطالب مرة أخرى إذا كنا قد فعلنا ذلك في الأسبوع الماضي
         final int lastPromptTime = prefs.getInt('dnd_prompt_time') ?? 0;
         final int now = DateTime.now().millisecondsSinceEpoch;
         
-        // Check if a week has passed since we last prompted
+        // التحقق مما إذا كان قد مر أسبوع منذ آخر مرة طالبناه
         if (now - lastPromptTime < 7 * 24 * 60 * 60 * 1000) {
           return false;
         }
       }
       
-      // Check if the device is in Do Not Disturb mode
+      // التحقق مما إذا كان الجهاز في وضع عدم الإزعاج
       final bool isDndActive = await isInDoNotDisturbMode();
       if (!isDndActive) {
-        return false; // No need to prompt if DND is not active
+        return false; // لا حاجة للمطالبة إذا لم يكن DND نشطًا
       }
       
-      // Check if the app can already bypass DND
+      // التحقق مما إذا كان التطبيق يمكنه بالفعل تجاوز DND
       final bool canBypass = await canBypassDoNotDisturb();
-      return !canBypass; // Only prompt if we can't bypass DND
+      return !canBypass; // فقط مطالبة إذا لم نتمكن من تجاوز DND
     } catch (e) {
       _errorLoggingService.logError(
         'DoNotDisturbService', 
-        'Error checking if should prompt about DND', 
+        'خطأ في التحقق مما إذا كان ينبغي المطالبة بشأن DND', 
         e
       );
       return false;
     }
   }
   
-  // Record that we've prompted the user about Do Not Disturb settings
+  /// تسجيل أننا طالبنا المستخدم بإعدادات وضع عدم الإزعاج
   Future<void> recordDoNotDisturbPrompt() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -128,13 +134,13 @@ class DoNotDisturbService {
     } catch (e) {
       _errorLoggingService.logError(
         'DoNotDisturbService', 
-        'Error recording DND prompt', 
+        'خطأ في تسجيل مطالبة DND', 
         e
       );
     }
   }
   
-  // Show dialog about Do Not Disturb settings
+  /// عرض حوار حول إعدادات وضع عدم الإزعاج
   Future<void> showDoNotDisturbDialog(BuildContext context) async {
     try {
       final isDndActive = await isInDoNotDisturbMode();
@@ -165,19 +171,19 @@ class DoNotDisturbService {
           ),
         );
         
-        // Record that we've prompted the user
+        // تسجيل أننا طالبنا المستخدم
         await recordDoNotDisturbPrompt();
       }
     } catch (e) {
       _errorLoggingService.logError(
         'DoNotDisturbService', 
-        'Error showing Do Not Disturb dialog', 
+        'خطأ في عرض حوار عدم الإزعاج', 
         e
       );
     }
   }
   
-  // Configure notification channels to bypass Do Not Disturb (Android only)
+  /// تكوين قنوات الإشعارات لتجاوز وضع عدم الإزعاج (Android فقط)
   Future<void> configureNotificationChannelsForDoNotDisturb() async {
     try {
       if (Platform.isAndroid) {
@@ -186,7 +192,7 @@ class DoNotDisturbService {
     } catch (e) {
       _errorLoggingService.logError(
         'DoNotDisturbService', 
-        'Error configuring notification channels', 
+        'خطأ في تكوين قنوات الإشعارات', 
         e
       );
     }
