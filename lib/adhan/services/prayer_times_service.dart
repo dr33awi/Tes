@@ -8,7 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
 import 'package:test_athkar_app/adhan/widgets/location_permission_dialog.dart';
-import 'package:test_athkar_app/adhan/services/EnhancedPrayerNotificationService.dart';
+import 'package:test_athkar_app/adhan/services/PrayerNotificationService.dart';
 
 /// Service for managing prayer times
 class PrayerTimesService {
