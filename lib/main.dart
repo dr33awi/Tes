@@ -5,10 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'package:test_athkar_app/screens/athkarscreen/services/app_initializer.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
-import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
-import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 
 void main() async {
@@ -26,60 +23,6 @@ void main() async {
   
   // Initialize app services (includes notification services)
   await AppInitializer.initialize();
-  
-  // Initialize prayer services
-  try {
-    debugPrint('Initializing prayer services...');
-    
-    // Initialize prayer notification service
-    final notificationService = PrayerNotificationService();
-    final notificationInitialized = await notificationService.initialize();
-    debugPrint('Prayer notification service initialized: $notificationInitialized');
-    
-    // Test immediate notifications
-    if (notificationInitialized) {
-      await notificationService.testImmediateNotification();
-      // Test scheduled notifications after 30 seconds
-      await notificationService.testScheduledNotification();
-    }
-    
-    // Initialize prayer times service
-    final prayerTimesService = PrayerTimesService();
-    final prayerServiceInitialized = await prayerTimesService.initialize();
-    debugPrint('Prayer times service initialized: $prayerServiceInitialized');
-    
-    // Schedule notifications for today's prayers
-    if (notificationInitialized && prayerServiceInitialized) {
-      final scheduled = await prayerTimesService.schedulePrayerNotifications();
-      debugPrint('Prayer notifications scheduled: $scheduled');
-      
-      // Check pending notifications
-      final pendingNotifications = await notificationService.getPendingNotifications();
-      debugPrint('Total pending prayer notifications: ${pendingNotifications.length}');
-    }
-    
-    debugPrint('Prayer services initialization complete');
-  } catch (e) {
-    debugPrint('Error initializing prayer services: $e');
-    // Continue despite error
-  }
-  
-  // Initialize Athkar notification service
-  try {
-    debugPrint('Initializing Athkar notification service...');
-    
-    // Initialize Athkar notification service (this is now handled in AppInitializer, but we're keeping this check)
-    final athkarNotificationService = NotificationService();
-    
-    // Check pending notifications for debugging
-    final pendingNotifications = await athkarNotificationService.getPendingNotifications();
-    debugPrint('Total pending Athkar notifications: ${pendingNotifications.length}');
-    
-    debugPrint('Athkar notification service initialized successfully');
-  } catch (e) {
-    debugPrint('Error initializing Athkar notification service: $e');
-    // Continue despite error
-  }
   
   // Run the app
   runApp(const MyApp());
@@ -109,43 +52,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Check if notifications need to be updated when app is resumed
-      _checkAndUpdateNotifications();
-    }
-  }
-
-  Future<void> _checkAndUpdateNotifications() async {
-    try {
-      // Check prayer notifications
-      debugPrint('Checking if prayer notifications need to be updated...');
-      
-      final notificationService = PrayerNotificationService();
-      final shouldUpdate = await notificationService.shouldUpdateNotifications();
-      
-      if (shouldUpdate) {
-        debugPrint('Prayer notifications need to be updated. Scheduling new notifications...');
-        
-        // Schedule notifications for the new day
-        final prayerTimesService = PrayerTimesService();
-        final scheduled = await prayerTimesService.schedulePrayerNotifications();
-        
-        debugPrint('Prayer notifications updated: $scheduled scheduled');
-      } else {
-        debugPrint('Prayer notifications already up-to-date');
-      }
-      
-      // Check Athkar notifications
-      debugPrint('Checking Athkar notifications...');
-      
-      // Athkar notifications don't need daily updates because they repeat automatically,
-      // but we can make sure they're still scheduled correctly
-      final athkarNotificationService = NotificationService();
-      
-      // Re-schedule saved notifications to ensure they work
-      await athkarNotificationService.scheduleAllSavedNotifications();
-      
-      debugPrint('Athkar notifications checked and updated if needed');
-    } catch (e) {
-      debugPrint('Error checking/updating notifications: $e');
+      AppInitializer.checkAndRescheduleNotifications();
     }
   }
 

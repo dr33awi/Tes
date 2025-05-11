@@ -1,9 +1,9 @@
-// lib/services/notification_service.dart
+// lib/screens/athkarscreen/services/notification_service.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
+import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,7 +21,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  // Guarda la zona horaria del dispositivo
+  // Store device timezone
   String _deviceTimeZone = 'UTC';
       
   // Alarm IDs for background notifications
@@ -59,7 +59,11 @@ class NotificationService {
 
       // For iOS
       final DarwinInitializationSettings initializationSettingsDarwin =
-          DarwinInitializationSettings();
+          DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
 
       final InitializationSettings initializationSettings =
           InitializationSettings(
@@ -140,19 +144,16 @@ class NotificationService {
       final tz.TZDateTime scheduledDate = _getScheduledDate(notificationTime);
 
       // Set notification content
-      final title = category.notifyTitle ?? 'حان موعد ${category.title}';
-      final body = category.notifyBody ?? 'اضغط هنا لقراءة الأذكار';
+      final String title = 'حان موعد ${category.title}';
+      final String body = 'اضغط هنا لقراءة الأذكار';
       
-      // Set notification details
+      // Set notification details - simplified without custom sounds
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
         'athkar_channel_id',
         'أذكار',
         channelDescription: 'تنبيهات الأذكار',
         importance: Importance.high,
         priority: Priority.high,
-        sound: category.notifySound != null 
-          ? RawResourceAndroidNotificationSound(category.notifySound!) 
-          : null,
         icon: '@mipmap/ic_launcher',
       );
       
@@ -160,7 +161,6 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-        sound: category.notifySound != null ? '${category.notifySound}.aiff' : null,
       );
       
       final NotificationDetails notificationDetails = NotificationDetails(
@@ -198,39 +198,43 @@ class NotificationService {
   // Schedule background alarm (for Android)
   Future<void> _scheduleBackgroundAlarm(
       AthkarCategory category, TimeOfDay notificationTime, String title, String body) async {
-    int alarmId = _getAlarmIdForCategory(category.id);
-    
-    // Calculate alarm time
-    final now = DateTime.now();
-    DateTime scheduledDateTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      notificationTime.hour,
-      notificationTime.minute,
-    );
-    
-    // If time already passed today, schedule for tomorrow
-    if (scheduledDateTime.isBefore(now)) {
-      scheduledDateTime = scheduledDateTime.add(const Duration(days: 1));
+    try {
+      int alarmId = _getAlarmIdForCategory(category.id);
+      
+      // Calculate alarm time
+      final now = DateTime.now();
+      DateTime scheduledDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        notificationTime.hour,
+        notificationTime.minute,
+      );
+      
+      // If time already passed today, schedule for tomorrow
+      if (scheduledDateTime.isBefore(now)) {
+        scheduledDateTime = scheduledDateTime.add(const Duration(days: 1));
+      }
+      
+      // Schedule alarm
+      await AndroidAlarmManager.periodic(
+        const Duration(days: 1),
+        alarmId,
+        _showAthkarNotificationCallback,
+        startAt: scheduledDateTime,
+        exact: true,
+        wakeup: true,
+        rescheduleOnReboot: true,
+        params: {
+          'categoryId': category.id,
+          'notificationId': _getNotificationIdFromCategoryId(category.id),
+          'title': title,
+          'body': body,
+        },
+      );
+    } catch (e) {
+      print('Error scheduling background alarm: $e');
     }
-    
-    // Schedule alarm
-    await AndroidAlarmManager.periodic(
-      const Duration(days: 1),
-      alarmId,
-      _showAthkarNotificationCallback,
-      startAt: scheduledDateTime,
-      exact: true,
-      wakeup: true,
-      rescheduleOnReboot: true,
-      params: {
-        'categoryId': category.id,
-        'notificationId': _getNotificationIdFromCategoryId(category.id),
-        'title': title,
-        'body': body,
-      },
-    );
   }
   
   // Get alarm ID based on category ID
@@ -262,41 +266,57 @@ class NotificationService {
   static Future<void> _showAthkarNotificationCallback(int id, Map<String, dynamic>? params) async {
     if (params == null) return;
     
-    // Initialize notifications plugin
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
-    
-    // Set up notification details
-    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'athkar_channel_id',
-      'أذكار',
-      channelDescription: 'تنبيهات الأذكار',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    
-    final NotificationDetails notificationDetails = NotificationDetails(
-      android: androidDetails,
-    );
-    
-    // Extract notification data
-    final categoryId = params['categoryId'] as String;
-    final notificationId = params['notificationId'] as int;
-    final title = params['title'] as String;
-    final body = params['body'] as String;
-    
-    // Save for navigation if tapped
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('last_notification_payload', categoryId);
-    
-    // Show notification
-    await flutterLocalNotificationsPlugin.show(
-      notificationId,
-      title,
-      body,
-      notificationDetails,
-      payload: categoryId,
-    );
+    try {
+      // Initialize notifications plugin with proper initialization
+      final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+          FlutterLocalNotificationsPlugin();
+      
+      // Need to initialize the plugin before showing notifications
+      await flutterLocalNotificationsPlugin.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(),
+        ),
+      );
+      
+      // Set up notification details
+      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'athkar_channel_id',
+        'أذكار',
+        channelDescription: 'تنبيهات الأذكار',
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      
+      final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+      );
+      
+      // Extract notification data
+      final categoryId = params['categoryId'] as String;
+      final notificationId = params['notificationId'] as int;
+      final title = params['title'] as String;
+      final body = params['body'] as String;
+      
+      // Save for navigation if tapped
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_notification_payload', categoryId);
+      await prefs.setBool('opened_from_notification', true);
+      await prefs.setString('notification_payload', categoryId);
+      
+      // Show notification
+      await flutterLocalNotificationsPlugin.show(
+        notificationId,
+        title,
+        body,
+        notificationDetails,
+        payload: categoryId,
+      );
+      
+      print('Background notification showed successfully for category: $categoryId');
+    } catch (e) {
+      print('Error in background notification callback: $e');
+    }
   }
 
   // Schedule additional notifications for multiple reminder times
@@ -323,8 +343,8 @@ class NotificationService {
             final tz.TZDateTime scheduledDate = _getScheduledDate(additionalTime);
             
             // Set notification content
-            final title = category.notifyTitle ?? 'حان موعد ${category.title}';
-            final body = category.notifyBody ?? 'اضغط هنا لقراءة الأذكار';
+            final title = 'حان موعد ${category.title}';
+            final body = 'اضغط هنا لقراءة الأذكار';
             
             // Set notification details
             final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -333,16 +353,12 @@ class NotificationService {
               channelDescription: 'تنبيهات الأذكار',
               importance: Importance.high,
               priority: Priority.high,
-              sound: category.notifySound != null 
-                ? RawResourceAndroidNotificationSound(category.notifySound!) 
-                : null,
             );
             
             final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
               presentAlert: true,
               presentBadge: true,
               presentSound: true,
-              sound: category.notifySound != null ? '${category.notifySound}.aiff' : null,
             );
             
             final NotificationDetails notificationDetails = NotificationDetails(
@@ -459,28 +475,38 @@ class NotificationService {
 
   // Check if notifications are enabled for a category
   Future<bool> isNotificationEnabled(String categoryId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('notification_${categoryId}_enabled') ?? false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool('notification_${categoryId}_enabled') ?? false;
+    } catch (e) {
+      print('Error checking if notification is enabled: $e');
+      return false;
+    }
   }
 
   // Get saved notification time for a category
   Future<TimeOfDay?> getNotificationTime(String categoryId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final timeString = prefs.getString('notification_${categoryId}_time');
-    
-    if (timeString != null) {
-      final timeParts = timeString.split(':');
-      if (timeParts.length == 2) {
-        final hour = int.tryParse(timeParts[0]);
-        final minute = int.tryParse(timeParts[1]);
-        
-        if (hour != null && minute != null) {
-          return TimeOfDay(hour: hour, minute: minute);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timeString = prefs.getString('notification_${categoryId}_time');
+      
+      if (timeString != null) {
+        final timeParts = timeString.split(':');
+        if (timeParts.length == 2) {
+          final hour = int.tryParse(timeParts[0]);
+          final minute = int.tryParse(timeParts[1]);
+          
+          if (hour != null && minute != null) {
+            return TimeOfDay(hour: hour, minute: minute);
+          }
         }
       }
+      
+      return null;
+    } catch (e) {
+      print('Error getting notification time: $e');
+      return null;
     }
-    
-    return null;
   }
 
   // Schedule all saved notifications
@@ -540,12 +566,16 @@ class NotificationService {
   // Save notification settings
   Future<void> _saveNotificationSettings(
       String categoryId, bool isEnabled, TimeOfDay? notificationTime) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notification_${categoryId}_enabled', isEnabled);
-    
-    if (notificationTime != null) {
-      final timeString = '${notificationTime.hour}:${notificationTime.minute}';
-      await prefs.setString('notification_${categoryId}_time', timeString);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_${categoryId}_enabled', isEnabled);
+      
+      if (notificationTime != null) {
+        final timeString = '${notificationTime.hour}:${notificationTime.minute}';
+        await prefs.setString('notification_${categoryId}_time', timeString);
+      }
+    } catch (e) {
+      print('Error saving notification settings: $e');
     }
   }
 
@@ -715,6 +745,11 @@ class NotificationService {
   
   // Get pending notifications
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
-    return await flutterLocalNotificationsPlugin.pendingNotificationRequests();
+    try {
+      return await flutterLocalNotificationsPlugin.pendingNotificationRequests();
+    } catch (e) {
+      print('Error getting pending notifications: $e');
+      return [];
+    }
   }
 }

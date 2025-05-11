@@ -8,9 +8,8 @@ class AthkarCategory {
   final String? description;
   final List<Thikr> athkar;
   
-  // تحسين نظام الإشعارات
+  // تحسين نظام الإشعارات (تم إزالة notifySound لتبسيط نظام الإشعارات)
   final String? notifyTime; // الوقت الافتراضي للإشعارات (بصيغة "HH:MM")
-  final String? notifySound; // إضافة خيار الصوت المخصص لكل فئة
   final String? notifyTitle; // عنوان الإشعار المخصص
   final String? notifyBody; // نص الإشعار المخصص
   final bool hasMultipleReminders; // إمكانية تعيين تذكيرات متعددة
@@ -24,7 +23,6 @@ class AthkarCategory {
     this.description,
     required this.athkar,
     this.notifyTime,
-    this.notifySound,
     this.notifyTitle,
     this.notifyBody,
     this.hasMultipleReminders = false,
@@ -49,7 +47,6 @@ class AthkarCategory {
       description: json['description'],
       athkar: athkarList,
       notifyTime: json['notify_time'],
-      notifySound: json['notify_sound'],
       notifyTitle: json['notify_title'],
       notifyBody: json['notify_body'],
       hasMultipleReminders: json['has_multiple_reminders'] ?? false,
@@ -69,7 +66,6 @@ class AthkarCategory {
       'description': description,
       'athkar': athkar.map((thikr) => thikr.toJson()).toList(),
       'notify_time': notifyTime,
-      'notify_sound': notifySound,
       'notify_title': notifyTitle,
       'notify_body': notifyBody,
       'has_multiple_reminders': hasMultipleReminders,
@@ -104,7 +100,6 @@ class AthkarCategory {
     String? description,
     List<Thikr>? athkar,
     String? notifyTime,
-    String? notifySound,
     String? notifyTitle,
     String? notifyBody,
     bool? hasMultipleReminders,
@@ -118,7 +113,6 @@ class AthkarCategory {
       description: description ?? this.description,
       athkar: athkar ?? this.athkar,
       notifyTime: notifyTime ?? this.notifyTime,
-      notifySound: notifySound ?? this.notifySound,
       notifyTitle: notifyTitle ?? this.notifyTitle,
       notifyBody: notifyBody ?? this.notifyBody,
       hasMultipleReminders: hasMultipleReminders ?? this.hasMultipleReminders,
@@ -207,23 +201,17 @@ class Thikr {
   }
 }
 
-// نموذج لإعدادات الإشعارات
+// نموذج لإعدادات الإشعارات - تبسيط بإزالة خيارات الصوت المخصصة
 class NotificationSettings {
   final bool isEnabled;
   final String? customTime;
-  final String? customSound;
   final bool vibrate;
-  final bool showLed;
-  final Color? ledColor;
   final int? importance; // أهمية الإشعار (0-5)
 
   NotificationSettings({
     this.isEnabled = true,
     this.customTime,
-    this.customSound,
     this.vibrate = true,
-    this.showLed = true,
-    this.ledColor,
     this.importance = 4, // High importance by default
   });
   
@@ -232,10 +220,7 @@ class NotificationSettings {
     return NotificationSettings(
       isEnabled: json['is_enabled'] ?? true,
       customTime: json['custom_time'],
-      customSound: json['custom_sound'],
       vibrate: json['vibrate'] ?? true,
-      showLed: json['show_led'] ?? true,
-      ledColor: json['led_color'] != null ? Color(int.parse(json['led_color'])) : null,
       importance: json['importance'] ?? 4,
     );
   }
@@ -245,10 +230,7 @@ class NotificationSettings {
     return {
       'is_enabled': isEnabled,
       'custom_time': customTime,
-      'custom_sound': customSound,
       'vibrate': vibrate,
-      'show_led': showLed,
-      'led_color': ledColor?.value.toString(),
       'importance': importance,
     };
   }
@@ -257,19 +239,13 @@ class NotificationSettings {
   NotificationSettings copyWith({
     bool? isEnabled,
     String? customTime,
-    String? customSound,
     bool? vibrate,
-    bool? showLed,
-    Color? ledColor,
     int? importance,
   }) {
     return NotificationSettings(
       isEnabled: isEnabled ?? this.isEnabled,
       customTime: customTime ?? this.customTime,
-      customSound: customSound ?? this.customSound,
       vibrate: vibrate ?? this.vibrate,
-      showLed: showLed ?? this.showLed,
-      ledColor: ledColor ?? this.ledColor,
       importance: importance ?? this.importance,
     );
   }

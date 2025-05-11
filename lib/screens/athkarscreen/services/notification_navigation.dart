@@ -1,7 +1,7 @@
-// lib/services/notification_navigation.dart
+// lib/screens/athkarscreen/services/notification_navigation.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
+import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
 
@@ -11,19 +11,23 @@ class NotificationNavigation {
   
   /// Initialize notification navigation
   static Future<void> initialize() async {
-    // Check if app was opened from notification
-    final isFromNotification = await checkNotificationOpen();
-    if (isFromNotification) {
-      final payload = await getNotificationPayload();
-      if (payload != null && payload.isNotEmpty) {
-        // Delay navigation to ensure app is fully loaded
-        Future.delayed(const Duration(milliseconds: 500), () {
-          handleNotificationNavigation(payload);
-        });
+    try {
+      // Check if app was opened from notification
+      final isFromNotification = await checkNotificationOpen();
+      if (isFromNotification) {
+        final payload = await getNotificationPayload();
+        if (payload != null && payload.isNotEmpty) {
+          // Delay navigation to ensure app is fully loaded
+          Future.delayed(const Duration(milliseconds: 500), () {
+            handleNotificationNavigation(payload);
+          });
+        }
+        
+        // Clear notification data
+        await clearNotificationData();
       }
-      
-      // Clear notification data
-      await clearNotificationData();
+    } catch (e) {
+      print('Error initializing notification navigation: $e');
     }
   }
   
@@ -64,26 +68,32 @@ class NotificationNavigation {
   static Future<void> handleNotificationNavigation(String payload) async {
     if (payload.isEmpty) return;
     
-    // Extract category ID and any additional parameters
-    final parts = payload.split(':');
-    final categoryId = parts[0];
-    
-    // Get navigator context
-    final context = navigatorKey.currentState?.context;
-    if (context == null) return;
-    
-    // Load the Athkar category
-    final AthkarService athkarService = AthkarService();
-    final category = await athkarService.getAthkarCategory(categoryId);
-    
-    if (category != null) {
-      // Navigate to Athkar details screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AthkarDetailsScreen(category: category),
-        ),
-      );
+    try {
+      // Extract category ID and any additional parameters
+      final parts = payload.split(':');
+      final categoryId = parts[0];
+      
+      // Get navigator context
+      final context = navigatorKey.currentState?.context;
+      if (context == null) return;
+      
+      // Load the Athkar category
+      final AthkarService athkarService = AthkarService();
+      final category = await athkarService.getAthkarCategory(categoryId);
+      
+      if (category != null) {
+        // Navigate to Athkar details screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AthkarDetailsScreen(category: category),
+          ),
+        );
+      } else {
+        print('Could not find category: $categoryId');
+      }
+    } catch (e) {
+      print('Error handling notification navigation: $e');
     }
   }
   

@@ -93,7 +93,15 @@ class NotificationInfoScreen extends StatelessWidget {
                     icon: Icons.warning_amber,
                     title: 'المنطقة الزمنية',
                     color: kPrimary,
-                    content: 'يعتمد التطبيق على المنطقة الزمنية "آسيا/الرياض" كمنطقة زمنية ثابتة. إذا كنت تعيش في منطقة زمنية مختلفة، فقد تصلك الإشعارات في أوقات غير مناسبة. يمكنك تعديل الأوقات بما يناسب منطقتك الزمنية.',
+                    content: 'يعتمد التطبيق على المنطقة الزمنية للجهاز. إذا كنت تسافر أو تغير المنطقة الزمنية، قد تحتاج إلى إعادة ضبط أوقات الإشعارات بما يناسب المنطقة الزمنية الجديدة.',
+                  ),
+                  
+                  _buildInfoCard(
+                    context,
+                    icon: Icons.update,
+                    title: 'تحديث التطبيق',
+                    color: kPrimary,
+                    content: 'تأكد من أنك تستخدم أحدث إصدار من التطبيق للاستفادة من التحسينات المستمرة في نظام الإشعارات.',
                   ),
                   
                   _buildTroubleshootingTips(context),
@@ -328,14 +336,6 @@ class NotificationInfoScreen extends StatelessWidget {
                     
                     _buildTroubleshootingTip(
                       number: '3',
-                      title: 'لا يوجد صوت للإشعارات',
-                      content: 'تأكد من عدم كتم صوت الإشعارات في إعدادات جهازك.',
-                    ),
-                    
-                    Divider(color: Colors.white.withOpacity(0.1), height: 24),
-                    
-                    _buildTroubleshootingTip(
-                      number: '4',
                       title: 'الإشعارات تتوقف بعد فترة',
                       content: 'أجهزة الأندرويد تميل إلى إيقاف التطبيقات في الخلفية لتوفير البطارية. قم بإضافة التطبيق إلى قائمة الاستثناءات من إعدادات "توفير البطارية" أو "تحسين البطارية" في جهازك.',
                     ),
@@ -343,9 +343,25 @@ class NotificationInfoScreen extends StatelessWidget {
                     Divider(color: Colors.white.withOpacity(0.1), height: 24),
                     
                     _buildTroubleshootingTip(
-                      number: '5',
+                      number: '4',
                       title: 'إعادة تشغيل التطبيق',
                       content: 'في حال استمرار المشكلة، حاول إعادة تشغيل التطبيق أو إعادة تشغيل الجهاز.',
+                    ),
+                    
+                    Divider(color: Colors.white.withOpacity(0.1), height: 24),
+                    
+                    _buildTroubleshootingTip(
+                      number: '5',
+                      title: 'إعادة تثبيت التطبيق',
+                      content: 'إذا استمرت المشكلة، قم بإلغاء تثبيت التطبيق ثم إعادة تثبيته. لاحظ أن هذا سيؤدي إلى فقدان إعدادات الإشعارات الحالية.',
+                    ),
+                    
+                    Divider(color: Colors.white.withOpacity(0.1), height: 24),
+                    
+                    _buildTroubleshootingTip(
+                      number: '6',
+                      title: 'التأكد من التحديثات',
+                      content: 'تأكد من تحديث التطبيق إلى أحدث إصدار من متجر التطبيقات.',
                     ),
                   ],
                 ),

@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
+import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
 import 'package:test_athkar_app/screens/athkarscreen/notification_info_screen.dart';
@@ -24,7 +24,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   bool _isLoading = true;
   bool _masterSwitch = true;
   
-  // Variable para la zona horaria del dispositivo
+  // Variable for device timezone
   String _deviceTimeZone = '';
   
   // Maps to track notification settings
@@ -46,7 +46,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       vsync: this,
     );
     
-    // Obtener zona horaria del dispositivo
+    // Get device timezone
     _deviceTimeZone = _notificationService.getCurrentTimezoneName();
     
     _loadData();

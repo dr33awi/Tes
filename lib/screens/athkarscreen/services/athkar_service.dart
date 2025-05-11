@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_athkar_app/screens/athkarscreen/athkar_model.dart';
+import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 
 class AthkarService {
   // Singleton implementation
@@ -12,19 +12,6 @@ class AthkarService {
 
   // Cache for loaded athkar to avoid repeated file reads
   Map<String, AthkarCategory> _athkarCache = {};
-  
-  // قائمة بمصادر صوتية مخصصة للإشعارات
-  final Map<String, String> availableNotificationSounds = {
-    'azan': 'أذان',
-    'short_azan': 'أذان قصير',
-    'dua': 'دعاء',
-    'reminder': 'تنبيه',
-    'quran': 'تلاوة قرآن',
-    'birds': 'عصافير',
-    'nature': 'أصوات طبيعة',
-    'bell': 'جرس',
-    'default': 'الصوت الافتراضي',
-  };
 
   // Load athkar from JSON file
   Future<List<AthkarCategory>> loadAllAthkarCategories() async {
@@ -101,7 +88,7 @@ class AthkarService {
       }
     }
     
-    // Create and return category with enhanced notification properties
+    // Create and return category with notification properties
     return AthkarCategory(
       id: data['id'],
       title: data['title'],
@@ -110,7 +97,6 @@ class AthkarService {
       description: data['description'],
       athkar: athkarList,
       notifyTime: data['notify_time'],
-      notifySound: data['notify_sound'],
       notifyTitle: data['notify_title'],
       notifyBody: data['notify_body'],
       hasMultipleReminders: data['has_multiple_reminders'] ?? false,
@@ -165,118 +151,162 @@ class AthkarService {
   
   // Check if a thikr is favorited
   Future<bool> isFavorite(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'favorite_${categoryId}_$thikrIndex';
-    return prefs.getBool(key) ?? false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'favorite_${categoryId}_$thikrIndex';
+      return prefs.getBool(key) ?? false;
+    } catch (e) {
+      print('Error checking favorite status: $e');
+      return false;
+    }
   }
   
   // Toggle favorite status
   Future<void> toggleFavorite(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'favorite_${categoryId}_$thikrIndex';
-    final currentValue = prefs.getBool(key) ?? false;
-    await prefs.setBool(key, !currentValue);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'favorite_${categoryId}_$thikrIndex';
+      final currentValue = prefs.getBool(key) ?? false;
+      
+      // Toggle the value
+      await prefs.setBool(key, !currentValue);
+      
+      // If it's being added to favorites, save the date
+      if (!currentValue) {
+        await saveFavoriteAddedDate(categoryId, thikrIndex);
+      }
+    } catch (e) {
+      print('Error toggling favorite: $e');
+    }
   }
   
   // Get all favorites with improved sorting
   Future<List<FavoriteThikr>> getAllFavorites({String? sortBy}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final favoriteKeys = prefs.getKeys().where((key) => key.startsWith('favorite_'));
-    
-    List<FavoriteThikr> favorites = [];
-    
-    for (final key in favoriteKeys) {
-      final isFavorite = prefs.getBool(key) ?? false;
-      if (isFavorite) {
-        // Parse the key to get categoryId and thikrIndex
-        final parts = key.split('_');
-        if (parts.length >= 3) {
-          final categoryId = parts[1];
-          final thikrIndex = int.parse(parts[2]);
-          
-          // Load the category and thikr
-          final category = await getAthkarCategory(categoryId);
-          if (category != null && thikrIndex < category.athkar.length) {
-            favorites.add(FavoriteThikr(
-              category: category,
-              thikr: category.athkar[thikrIndex],
-              thikrIndex: thikrIndex,
-              dateAdded: await getFavoriteAddedDate(categoryId, thikrIndex) ?? DateTime.now(),
-            ));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final favoriteKeys = prefs.getKeys().where((key) => key.startsWith('favorite_') && !key.startsWith('favorite_date_'));
+      
+      List<FavoriteThikr> favorites = [];
+      
+      for (final key in favoriteKeys) {
+        final isFavorite = prefs.getBool(key) ?? false;
+        if (isFavorite) {
+          // Parse the key to get categoryId and thikrIndex
+          final parts = key.split('_');
+          if (parts.length >= 3) {
+            try {
+              final categoryId = parts[1];
+              final thikrIndex = int.parse(parts[2]);
+              
+              // Load the category and thikr
+              final category = await getAthkarCategory(categoryId);
+              if (category != null && thikrIndex < category.athkar.length) {
+                favorites.add(FavoriteThikr(
+                  category: category,
+                  thikr: category.athkar[thikrIndex],
+                  thikrIndex: thikrIndex,
+                  dateAdded: await getFavoriteAddedDate(categoryId, thikrIndex) ?? DateTime.now(),
+                ));
+              }
+            } catch (e) {
+              print('Error parsing favorite key $key: $e');
+              continue;
+            }
           }
         }
       }
-    }
-    
-    // Sort favorites based on sortBy parameter
-    if (sortBy != null) {
-      switch (sortBy) {
-        case 'category':
-          favorites.sort((a, b) => a.category.title.compareTo(b.category.title));
-          break;
-        case 'date_added_newest':
-          favorites.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
-          break;
-        case 'date_added_oldest':
-          favorites.sort((a, b) => a.dateAdded.compareTo(b.dateAdded));
-          break;
-        case 'length':
-          favorites.sort((a, b) => a.thikr.text.length.compareTo(b.thikr.text.length));
-          break;
-        case 'count':
-          favorites.sort((a, b) => a.thikr.count.compareTo(b.thikr.count));
-          break;
+      
+      // Sort favorites based on sortBy parameter
+      if (sortBy != null) {
+        switch (sortBy) {
+          case 'category':
+            favorites.sort((a, b) => a.category.title.compareTo(b.category.title));
+            break;
+          case 'date_added_newest':
+            favorites.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
+            break;
+          case 'date_added_oldest':
+            favorites.sort((a, b) => a.dateAdded.compareTo(b.dateAdded));
+            break;
+          case 'length':
+            favorites.sort((a, b) => a.thikr.text.length.compareTo(b.thikr.text.length));
+            break;
+          case 'count':
+            favorites.sort((a, b) => a.thikr.count.compareTo(b.thikr.count));
+            break;
+        }
       }
+      
+      return favorites;
+    } catch (e) {
+      print('Error getting all favorites: $e');
+      return [];
     }
-    
-    return favorites;
   }
   
   // Save the date when a thikr was added to favorites
   Future<void> saveFavoriteAddedDate(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'favorite_date_${categoryId}_$thikrIndex';
-    await prefs.setString(key, DateTime.now().toIso8601String());
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'favorite_date_${categoryId}_$thikrIndex';
+      await prefs.setString(key, DateTime.now().toIso8601String());
+    } catch (e) {
+      print('Error saving favorite added date: $e');
+    }
   }
   
   // Get the date when a thikr was added to favorites
   Future<DateTime?> getFavoriteAddedDate(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'favorite_date_${categoryId}_$thikrIndex';
-    final dateString = prefs.getString(key);
-    return dateString != null ? DateTime.parse(dateString) : null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'favorite_date_${categoryId}_$thikrIndex';
+      final dateString = prefs.getString(key);
+      return dateString != null ? DateTime.parse(dateString) : null;
+    } catch (e) {
+      print('Error getting favorite added date: $e');
+      return null;
+    }
   }
   
   // Get thikr count
   Future<int> getThikrCount(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'count_${categoryId}_$thikrIndex';
-    return prefs.getInt(key) ?? 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'count_${categoryId}_$thikrIndex';
+      return prefs.getInt(key) ?? 0;
+    } catch (e) {
+      print('Error getting thikr count: $e');
+      return 0;
+    }
   }
   
   // Update thikr count
   Future<void> updateThikrCount(String categoryId, int thikrIndex, int count) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'count_${categoryId}_$thikrIndex';
-    await prefs.setInt(key, count);
-    
-    // إذا كان هذا هو أول إكمال للذكر، قم بتسجيل تاريخ الإكمال
-    if (count > 0) {
-      final completionCountKey = 'completion_count_${categoryId}_$thikrIndex';
-      final currentCompletions = prefs.getInt(completionCountKey) ?? 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'count_${categoryId}_$thikrIndex';
+      await prefs.setInt(key, count);
       
-      if (currentCompletions == 0) {
-        // تسجيل تاريخ أول إكمال
-        final firstCompletionKey = 'first_completion_${categoryId}_$thikrIndex';
-        await prefs.setString(firstCompletionKey, DateTime.now().toIso8601String());
+      // إذا كان هذا هو أول إكمال للذكر، قم بتسجيل تاريخ الإكمال
+      if (count > 0) {
+        final completionCountKey = 'completion_count_${categoryId}_$thikrIndex';
+        final currentCompletions = prefs.getInt(completionCountKey) ?? 0;
+        
+        if (currentCompletions == 0) {
+          // تسجيل تاريخ أول إكمال
+          final firstCompletionKey = 'first_completion_${categoryId}_$thikrIndex';
+          await prefs.setString(firstCompletionKey, DateTime.now().toIso8601String());
+        }
+        
+        // زيادة عدد مرات الإكمال
+        await prefs.setInt(completionCountKey, currentCompletions + 1);
+        
+        // تسجيل تاريخ آخر إكمال
+        final lastCompletionKey = 'last_completion_${categoryId}_$thikrIndex';
+        await prefs.setString(lastCompletionKey, DateTime.now().toIso8601String());
       }
-      
-      // زيادة عدد مرات الإكمال
-      await prefs.setInt(completionCountKey, currentCompletions + 1);
-      
-      // تسجيل تاريخ آخر إكمال
-      final lastCompletionKey = 'last_completion_${categoryId}_$thikrIndex';
-      await prefs.setString(lastCompletionKey, DateTime.now().toIso8601String());
+    } catch (e) {
+      print('Error updating thikr count: $e');
     }
   }
 
@@ -284,170 +314,235 @@ class AthkarService {
   
   // الحصول على إعدادات الإشعارات الكاملة لفئة معينة
   Future<NotificationSettings> getNotificationSettings(String categoryId) async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // الحصول على الإعدادات الأساسية
-    final enabled = prefs.getBool('notification_${categoryId}_enabled') ?? true;
-    final customTime = prefs.getString('notification_${categoryId}_custom_time');
-    final customSound = prefs.getString('notification_${categoryId}_custom_sound');
-    final vibrate = prefs.getBool('notification_${categoryId}_vibrate') ?? true;
-    final showLed = prefs.getBool('notification_${categoryId}_show_led') ?? true;
-    
-    // استرجاع لون LED إذا كان موجوداً
-    final ledColorString = prefs.getString('notification_${categoryId}_led_color');
-    Color? ledColor;
-    if (ledColorString != null) {
-      try {
-        ledColor = Color(int.parse(ledColorString));
-      } catch (e) {
-        print('Error parsing LED color: $e');
-      }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // الحصول على الإعدادات الأساسية
+      final enabled = prefs.getBool('notification_${categoryId}_enabled') ?? true;
+      final customTime = prefs.getString('notification_${categoryId}_time');
+      final vibrate = prefs.getBool('notification_${categoryId}_vibrate') ?? true;
+      
+      // استرجاع أهمية الإشعار
+      final importance = prefs.getInt('notification_${categoryId}_importance') ?? 4;
+      
+      return NotificationSettings(
+        isEnabled: enabled,
+        customTime: customTime,
+        vibrate: vibrate,
+        importance: importance,
+      );
+    } catch (e) {
+      print('Error getting notification settings: $e');
+      return NotificationSettings();
     }
-    
-    // استرجاع أهمية الإشعار
-    final importance = prefs.getInt('notification_${categoryId}_importance') ?? 4;
-    
-    return NotificationSettings(
-      isEnabled: enabled,
-      customTime: customTime,
-      customSound: customSound,
-      vibrate: vibrate,
-      showLed: showLed,
-      ledColor: ledColor,
-      importance: importance,
-    );
   }
   
   // حفظ إعدادات الإشعارات الكاملة لفئة معينة
   Future<void> saveNotificationSettings(String categoryId, NotificationSettings settings) async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    await prefs.setBool('notification_${categoryId}_enabled', settings.isEnabled);
-    
-    if (settings.customTime != null) {
-      await prefs.setString('notification_${categoryId}_custom_time', settings.customTime!);
-    } else {
-      await prefs.remove('notification_${categoryId}_custom_time');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      await prefs.setBool('notification_${categoryId}_enabled', settings.isEnabled);
+      
+      if (settings.customTime != null) {
+        await prefs.setString('notification_${categoryId}_time', settings.customTime!);
+      } else {
+        await prefs.remove('notification_${categoryId}_time');
+      }
+      
+      await prefs.setBool('notification_${categoryId}_vibrate', settings.vibrate);
+      
+      await prefs.setInt('notification_${categoryId}_importance', settings.importance ?? 4);
+    } catch (e) {
+      print('Error saving notification settings: $e');
     }
-    
-    if (settings.customSound != null) {
-      await prefs.setString('notification_${categoryId}_custom_sound', settings.customSound!);
-    } else {
-      await prefs.remove('notification_${categoryId}_custom_sound');
-    }
-    
-    await prefs.setBool('notification_${categoryId}_vibrate', settings.vibrate);
-    await prefs.setBool('notification_${categoryId}_show_led', settings.showLed);
-    
-    if (settings.ledColor != null) {
-      await prefs.setString('notification_${categoryId}_led_color', settings.ledColor!.value.toString());
-    } else {
-      await prefs.remove('notification_${categoryId}_led_color');
-    }
-    
-    await prefs.setInt('notification_${categoryId}_importance', settings.importance ?? 4);
   }
   
   // تبسيط - الحصول على حالة تفعيل الإشعار
   Future<bool> getNotificationEnabled(String categoryId) async {
-    final settings = await getNotificationSettings(categoryId);
-    return settings.isEnabled;
+    try {
+      final settings = await getNotificationSettings(categoryId);
+      return settings.isEnabled;
+    } catch (e) {
+      print('Error checking if notification is enabled: $e');
+      return false;
+    }
   }
   
   // تبسيط - ضبط حالة تفعيل الإشعار
   Future<void> setNotificationEnabled(String categoryId, bool enabled) async {
-    final settings = await getNotificationSettings(categoryId);
-    await saveNotificationSettings(
-      categoryId, 
-      settings.copyWith(isEnabled: enabled)
-    );
+    try {
+      final settings = await getNotificationSettings(categoryId);
+      await saveNotificationSettings(
+        categoryId, 
+        settings.copyWith(isEnabled: enabled)
+      );
+    } catch (e) {
+      print('Error setting notification enabled status: $e');
+    }
   }
   
   // تبسيط - الحصول على وقت الإشعار المخصص
   Future<String?> getCustomNotificationTime(String categoryId) async {
-    final settings = await getNotificationSettings(categoryId);
-    return settings.customTime;
+    try {
+      final settings = await getNotificationSettings(categoryId);
+      return settings.customTime;
+    } catch (e) {
+      print('Error getting custom notification time: $e');
+      return null;
+    }
   }
   
   // تبسيط - ضبط وقت الإشعار المخصص
   Future<void> setCustomNotificationTime(String categoryId, String time) async {
-    final settings = await getNotificationSettings(categoryId);
-    await saveNotificationSettings(
-      categoryId, 
-      settings.copyWith(customTime: time)
-    );
+    try {
+      final settings = await getNotificationSettings(categoryId);
+      await saveNotificationSettings(
+        categoryId, 
+        settings.copyWith(customTime: time)
+      );
+    } catch (e) {
+      print('Error setting custom notification time: $e');
+    }
   }
   
   // الحصول على قائمة الأوقات الإضافية للإشعارات
   Future<List<String>> getAdditionalNotificationTimes(String categoryId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'notification_${categoryId}_additional_times';
-    final jsonList = prefs.getString(key);
-    
-    if (jsonList != null) {
-      try {
-        final List<dynamic> decoded = json.decode(jsonList);
-        return decoded.map((item) => item.toString()).toList();
-      } catch (e) {
-        print('Error decoding additional times: $e');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'notification_${categoryId}_additional_times';
+      final jsonList = prefs.getString(key);
+      
+      if (jsonList != null) {
+        try {
+          final List<dynamic> decoded = json.decode(jsonList);
+          return decoded.map((item) => item.toString()).toList();
+        } catch (e) {
+          print('Error decoding additional times: $e');
+        }
       }
+      
+      return [];
+    } catch (e) {
+      print('Error getting additional notification times: $e');
+      return [];
     }
-    
-    return [];
   }
   
   // حفظ قائمة الأوقات الإضافية للإشعارات
   Future<void> saveAdditionalNotificationTimes(String categoryId, List<String> times) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'notification_${categoryId}_additional_times';
-    await prefs.setString(key, json.encode(times));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'notification_${categoryId}_additional_times';
+      await prefs.setString(key, json.encode(times));
+    } catch (e) {
+      print('Error saving additional notification times: $e');
+    }
   }
   
   // إضافة وقت إشعار إضافي
   Future<void> addAdditionalNotificationTime(String categoryId, String time) async {
-    final times = await getAdditionalNotificationTimes(categoryId);
-    if (!times.contains(time)) {
-      times.add(time);
-      await saveAdditionalNotificationTimes(categoryId, times);
+    try {
+      final times = await getAdditionalNotificationTimes(categoryId);
+      if (!times.contains(time)) {
+        times.add(time);
+        await saveAdditionalNotificationTimes(categoryId, times);
+      }
+    } catch (e) {
+      print('Error adding additional notification time: $e');
     }
   }
   
   // حذف وقت إشعار إضافي
   Future<void> removeAdditionalNotificationTime(String categoryId, String time) async {
-    final times = await getAdditionalNotificationTimes(categoryId);
-    times.remove(time);
-    await saveAdditionalNotificationTimes(categoryId, times);
+    try {
+      final times = await getAdditionalNotificationTimes(categoryId);
+      times.remove(time);
+      await saveAdditionalNotificationTimes(categoryId, times);
+    } catch (e) {
+      print('Error removing additional notification time: $e');
+    }
   }
 
   // إحصائيات الأذكار
   
   // الحصول على عدد مرات إكمال ذكر معين
   Future<int> getThikrCompletionCount(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'completion_count_${categoryId}_$thikrIndex';
-    return prefs.getInt(key) ?? 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'completion_count_${categoryId}_$thikrIndex';
+      return prefs.getInt(key) ?? 0;
+    } catch (e) {
+      print('Error getting thikr completion count: $e');
+      return 0;
+    }
   }
   
   // الحصول على تاريخ أول إكمال لذكر معين
   Future<DateTime?> getThikrFirstCompletionDate(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'first_completion_${categoryId}_$thikrIndex';
-    final dateString = prefs.getString(key);
-    return dateString != null ? DateTime.parse(dateString) : null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'first_completion_${categoryId}_$thikrIndex';
+      final dateString = prefs.getString(key);
+      return dateString != null ? DateTime.parse(dateString) : null;
+    } catch (e) {
+      print('Error getting thikr first completion date: $e');
+      return null;
+    }
   }
   
   // الحصول على تاريخ آخر إكمال لذكر معين
   Future<DateTime?> getThikrLastCompletionDate(String categoryId, int thikrIndex) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'last_completion_${categoryId}_$thikrIndex';
-    final dateString = prefs.getString(key);
-    return dateString != null ? DateTime.parse(dateString) : null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'last_completion_${categoryId}_$thikrIndex';
+      final dateString = prefs.getString(key);
+      return dateString != null ? DateTime.parse(dateString) : null;
+    } catch (e) {
+      print('Error getting thikr last completion date: $e');
+      return null;
+    }
   }
   
   // الحصول على إحصائيات إكمال لفئة كاملة
   Future<CategoryStats> getCategoryStats(String categoryId) async {
-    final category = await getAthkarCategory(categoryId);
-    if (category == null) {
+    try {
+      final category = await getAthkarCategory(categoryId);
+      if (category == null) {
+        return CategoryStats(
+          totalCompletions: 0,
+          totalThikrs: 0,
+          completedThikrs: 0,
+          lastCompletionDate: null,
+        );
+      }
+      
+      int totalCompletions = 0;
+      int completedThikrs = 0;
+      DateTime? lastCompletionDate;
+      
+      for (int i = 0; i < category.athkar.length; i++) {
+        final completions = await getThikrCompletionCount(categoryId, i);
+        totalCompletions += completions;
+        
+        if (completions > 0) {
+          completedThikrs++;
+          
+          final date = await getThikrLastCompletionDate(categoryId, i);
+          if (date != null && (lastCompletionDate == null || date.isAfter(lastCompletionDate))) {
+            lastCompletionDate = date;
+          }
+        }
+      }
+      
+      return CategoryStats(
+        totalCompletions: totalCompletions,
+        totalThikrs: category.athkar.length,
+        completedThikrs: completedThikrs,
+        lastCompletionDate: lastCompletionDate,
+      );
+    } catch (e) {
+      print('Error getting category stats: $e');
       return CategoryStats(
         totalCompletions: 0,
         totalThikrs: 0,
@@ -455,49 +550,33 @@ class AthkarService {
         lastCompletionDate: null,
       );
     }
-    
-    int totalCompletions = 0;
-    int completedThikrs = 0;
-    DateTime? lastCompletionDate;
-    
-    for (int i = 0; i < category.athkar.length; i++) {
-      final completions = await getThikrCompletionCount(categoryId, i);
-      totalCompletions += completions;
-      
-      if (completions > 0) {
-        completedThikrs++;
-        
-        final date = await getThikrLastCompletionDate(categoryId, i);
-        if (date != null && (lastCompletionDate == null || date.isAfter(lastCompletionDate))) {
-          lastCompletionDate = date;
-        }
-      }
-    }
-    
-    return CategoryStats(
-      totalCompletions: totalCompletions,
-      totalThikrs: category.athkar.length,
-      completedThikrs: completedThikrs,
-      lastCompletionDate: lastCompletionDate,
-    );
   }
   
   // الحصول على إحصائيات إكمال لجميع الفئات
   Future<Map<String, CategoryStats>> getAllCategoriesStats() async {
-    final categories = await loadAllAthkarCategories();
-    final Map<String, CategoryStats> stats = {};
-    
-    for (final category in categories) {
-      stats[category.id] = await getCategoryStats(category.id);
+    try {
+      final categories = await loadAllAthkarCategories();
+      final Map<String, CategoryStats> stats = {};
+      
+      for (final category in categories) {
+        stats[category.id] = await getCategoryStats(category.id);
+      }
+      
+      return stats;
+    } catch (e) {
+      print('Error getting all categories stats: $e');
+      return {};
     }
-    
-    return stats;
   }
   
   // مسح الإعدادات وبدء من جديد
   Future<void> resetAllData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    } catch (e) {
+      print('Error resetting all data: $e');
+    }
   }
 }
 
