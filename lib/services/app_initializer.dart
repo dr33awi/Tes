@@ -6,19 +6,19 @@ import 'package:test_athkar_app/services/notification_service.dart';
 import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/do_not_disturb_service.dart';
-import 'package:test_athkar_app/services/ios_notification_service.dart';
-import 'package:test_athkar_app/services/notification_grouping_service.dart';
+import 'package:test_athkar_app/services/di_container.dart';
 
 /// فئة مساعدة لتهيئة خدمات التطبيق
 class AppInitializer {
-  // خدمات التبعية المعكوسة
-  static final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
-  static late NotificationService _notificationService;
-  static late BatteryOptimizationService _batteryOptimizationService;
-  static late DoNotDisturbService _doNotDisturbService;
+  // مؤشر لمعرفة ما إذا تمت تهيئة التطبيق بالفعل
+  static bool _isInitialized = false;
   
   /// تهيئة جميع خدمات التطبيق
-  static Future<void> initialize() async {
+  static Future<bool> initialize() async {
+    if (_isInitialized) {
+      return true;
+    }
+    
     try {
       // تعيين اتجاه الشاشة
       await SystemChrome.setPreferredOrientations([
@@ -26,8 +26,8 @@ class AppInitializer {
         DeviceOrientation.portraitDown,
       ]);
       
-      // تهيئة الخدمات باستخدام التبعية المعكوسة
-      _initializeServices();
+      // تهيئة حاوية التبعيات
+      await setupServiceLocator();
       
       // تهيئة خدمة الإشعارات
       await _initializeNotifications();
@@ -35,31 +35,21 @@ class AppInitializer {
       // تهيئة التنقل من الإشعارات
       await NotificationNavigation.initialize();
       
+      _isInitialized = true;
       print("اكتملت تهيئة التطبيق بنجاح");
+      return true;
     } catch (e) {
-      _errorLoggingService.logError('AppInitializer', 'خطأ في تهيئة التطبيق', e);
-    }
-  }
-  
-  /// تهيئة الخدمات باستخدام التبعية المعكوسة
-  static void _initializeServices() {
-    try {
-      // إنشاء كائنات الخدمات المطلوبة
-      final iosNotificationService = IOSNotificationService();
-      final notificationGroupingService = NotificationGroupingService();
-      _batteryOptimizationService = BatteryOptimizationService();
-      _doNotDisturbService = DoNotDisturbService();
-      
-      // تهيئة خدمة الإشعارات مع كائنات التبعية المعكوسة
-      _notificationService = NotificationService(
-        errorLoggingService: _errorLoggingService,
-        doNotDisturbService: _doNotDisturbService,
-        iosNotificationService: iosNotificationService,
-        notificationGroupingService: notificationGroupingService,
-        batteryOptimizationService: _batteryOptimizationService,
-      );
-    } catch (e) {
-      _errorLoggingService.logError('AppInitializer', 'خطأ في تهيئة الخدمات', e);
+      // في حالة عدم تهيئة serviceLocator بعد، استخدم ErrorLoggingService مباشرةً
+      if (serviceLocator.isRegistered<ErrorLoggingService>()) {
+        serviceLocator<ErrorLoggingService>().logError(
+          'AppInitializer', 
+          'خطأ في تهيئة التطبيق', 
+          e
+        );
+      } else {
+        print('خطأ في تهيئة التطبيق: $e');
+      }
+      return false;
     }
   }
   
@@ -68,22 +58,33 @@ class AppInitializer {
     try {
       print("جاري تهيئة خدمات الإشعارات...");
       
-      final initialized = await _notificationService.initialize();
+      final NotificationService notificationService = 
+          serviceLocator<NotificationService>();
+      
+      final initialized = await notificationService.initialize();
       
       if (initialized) {
         print("تم تهيئة خدمة الإشعارات بنجاح");
         
         // إعادة جدولة جميع الإشعارات المحفوظة للتأكد من عملها
-        await _notificationService.scheduleAllSavedNotifications();
+        await notificationService.scheduleAllSavedNotifications();
         
         // التحقق من الإشعارات المعلقة (معلومات التصحيح)
-        final pendingNotifications = await _notificationService.getPendingNotifications();
+        final pendingNotifications = await notificationService.getPendingNotifications();
         print("عدد الإشعارات المعلقة: ${pendingNotifications.length}");
       } else {
         print("فشل في تهيئة خدمة الإشعارات");
+        
+        // محاولة التهيئة مرة أخرى بعد فترة
+        await Future.delayed(Duration(seconds: 2));
+        await notificationService.initialize();
       }
     } catch (e) {
-      _errorLoggingService.logError('AppInitializer', 'خطأ في تهيئة الإشعارات', e);
+      serviceLocator<ErrorLoggingService>().logError(
+        'AppInitializer', 
+        'خطأ في تهيئة الإشعارات', 
+        e
+      );
     }
   }
   
@@ -97,35 +98,54 @@ class AppInitializer {
     try {
       print("جاري التحقق من جداول الإشعارات...");
       
-      await _notificationService.scheduleAllSavedNotifications();
+      final NotificationService notificationService = 
+          serviceLocator<NotificationService>();
+      
+      await notificationService.scheduleAllSavedNotifications();
       
       print("اكتمل التحقق من الإشعارات");
     } catch (e) {
-      _errorLoggingService.logError('AppInitializer', 'خطأ في التحقق من الإشعارات', e);
+      serviceLocator<ErrorLoggingService>().logError(
+        'AppInitializer', 
+        'خطأ في التحقق من الإشعارات', 
+        e
+      );
     }
   }
   
   /// التحقق من تحسينات الإشعارات عند بدء التطبيق
+  /// مع تحسين منطق العمل لتجنب إزعاج المستخدم
   static Future<void> checkNotificationOptimizations(BuildContext context) async {
     try {
+      final BatteryOptimizationService batteryService = 
+          serviceLocator<BatteryOptimizationService>();
+      
+      final DoNotDisturbService dndService = 
+          serviceLocator<DoNotDisturbService>();
+      
       // التحقق من تحسينات البطارية
-      await _batteryOptimizationService.checkAndRequestBatteryOptimization(context);
+      if (await batteryService.shouldCheckBatteryOptimization()) {
+        await batteryService.checkAndRequestBatteryOptimization(context);
+      }
       
-      // التحقق من القيود الإضافية للبطارية
-      await _batteryOptimizationService.checkForAdditionalBatteryRestrictions(context);
+      // التحقق من وضع عدم الإزعاج بعد فترة قصيرة لتجنب عرض حوارات متعددة في وقت واحد
+      await Future.delayed(Duration(seconds: 1));
       
-      // التحقق من وضع عدم الإزعاج
-      final shouldPrompt = await _doNotDisturbService.shouldPromptAboutDoNotDisturb();
+      final shouldPrompt = await dndService.shouldPromptAboutDoNotDisturb();
       if (shouldPrompt) {
-        await _doNotDisturbService.showDoNotDisturbDialog(context);
+        await dndService.showDoNotDisturbDialog(context);
       }
     } catch (e) {
-      _errorLoggingService.logError('AppInitializer', 'خطأ في التحقق من تحسينات الإشعارات', e);
+      serviceLocator<ErrorLoggingService>().logError(
+        'AppInitializer', 
+        'خطأ في التحقق من تحسينات الإشعارات', 
+        e
+      );
     }
   }
   
   /// الحصول على كائن خدمة الإشعارات
   static NotificationService getNotificationService() {
-    return _notificationService;
+    return serviceLocator<NotificationService>();
   }
 }
