@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
-import 'package:test_athkar_app/services/notification_service.dart'; // استيراد خدمة الإشعارات الموحدة
+import 'package:test_athkar_app/services/notification_facade.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
-import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/notification_info_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/multiple_notifications_screen.dart';
+import 'package:test_athkar_app/screens/athkarscreen/screen/notification_diagnostics_screen.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -22,9 +22,8 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> with SingleTickerProviderStateMixin {
   final AthkarService _athkarService = AthkarService();
-  final NotificationService _notificationService = NotificationService(); // استخدام الخدمة الموحدة
+  final NotificationFacade _notificationFacade = NotificationFacade.instance;
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
-  final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
   
   List<AthkarCategory> _categories = [];
   bool _isLoading = true;
@@ -54,12 +53,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
     
     // Get device timezone
-    _deviceTimeZone = _notificationService.getCurrentTimezoneName();
+    _deviceTimeZone = DateTime.now().timeZoneName;
     
+    _checkPermissions();
     _loadData();
-    
-    // Check battery optimization
-    _checkBatteryOptimization();
   }
   
   @override
@@ -68,17 +65,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     super.dispose();
   }
 
-  // Check battery optimization
-  Future<void> _checkBatteryOptimization() async {
+  // Check permissions
+  Future<void> _checkPermissions() async {
     try {
-      // Check if notification permissions need to be requested
-      await Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _batteryOptimizationService.checkAndRequestBatteryOptimization(context);
-        }
-      });
+      final status = await _notificationFacade.checkAllPermissions(context);
+      if (!status.allPermissionsGranted) {
+        await _notificationFacade.requestAllPermissions(context);
+      }
     } catch (e) {
-      print('Error checking battery optimization: $e');
+      print('Error checking permissions: $e');
     }
   }
 
@@ -97,13 +92,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       final Map<String, int> additionalCountMap = {};
       
       for (final category in categories) {
-        // Load notification status
-        final isEnabled = await _notificationService.isNotificationEnabled(category.id);
-        enabledMap[category.id] = isEnabled;
+        // Get notification status from facade
+        final status = await _notificationFacade.getAthkarNotificationStatus(category.id);
+        enabledMap[category.id] = status.isEnabled;
         
-        // Load saved notification time
-        final savedTime = await _notificationService.getNotificationTime(category.id);
-        timeMap[category.id] = savedTime;
+        // Get saved notification times
+        if (status.scheduledTimes.isNotEmpty) {
+          timeMap[category.id] = status.scheduledTimes.first;
+        }
         
         // Check if category has multiple reminders
         final hasMultiple = category.hasMultipleReminders;
@@ -169,13 +165,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     setState(() => _masterSwitch = value);
     
     try {
-      // Apply setting to all categories
-      for (final category in _categories) {
-        await _toggleNotification(category, value, updateState: false);
+      if (value) {
+        // تفعيل جميع الإشعارات
+        await _notificationFacade.setAllNotificationsEnabled(true);
+        
+        // جدولة الإشعارات الافتراضية
+        await _notificationFacade.scheduleDefaultAthkarNotifications();
+      } else {
+        // إيقاف جميع الإشعارات
+        await _notificationFacade.setAllNotificationsEnabled(false);
       }
       
-      // Update UI
-      setState(() {});
+      // إعادة تحميل البيانات
+      await _loadData();
       
       // Show message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,15 +212,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   // Toggle notification for a specific category
-  Future<void> _toggleNotification(AthkarCategory category, bool value, {bool updateState = true}) async {
+  Future<void> _toggleNotification(AthkarCategory category, bool value) async {
     // Haptic feedback
     HapticFeedback.lightImpact();
     
     try {
       if (value) {
         // Enable notifications
-        
-        // Choose appropriate time for notification
         TimeOfDay? selectedTime = _notificationTimes[category.id];
         
         // If no saved time, use default time from category or show time picker
@@ -238,13 +238,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           
           // If no default time, show time picker
           if (selectedTime == null) {
-            // Suggest time based on category type
-            TimeOfDay suggestedTime = _notificationService.getSuggestedTimeForCategory(category.id);
-            
             // Show time picker
             final pickedTime = await showTimePicker(
               context: context,
-              initialTime: suggestedTime,
+              initialTime: getSuggestedTimeForCategory(category.id),
               builder: (context, child) {
                 return Theme(
                   data: Theme.of(context).copyWith(
@@ -266,13 +263,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             
             if (pickedTime == null) {
               // User canceled time selection
-              if (updateState) {
-                setState(() {
-                  _notificationsEnabled[category.id] = false;
-                });
-              } else {
+              setState(() {
                 _notificationsEnabled[category.id] = false;
-              }
+              });
               return;
             }
             
@@ -280,40 +273,49 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           }
         }
         
-        // Schedule notification using the unified service
-        await _notificationService.scheduleAthkarNotification(category, selectedTime!);
+        // Schedule notification using the facade
+        final result = await _notificationFacade.scheduleAthkarNotifications(
+          categoryId: category.id,
+          categoryTitle: category.title,
+          times: [selectedTime!],
+          customTitle: category.notifyTitle,
+          customBody: category.notifyBody,
+          color: category.color,
+        );
         
-        // Schedule additional notifications if category has multiple reminders
-        if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
-          await _notificationService.scheduleAdditionalNotifications(category);
-        }
-        
-        if (updateState) {
+        if (result.success) {
           setState(() {
             _notificationsEnabled[category.id] = true;
             _notificationTimes[category.id] = selectedTime;
           });
+          
+          // Update master switch
+          _updateMasterSwitch();
         } else {
-          _notificationsEnabled[category.id] = true;
-          _notificationTimes[category.id] = selectedTime;
+          // Show error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('حدث خطأ أثناء جدولة الإشعار'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: EdgeInsets.all(16),
+              duration: Duration(seconds: 2),
+            ),
+          );
         }
-        
-        // Update master switch
-        _updateMasterSwitch();
       } else {
         // Cancel notifications
-        await _notificationService.cancelAthkarNotification(category.id);
+        final success = await _notificationFacade.cancelAthkarNotifications(category.id);
         
-        if (updateState) {
+        if (success) {
           setState(() {
             _notificationsEnabled[category.id] = false;
           });
-        } else {
-          _notificationsEnabled[category.id] = false;
+          
+          // Update master switch
+          _updateMasterSwitch();
         }
-        
-        // Update master switch
-        _updateMasterSwitch();
       }
     } catch (e) {
       _errorLoggingService.logError(
@@ -344,7 +346,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     try {
       // Get current time
       TimeOfDay initialTime = _notificationTimes[category.id] ?? 
-                         _notificationService.getSuggestedTimeForCategory(category.id);
+                         getSuggestedTimeForCategory(category.id);
       
       // Show time picker
       final pickedTime = await showTimePicker(
@@ -377,24 +379,28 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         });
         
         // Schedule notification with new time
-        await _notificationService.scheduleAthkarNotification(category, pickedTime);
-        
-        // Schedule additional notifications if category has multiple reminders
-        if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
-          await _notificationService.scheduleAdditionalNotifications(category);
-        }
-        
-        // Show message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم تحديث وقت الإشعار لـ ${category.title}'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: kPrimary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: EdgeInsets.all(16),
-            duration: Duration(seconds: 2),
-          ),
+        final result = await _notificationFacade.scheduleAthkarNotifications(
+          categoryId: category.id,
+          categoryTitle: category.title,
+          times: [pickedTime],
+          customTitle: category.notifyTitle,
+          customBody: category.notifyBody,
+          color: category.color,
         );
+        
+        if (result.success) {
+          // Show message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم تحديث وقت الإشعار لـ ${category.title}'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: kPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: EdgeInsets.all(16),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       _errorLoggingService.logError(
@@ -414,6 +420,28 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           duration: Duration(seconds: 2),
         ),
       );
+    }
+  }
+
+  // Get suggested time for category
+  TimeOfDay getSuggestedTimeForCategory(String categoryId) {
+    switch (categoryId) {
+      case 'morning':
+        return TimeOfDay(hour: 6, minute: 0);
+      case 'evening':
+        return TimeOfDay(hour: 18, minute: 0);
+      case 'sleep':
+        return TimeOfDay(hour: 22, minute: 0);
+      case 'wake':
+        return TimeOfDay(hour: 5, minute: 30);
+      case 'prayer':
+        return TimeOfDay(hour: 12, minute: 0);
+      case 'home':
+        return TimeOfDay(hour: 8, minute: 0);
+      case 'food':
+        return TimeOfDay(hour: 13, minute: 0);
+      default:
+        return TimeOfDay(hour: 12, minute: 0);
     }
   }
   
@@ -475,7 +503,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         setState(() => _isResetting = true);
         
         // Cancel all notifications
-        await _notificationService.cancelAllNotifications();
+        await _notificationFacade.cancelAllNotifications();
         
         // Clear all settings
         setState(() {
@@ -524,76 +552,36 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       );
     }
   }
-  
-  // Check and fix notification settings
-  Future<void> _checkAndFixNotifications() async {
+
+  // Test notification
+  Future<void> _testNotification() async {
     try {
-      setState(() => _isResetting = true);
+      final success = await _notificationFacade.sendTestNotification();
       
-      // Get pending notifications
-      final pendingNotifications = await _notificationService.getPendingNotifications();
-      
-      // Check if notifications match saved settings
-      bool needsFix = false;
-      for (final category in _categories) {
-        final isEnabled = _notificationsEnabled[category.id] ?? false;
-        
-        if (isEnabled) {
-          // Category should have notifications
-          final hasPending = pendingNotifications.any((pending) => 
-            pending.payload?.startsWith(category.id) ?? false
-          );
-          
-          if (!hasPending) {
-            needsFix = true;
-            break;
-          }
-        }
-      }
-      
-      if (needsFix) {
-        // Re-schedule all notifications
-        await _notificationService.scheduleAllSavedNotifications();
-        
+      if (success) {
         // Show message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('تم إصلاح الإشعارات'),
+            content: Text('تم إرسال إشعار تجريبي'),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: EdgeInsets.all(16),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        // Show message that everything is OK
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('جميع الإشعارات تعمل بشكل صحيح'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
+            backgroundColor: kPrimary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: EdgeInsets.all(16),
             duration: Duration(seconds: 2),
           ),
         );
       }
-      
-      setState(() => _isResetting = false);
     } catch (e) {
       _errorLoggingService.logError(
         'NotificationSettingsScreen', 
-        'Error checking and fixing notifications', 
+        'Error sending test notification', 
         e
       );
-      
-      setState(() => _isResetting = false);
       
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('حدث خطأ أثناء فحص الإشعارات'),
+          content: Text('حدث خطأ أثناء إرسال الإشعار التجريبي'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.red,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -603,7 +591,27 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       );
     }
   }
+
+  // Navigate to diagnostics screen
+  void _navigateToDiagnosticsScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NotificationDiagnosticsScreen(),
+      ),
+    );
+  }
   
+  // Navigate to notification info screen
+  void _navigateToInfoScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NotificationInfoScreen(),
+      ),
+    );
+  }
+
   // استخراج لون الفئة بناءً على معرف الفئة
   Color _getCategoryColorWithId(String categoryId) {
     // ألوان الفئات كما في athkar_screen
@@ -625,53 +633,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       default:
         return kPrimary; // اللون الافتراضي
     }
-  }
-  
-  // Test notification
-  Future<void> _testNotification() async {
-    try {
-      await _notificationService.testImmediateNotification();
-      
-      // Show message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تم إرسال إشعار تجريبي'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: kPrimary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      _errorLoggingService.logError(
-        'NotificationSettingsScreen', 
-        'Error sending test notification', 
-        e
-      );
-      
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ أثناء إرسال الإشعار التجريبي'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-  
-  // Navigate to notification info screen
-  void _navigateToInfoScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const NotificationInfoScreen(),
-      ),
-    );
   }
 
   @override
@@ -715,6 +676,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             ),
             tooltip: 'اختبار الإشعارات',
             onPressed: _testNotification,
+          ),
+          // Diagnostics button
+          IconButton(
+            icon: const Icon(
+              Icons.bug_report,
+              color: kPrimary,
+            ),
+            tooltip: 'تشخيص الإشعارات',
+            onPressed: _navigateToDiagnosticsScreen,
           ),
         ],
       ),
@@ -887,17 +857,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                             padding: const EdgeInsets.all(12),
                             child: Row(
                               children: [
-                                Expanded(
-                                  child: TextButton.icon(
-                                    onPressed: _checkAndFixNotifications,
-                                    icon: Icon(Icons.build_rounded),
-                                    label: Text('فحص وإصلاح'),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: kPrimary,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 8),
                                 Expanded(
                                   child: TextButton.icon(
                                     onPressed: _resetAllNotifications,
@@ -1091,9 +1050,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                                         ],
                                                       ),
                                                     ],
-                                                  ),
-                                                  
-                                                  // إعدادات الإشعارات المتعددة (فقط إذا كانت الإشعارات مفعلة)
+                                                  ),// إعدادات الإشعارات المتعددة (فقط إذا كانت الإشعارات مفعلة)
                                                   if (isNotificationEnabled)
                                                     Padding(
                                                       padding: const EdgeInsets.only(top: 12),
