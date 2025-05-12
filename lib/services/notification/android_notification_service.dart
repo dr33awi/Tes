@@ -1,6 +1,7 @@
 // lib/services/notification/android_notification_service.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +11,6 @@ import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/services/permissions_service.dart';
 import 'package:test_athkar_app/services/notification/notification_service_interface.dart';
 import 'package:test_athkar_app/services/notification/notification_helpers.dart';
-import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -66,7 +66,7 @@ class NotificationBatchItem {
 }
 
 /// تنفيذ خدمة الإشعارات الموحدة لنظام Android
-class AndroidNotificationService implements NotificationServiceInterface {
+    class AndroidNotificationService implements NotificationServiceInterface {
   // كائن FlutterLocalNotificationsPlugin
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = 
       FlutterLocalNotificationsPlugin();
@@ -82,6 +82,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
   static const String _highPriorityChannelId = 'high_priority_channel';
   static const String _scheduledChannelId = 'scheduled_channel';
   static const String _reminderChannelId = 'reminder_channel';
+  static const String _athkarChannelId = 'athkar_channel_id';
   
   // مفاتيح التخزين المحلي
   static const String _keyNotificationsEnabled = 'notifications_enabled';
@@ -115,12 +116,10 @@ class AndroidNotificationService implements NotificationServiceInterface {
       // تهيئة التوقيت المحلي إذا لم يتم بعد
       if (!_timezoneInitialized) {
         tz_data.initializeTimeZones();
-        tz.setLocalLocation(tz.getLocation('Asia/Riyadh')); // أو المنطقة الزمنية المناسبة
+        final location = tz.getLocation('Asia/Riyadh');
+        tz.setLocalLocation(location);
         _timezoneInitialized = true;
       }
-      
-      // تهيئة مدير التنبيهات للاعتمادية
-      await AndroidAlarmManager.initialize();
       
       // تحميل تكوين الإشعارات
       await _loadNotificationConfig();
@@ -259,6 +258,20 @@ class AndroidNotificationService implements NotificationServiceInterface {
           enableVibration: _config.enableVibration,
           playSound: _config.enableSound,
           enableLights: _config.enableLights,
+          showBadge: true,
+        ),
+        
+        // قناة الأذكار الرئيسية (مع تجاوز DND)
+        AndroidNotificationChannel(
+          _athkarChannelId,
+          'إشعارات الأذكار',
+          description: 'إشعارات تذكير بالأذكار اليومية',
+          importance: Importance.max,
+          enableVibration: true,
+          playSound: true,
+          enableLights: true,
+          showBadge: true,
+          bypassDnd: true,
         ),
         
         // قناة ذات أولوية عالية
@@ -271,6 +284,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
           playSound: _config.enableSound,
           enableLights: _config.enableLights,
           showBadge: true,
+          bypassDnd: true,
         ),
         
         // قناة الإشعارات المجدولة
@@ -282,6 +296,8 @@ class AndroidNotificationService implements NotificationServiceInterface {
           enableVibration: _config.enableVibration,
           playSound: _config.enableSound,
           enableLights: _config.enableLights,
+          showBadge: true,
+          bypassDnd: true,
         ),
         
         // قناة التذكيرات
@@ -293,6 +309,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
           enableVibration: _config.enableVibration,
           playSound: _config.enableSound,
           enableLights: _config.enableLights,
+          showBadge: true,
         ),
       ];
       
@@ -317,6 +334,18 @@ class AndroidNotificationService implements NotificationServiceInterface {
         onDidReceiveNotificationResponse: _onNotificationResponse,
         onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationResponse,
       );
+      
+      // طلب أذونات الإشعارات إذا لزم الأمر (Android 13+)
+      if (Platform.isAndroid) {
+        final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+            _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation
+                AndroidFlutterLocalNotificationsPlugin>();
+        
+        if (androidImplementation != null) {
+          final bool? granted = await androidImplementation.requestNotificationsPermission();
+          print('إذن الإشعارات: ${granted ?? false}');
+        }
+      }
     } catch (e) {
       _errorLoggingService.logError(
         'AndroidNotificationService', 
@@ -491,6 +520,8 @@ class AndroidNotificationService implements NotificationServiceInterface {
     int? priority,
   }) async {
     try {
+      print('جدولة إشعار: $notificationId في ${notificationTime.hour}:${notificationTime.minute}');
+      
       final hasPermission = await _permissionsService.checkNotificationPermission();
       if (!hasPermission) {
         print('لا توجد أذونات للإشعارات');
@@ -521,29 +552,91 @@ class AndroidNotificationService implements NotificationServiceInterface {
         }
       }
       
-      // استخدام Android Alarm Manager للجدولة الدقيقة
-      if (repeat) {
-        await AndroidAlarmManager.periodic(
-          const Duration(days: 1),
-          id,
-          () => _showScheduledNotification(id, groupKey),
-          startAt: NotificationHelpers.getNextInstanceOfTime(notificationTime).toLocal(),
-          exact: true,
-          wakeup: true,
-          rescheduleOnReboot: true,
-        );
-      } else {
-        await AndroidAlarmManager.oneShotAt(
-          NotificationHelpers.getNextInstanceOfTime(notificationTime).toLocal(),
-          id,
-          () => _showScheduledNotification(id, groupKey),
-          exact: true,
-          wakeup: true,
-          rescheduleOnReboot: true,
-        );
+      // تحسين الجدولة باستخدام flutter_local_notifications
+      final now = DateTime.now();
+      var scheduledDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        notificationTime.hour,
+        notificationTime.minute,
+        0,
+        0,
+        0,
+      );
+      
+      // إذا كان الوقت قد مر اليوم، جدولة ليوم غد
+      if (scheduledDateTime.isBefore(now)) {
+        scheduledDateTime = scheduledDateTime.add(Duration(days: 1));
       }
       
+      final tz.TZDateTime tzScheduledTime = tz.TZDateTime.from(scheduledDateTime, tz.local);
+      
+      // استخدام القناة المناسبة بناءً على الأولوية
+      String actualChannelId = channelId ?? _athkarChannelId;
+      if (priority != null && priority >= 4) {
+        actualChannelId = _highPriorityChannelId;
+      }
+      
+      final androidDetails = AndroidNotificationDetails(
+        actualChannelId,
+        'إشعارات الأذكار',
+        channelDescription: 'إشعارات تذكير بالأذكار اليومية',
+        importance: Importance.max,
+        priority: Priority.max,
+        icon: '@mipmap/ic_launcher',
+        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+        enableVibration: true,
+        playSound: true,
+        enableLights: true,
+        color: color,
+        groupKey: groupKey,
+        channelShowBadge: true,
+        autoCancel: true,
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        fullScreenIntent: true,
+        actions: <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            'MARK_READ',
+            'تم القراءة',
+            showsUserInterface: false,
+          ),
+          AndroidNotificationAction(
+            'SNOOZE',
+            'تأجيل',
+            showsUserInterface: false,
+          ),
+        ],
+      );
+      
+      final notificationDetails = NotificationDetails(android: androidDetails);
+      
+      // جدولة الإشعار مع إعدادات محسنة
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzScheduledTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: repeat ? DateTimeComponents.time : null,
+        payload: payload ?? notificationId,
+      );
+      
       await _updateScheduledNotificationsList(notificationId);
+      
+      print('تم جدولة الإشعار بنجاح: $notificationId في $tzScheduledTime');
+      
+      // اختبار الإشعار الفوري للتأكد من عمل النظام
+      if (DateTime.now().difference(scheduledDateTime).inMinutes > 60) {
+        // إذا كان الإشعار مجدول لأكثر من ساعة، أرسل إشعار تأكيد
+        await showSimpleNotification(
+          'تم جدولة الإشعار',
+          'سيصلك إشعار "$title" في ${notificationTime.hour}:${notificationTime.minute}',
+          999999,
+        );
+      }
       
       return true;
     } catch (e) {
@@ -597,46 +690,6 @@ class AndroidNotificationService implements NotificationServiceInterface {
         'خطأ في حفظ معلومات الإشعار الكاملة', 
         e
       );
-    }
-  }
-  
-  /// دالة الاستدعاء لعرض الإشعار المجدول
-  @pragma('vm:entry-point')
-  static void _showScheduledNotification(int alarmId, [String? groupKey]) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final infoString = prefs.getString('$_keyNotificationData$alarmId');
-      
-      if (infoString != null) {
-        final info = jsonDecode(infoString);
-        
-        final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
-            FlutterLocalNotificationsPlugin();
-        
-        final androidDetails = AndroidNotificationDetails(
-          info['channelId'] ?? 'scheduled_channel',
-          'إشعار مجدول',
-          channelDescription: 'إشعار مجدول',
-          importance: Importance.high,
-          priority: Priority.high,
-          color: info['color'] != null ? Color(info['color']) : null,
-          enableVibration: true,
-          playSound: true,
-          showWhen: true,
-          groupKey: groupKey, // إضافة مفتاح المجموعة
-          icon: '@mipmap/ic_launcher',
-        );
-        
-        await flutterLocalNotificationsPlugin.show(
-          alarmId,
-          info['title'],
-          info['body'],
-          NotificationDetails(android: androidDetails),
-          payload: info['payload'],
-        );
-      }
-    } catch (e) {
-      print('خطأ في عرض الإشعار المجدول: $e');
     }
   }
   
@@ -701,10 +754,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
         final batch = items.skip(i).take(batchSize).toList();
         
         await Future.wait(batch.map((item) async {
-          final id = item.notificationId.hashCode.abs() % 100000;
-          
-          // حفظ معلومات الإشعار
-          await _saveFullNotificationInfo(
+          await scheduleNotification(
             notificationId: item.notificationId,
             title: item.title,
             body: item.body,
@@ -712,33 +762,9 @@ class AndroidNotificationService implements NotificationServiceInterface {
             channelId: item.channelId,
             payload: item.payload,
             color: item.color,
-            priority: item.priority,
             repeat: repeat,
+            priority: item.priority,
           );
-          
-          // جدولة الإشعار
-          if (repeat) {
-            await AndroidAlarmManager.periodic(
-              const Duration(days: 1),
-              id,
-              () => _showScheduledNotification(id, item.groupKey),
-              startAt: NotificationHelpers.getNextInstanceOfTime(item.notificationTime).toLocal(),
-              exact: true,
-              wakeup: true,
-              rescheduleOnReboot: true,
-            );
-          } else {
-            await AndroidAlarmManager.oneShotAt(
-              NotificationHelpers.getNextInstanceOfTime(item.notificationTime).toLocal(),
-              id,
-              () => _showScheduledNotification(id, item.groupKey),
-              exact: true,
-              wakeup: true,
-              rescheduleOnReboot: true,
-            );
-          }
-          
-          await _updateScheduledNotificationsList(item.notificationId);
         }));
         
         // تأخير بسيط بين الدفعات لتجنب إرهاق النظام
@@ -763,7 +789,6 @@ class AndroidNotificationService implements NotificationServiceInterface {
     try {
       final id = notificationId.hashCode.abs() % 100000;
       
-      await AndroidAlarmManager.cancel(id);
       await _flutterLocalNotificationsPlugin.cancel(id);
       
       final prefs = await SharedPreferences.getInstance();
@@ -798,7 +823,6 @@ class AndroidNotificationService implements NotificationServiceInterface {
       
       for (String notificationId in scheduledList) {
         final id = notificationId.hashCode.abs() % 100000;
-        await AndroidAlarmManager.cancel(id);
         await prefs.remove('$_keyNotificationData$id');
       }
       
@@ -979,136 +1003,6 @@ class AndroidNotificationService implements NotificationServiceInterface {
         e
       );
       return [];
-    }
-  }
-  
-  @override
-  Future<void> showSimpleNotification(
-    String title,
-    String body,
-    int id, {
-    String? payload,
-  }) async {
-    try {
-      // التحقق من تهيئة القنوات أولاً
-      await _initializeNotificationChannels();
-      
-      final androidDetails = AndroidNotificationDetails(
-        _defaultChannelId,
-        'الإشعارات الافتراضية',
-        channelDescription: 'قناة الإشعارات العامة',
-        importance: Importance.high,
-        priority: Priority.high,
-        icon: '@mipmap/ic_launcher', // استخدم أيقونة launcher
-        enableVibration: _config.enableVibration,
-        playSound: _config.enableSound,
-        enableLights: _config.enableLights,
-      );
-      
-      final notificationDetails = NotificationDetails(android: androidDetails);
-      
-      await _flutterLocalNotificationsPlugin.show(
-        id,
-        title,
-        body,
-        notificationDetails,
-        payload: payload,
-      );
-    } catch (e) {
-      _errorLoggingService.logError(
-        'AndroidNotificationService', 
-        'خطأ في إرسال إشعار بسيط', 
-        e
-      );
-    }
-  }
-  
-  @override
-  Future<bool> testImmediateNotification() async {
-    try {
-      await showSimpleNotification(
-        'اختبار الإشعارات',
-        'هذا إشعار اختباري للتأكد من عمل الإشعارات بشكل صحيح',
-        9999,
-        payload: 'test',
-      );
-      return true;
-    } catch (e) {
-      _errorLoggingService.logError(
-        'AndroidNotificationService', 
-        'خطأ في إرسال إشعار اختباري مباشر', 
-        e
-      );
-      return false;
-    }
-  }
-  
-  @override
-  Future<bool> sendGroupedTestNotification() async {
-    try {
-      final groupKey = 'test_athkar_group';
-      
-      // إنشاء إشعار ملخص
-      final androidSummaryDetails = AndroidNotificationDetails(
-        _defaultChannelId,
-        'الإشعارات الافتراضية',
-        channelDescription: 'الإشعارات العامة للتطبيق',
-        importance: Importance.high,
-        priority: Priority.high,
-        groupKey: groupKey,
-        setAsGroupSummary: true,
-        icon: '@mipmap/ic_launcher',
-        styleInformation: InboxStyleInformation(
-          ['اختبار مجموعة الإشعارات'],
-          contentTitle: 'عدة إشعارات اختبارية',
-          summaryText: 'إشعارات الاختبار',
-        ),
-      );
-      
-      final summaryDetails = NotificationDetails(android: androidSummaryDetails);
-      
-      await _flutterLocalNotificationsPlugin.show(
-        9000,
-        'مجموعة اختبار الإشعارات',
-        'اختبار تجميع الإشعارات',
-        summaryDetails,
-        payload: 'test_group',
-      );
-      
-      // إنشاء إشعارات فردية في المجموعة
-      for (int i = 1; i <= 3; i++) {
-        final androidDetails = AndroidNotificationDetails(
-          _defaultChannelId,
-          'الإشعارات الافتراضية',
-          channelDescription: 'الإشعارات العامة للتطبيق',
-          importance: Importance.high,
-          priority: Priority.high,
-          groupKey: groupKey,
-          setAsGroupSummary: false,
-          icon: '@mipmap/ic_launcher',
-        );
-        
-        final details = NotificationDetails(android: androidDetails);
-        
-        await _flutterLocalNotificationsPlugin.show(
-          9000 + i,
-          'اختبار إشعار $i',
-          'هذا إشعار اختباري رقم $i',
-          details,
-          payload: 'test_notification_$i',
-        );
-        
-        await Future.delayed(Duration(milliseconds: 300));
-      }
-      
-      return true;
-    } catch (e) {
-      _errorLoggingService.logError(
-        'AndroidNotificationService', 
-        'خطأ في إرسال إشعار اختباري مجمع', 
-        e
-      );
-      return false;
     }
   }
   

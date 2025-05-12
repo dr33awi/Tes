@@ -1,7 +1,6 @@
-// lib/services/notification_manager.dart
+// lib/services/notification/notification_manager.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
@@ -9,7 +8,10 @@ import 'package:test_athkar_app/services/notification/notification_service_inter
 import 'package:test_athkar_app/services/notification/notification_service.dart';
 import 'package:test_athkar_app/services/notification/notification_helpers.dart';
 import 'package:test_athkar_app/services/retry_service.dart';
-
+import 'package:test_athkar_app/services/di_container.dart';
+import 'package:test_athkar_app/services/permissions_service.dart';
+import 'package:test_athkar_app/services/battery_optimization_service.dart';
+import 'package:test_athkar_app/services/do_not_disturb_service.dart';
 
 /// مدير مركزي لجميع وظائف الإشعارات في التطبيق
 class NotificationManager {
@@ -19,6 +21,9 @@ class NotificationManager {
   // التبعيات
   final ErrorLoggingService _errorLoggingService;
   final RetryService _retryService;
+  late final PermissionsService _permissionsService;
+  late final BatteryOptimizationService _batteryOptimizationService;
+  late final DoNotDisturbService _doNotDisturbService;
   
   // ثوابت للتخزين المحلي
   static const String _keyNotificationSettings = 'notification_settings';
@@ -33,6 +38,7 @@ class NotificationManager {
   }) : _errorLoggingService = errorLoggingService,
        _retryService = retryService ?? RetryService(errorLoggingService: errorLoggingService) {
     _initPlatformService();
+    _initializeServices();
   }
   
   /// تهيئة الخدمة المناسبة للمنصة
@@ -40,6 +46,13 @@ class NotificationManager {
     _notificationService = NotificationService(
       errorLoggingService: _errorLoggingService,
     );
+  }
+  
+  /// تهيئة الخدمات الإضافية
+  void _initializeServices() {
+    _permissionsService = serviceLocator<PermissionsService>();
+    _batteryOptimizationService = serviceLocator<BatteryOptimizationService>();
+    _doNotDisturbService = serviceLocator<DoNotDisturbService>();
   }
   
   /// تهيئة مدير الإشعارات
@@ -80,17 +93,31 @@ class NotificationManager {
       // إلغاء الإشعارات السابقة لهذه الفئة
       await cancelAthkarNotifications(categoryId);
       
-      // جدولة الإشعارات الجديدة
-      final results = await scheduleMultipleNotifications(
-        baseId: 'athkar_$categoryId',
-        title: customTitle ?? 'حان وقت $categoryTitle',
-        body: customBody ?? 'اضغط هنا لقراءة $categoryTitle',
-        notificationTimes: times,
-        channelId: 'athkar_channel',
-        payload: categoryId,
-        color: color ?? NotificationHelpers.getCategoryColor(categoryId),
-        repeat: true,
-      );
+      int successCount = 0;
+      int failCount = 0;
+      
+      // جدولة كل وقت بشكل منفصل
+      for (int i = 0; i < times.length; i++) {
+        final notificationId = 'athkar_${categoryId}_$i';
+        
+        final success = await scheduleNotification(
+          notificationId: notificationId,
+          title: customTitle ?? 'حان وقت $categoryTitle',
+          body: customBody ?? 'اضغط هنا لقراءة $categoryTitle',
+          notificationTime: times[i],
+          channelId: 'athkar_channel_id',
+          payload: 'athkar_$categoryId',
+          color: color ?? NotificationHelpers.getCategoryColor(categoryId),
+          repeat: true,
+          priority: NotificationHelpers.getNotificationPriority(categoryId),
+        );
+        
+        if (success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      }
       
       // حفظ حالة الجدولة
       final scheduledCategories = prefs.getStringList(_keyScheduledCategories) ?? [];
@@ -99,10 +126,19 @@ class NotificationManager {
         await prefs.setStringList(_keyScheduledCategories, scheduledCategories);
       }
       
+      // حفظ أوقات الإشعارات
+      await prefs.setStringList(
+        '${categoryId}_notification_times',
+        times.map((time) => '${time.hour}:${time.minute}').toList(),
+      );
+      
+      // حفظ حالة التفعيل
+      await prefs.setBool('${categoryId}_notifications_enabled', true);
+      
       return AthkarNotificationResult(
         categoryId: categoryId,
-        totalScheduled: results,
-        totalFailed: 0,
+        totalScheduled: successCount,
+        totalFailed: failCount,
       );
     } catch (e) {
       _errorLoggingService.logError(
@@ -227,6 +263,59 @@ class NotificationManager {
         e
       );
       return NotificationStatistics();
+    }
+  }
+  
+  /// إصلاح تلقائي للإشعارات
+  Future<void> autoFixNotifications(BuildContext context) async {
+    try {
+      // التحقق من الأذونات
+      final hasPermission = await _permissionsService.checkNotificationPermission();
+      if (!hasPermission) {
+        await _permissionsService.showNotificationPermissionDialog(context);
+        return;
+      }
+      
+      // التحقق من تحسينات البطارية
+      final batteryOptEnabled = await _batteryOptimizationService.isBatteryOptimizationEnabled();
+      if (batteryOptEnabled && context.mounted) {
+        await _batteryOptimizationService.checkAndRequestBatteryOptimization(context);
+      }
+      
+      // التحقق من وضع عدم الإزعاج
+      final shouldPromptDnd = await _doNotDisturbService.shouldPromptAboutDoNotDisturb();
+      if (shouldPromptDnd && context.mounted) {
+        await _doNotDisturbService.showDoNotDisturbDialog(context);
+      }
+      
+      // إعادة جدولة الإشعارات المحفوظة
+      await rescheduleAllNotifications();
+      
+      // إظهار رسالة نجاح
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 10),
+                Text('تم فحص وإصلاح إعدادات الإشعارات'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      _errorLoggingService.logError(
+        'NotificationManager',
+        'خطأ في إصلاح الإشعارات تلقائياً',
+        e
+      );
     }
   }
   
