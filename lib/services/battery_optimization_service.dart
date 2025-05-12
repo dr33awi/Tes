@@ -67,41 +67,41 @@ class BatteryOptimizationService {
       name: "Xiaomi",
       keywords: ["xiaomi", "redmi", "poco"],
       instructions: 
-        '1. Öffne "Einstellungen" > "Batterie & Leistung"\n'
-        '2. Wähle "Batteriesparmodus für Apps"\n'
-        '3. Suche nach {APP_NAME}\n'
-        '4. Wähle "Keine Einschränkungen" und aktiviere "Im Hintergrund ausführen"',
-      settingsPath: "Einstellungen > Batterie & Leistung > Batteriesparmodus für Apps",
+        '1. افتح "الإعدادات" > "البطارية والأداء"\n'
+        '2. اختر "توفير البطارية للتطبيقات"\n'
+        '3. ابحث عن {APP_NAME}\n'
+        '4. اختر "بدون قيود" وفعّل "التشغيل في الخلفية"',
+      settingsPath: "الإعدادات > البطارية والأداء > توفير البطارية للتطبيقات",
     ),
     ManufacturerInstructions(
       name: "Samsung",
       keywords: ["samsung"],
       instructions: 
-        '1. Öffne "Einstellungen" > "Batterie"\n'
-        '2. Wähle "Batterieverbrauch" oder "Energiesparmodus"\n'
-        '3. Suche nach {APP_NAME}\n'
-        '4. Wähle "Uneingeschränkt" unter Hintergrundbetrieb',
-      settingsPath: "Einstellungen > Batterie > Batterieverbrauch",
+        '1. افتح "الإعدادات" > "البطارية"\n'
+        '2. اختر "استخدام البطارية" أو "وضع توفير الطاقة"\n'
+        '3. ابحث عن {APP_NAME}\n'
+        '4. اختر "غير مقيد" تحت التشغيل في الخلفية',
+      settingsPath: "الإعدادات > البطارية > استخدام البطارية",
     ),
     ManufacturerInstructions(
       name: "Huawei",
       keywords: ["huawei", "honor"],
       instructions: 
-        '1. Öffne "Einstellungen" > "Batterie"\n'
-        '2. Wähle "App-Start" oder "Geschützte Apps"\n'
-        '3. Suche nach {APP_NAME}\n'
-        '4. Aktiviere sowohl "Automatisch starten" als auch "Im Hintergrund ausführen"',
-      settingsPath: "Einstellungen > Batterie > App-Start",
+        '1. افتح "الإعدادات" > "البطارية"\n'
+        '2. اختر "تشغيل التطبيقات" أو "التطبيقات المحمية"\n'
+        '3. ابحث عن {APP_NAME}\n'
+        '4. فعّل كلاً من "التشغيل التلقائي" و"التشغيل في الخلفية"',
+      settingsPath: "الإعدادات > البطارية > تشغيل التطبيقات",
     ),
     ManufacturerInstructions(
       name: "Oppo/Realme/Vivo/OnePlus",
       keywords: ["oppo", "realme", "vivo", "oneplus"],
       instructions: 
-        '1. Öffne "Einstellungen" > "Batterie"\n'
-        '2. Wähle "Batterieoptimierung" oder "Hintergrundaktivitäten"\n'
-        '3. Suche nach {APP_NAME}\n'
-        '4. Wähle "Keine Optimierung" und "Im Hintergrund ausführen erlauben"',
-      settingsPath: "Einstellungen > Batterie > Batterieoptimierung",
+        '1. افتح "الإعدادات" > "البطارية"\n'
+        '2. اختر "تحسين البطارية" أو "الأنشطة في الخلفية"\n'
+        '3. ابحث عن {APP_NAME}\n'
+        '4. اختر "بدون تحسين" و"السماح بالتشغيل في الخلفية"',
+      settingsPath: "الإعدادات > البطارية > تحسين البطارية",
     ),
   ];
   
@@ -123,7 +123,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService',
-        'Fehler bei der Initialisierung',
+        'خطأ في التهيئة',
         e
       );
     }
@@ -139,10 +139,10 @@ class BatteryOptimizationService {
         final bool? result = await platform.invokeMethod<bool>('isBatteryOptimizationEnabled');
         if (result != null) return result;
       } catch (e) {
-        print('Method Channel Fehler: $e');
+        print('Method Channel خطأ: $e');
         await _errorLoggingService.logError(
           'BatteryOptimizationService', 
-          'Fehler bei der Prüfung der Batterieoptimierung über Method Channel', 
+          'خطأ في التحقق من تحسين البطارية عبر Method Channel', 
           e
         );
       }
@@ -160,7 +160,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler bei der Prüfung der Batterieoptimierung', 
+        'خطأ في التحقق من تحسين البطارية', 
         e
       );
       return false;
@@ -177,10 +177,10 @@ class BatteryOptimizationService {
         final bool? result = await platform.invokeMethod<bool>('requestBatteryOptimizationDisable');
         if (result != null) return result;
       } catch (e) {
-        print('Method Channel Fehler: $e');
+        print('Method Channel خطأ: $e');
         await _errorLoggingService.logError(
           'BatteryOptimizationService', 
-          'Fehler bei der Deaktivierung der Batterieoptimierung über Method Channel', 
+          'خطأ في إلغاء تفعيل تحسين البطارية عبر Method Channel', 
           e
         );
       }
@@ -193,7 +193,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler bei der Anfrage zur Deaktivierung der Batterieoptimierung', 
+        'خطأ في طلب إلغاء تحسين البطارية', 
         e
       );
       return false;
@@ -232,7 +232,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler in checkAndRequestBatteryOptimization', 
+        'خطأ في checkAndRequestBatteryOptimization', 
         e
       );
     }
@@ -247,7 +247,7 @@ class BatteryOptimizationService {
           children: [
             Icon(Icons.battery_alert, color: Colors.orange),
             SizedBox(width: 10),
-            Expanded(child: Text('Benachrichtigungen optimieren')),
+            Expanded(child: Text('تحسين الإشعارات')),
           ],
         ),
         content: Column(
@@ -255,8 +255,8 @@ class BatteryOptimizationService {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Für zuverlässige Athkar-Benachrichtigungen sollten Sie den Batteriesparmodus für diese App deaktivieren.\n\n'
-              'Sie werden zu den Batterieeinstellungen weitergeleitet. Bitte wählen Sie dort "$_appName" und deaktivieren Sie die Batterieoptimierung.',
+              'للحصول على إشعارات موثوقة للأذكار، يُنصح بإلغاء تفعيل وضع توفير البطارية لهذا التطبيق.\n\n'
+              'سيتم توجيهك إلى إعدادات البطارية. اختر "$_appName" وألغِ تفعيل تحسين البطارية.',
             ),
             SizedBox(height: 12),
             _buildManufacturerSpecificNote(),
@@ -264,21 +264,21 @@ class BatteryOptimizationService {
         ),
         actions: [
           TextButton(
-            child: Text('Nicht jetzt'),
+            child: Text('ليس الآن'),
             onPressed: () {
               _markUserDismissed();
               Navigator.of(context).pop();
             },
           ),
           TextButton(
-            child: Text('Nie wieder anzeigen'),
+            child: Text('عدم الإظهار مجدداً'),
             onPressed: () {
               _markUserDismissedPermanently();
               Navigator.of(context).pop();
             },
           ),
           ElevatedButton(
-            child: Text('Einstellungen öffnen'),
+            child: Text('فتح الإعدادات'),
             onPressed: () {
               Navigator.of(context).pop();
               _openBatterySettings();
@@ -309,7 +309,7 @@ class BatteryOptimizationService {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Für ${matchingInstructions.name}-Geräte:',
+                      'لأجهزة ${matchingInstructions.name}:',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     SizedBox(height: 8),
@@ -335,7 +335,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler beim Markieren der Benutzerablehnung', 
+        'خطأ في تسجيل رفض المستخدم', 
         e
       );
     }
@@ -353,7 +353,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler beim permanenten Markieren der Benutzerablehnung', 
+        'خطأ في تسجيل الرفض الدائم للمستخدم', 
         e
       );
     }
@@ -367,7 +367,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler beim Öffnen der Batterieeinstellungen', 
+        'خطأ في فتح إعدادات البطارية', 
         e
       );
       // Fallback zu App-Einstellungen
@@ -383,7 +383,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler beim Speichern des letzten Prüfzeitpunkts', 
+        'خطأ في حفظ وقت الفحص الأخير', 
         e
       );
     }
@@ -401,7 +401,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler bei der Prüfung, ob Batterieoptimierung abgefragt werden sollte', 
+        'خطأ في التحقق من ضرورة فحص تحسين البطارية', 
         e
       );
       return false;
@@ -425,7 +425,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler bei der Prüfung auf zusätzliche Batterieeinschränkungen', 
+        'خطأ في التحقق من قيود البطارية الإضافية', 
         e
       );
     }
@@ -457,7 +457,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler beim Ermitteln des Geräteherstellers', 
+        'خطأ في تحديد مُصنِّع الجهاز', 
         e
       );
       return "unknown";
@@ -496,30 +496,30 @@ class BatteryOptimizationService {
           children: [
             Icon(Icons.settings, color: Colors.blue),
             SizedBox(width: 10),
-            Expanded(child: Text('Zusätzliche Einstellungen erforderlich')),
+            Expanded(child: Text('إعدادات إضافية مطلوبة')),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Für ${instructions.name}-Geräte:'),
+            Text('لأجهزة ${instructions.name}:'),
             SizedBox(height: 8),
             Text(displayInstructions),
             SizedBox(height: 16),
             Text(
-              'Diese Einstellungen sind wichtig, damit Sie Benachrichtigungen zuverlässig erhalten.',
+              'هذه الإعدادات مهمة لضمان وصول الإشعارات بشكل موثوق.',
               style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
             ),
           ],
         ),
         actions: [
           TextButton(
-            child: Text('Später'),
+            child: Text('لاحقاً'),
             onPressed: () => Navigator.of(context).pop(),
           ),
           ElevatedButton(
-            child: Text('Einstellungen öffnen'),
+            child: Text('فتح الإعدادات'),
             onPressed: () {
               Navigator.of(context).pop();
               _openManufacturerSpecificSettings(manufacturer);
@@ -548,7 +548,7 @@ class BatteryOptimizationService {
           return;
         }
       } catch (e) {
-        print('Method Channel Fehler: $e');
+        print('Method Channel خطأ: $e');
       }
       
       // Fallback: Batterieeinstellungen öffnen
@@ -557,7 +557,7 @@ class BatteryOptimizationService {
     } catch (e) {
       await _errorLoggingService.logError(
         'BatteryOptimizationService', 
-        'Fehler beim Öffnen herstellerspezifischer Einstellungen', 
+        'خطأ في فتح إعدادات الشركة المصنعة', 
         e
       );
       // Fallback zu allgemeinen App-Einstellungen

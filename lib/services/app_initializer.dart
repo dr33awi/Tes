@@ -63,7 +63,6 @@ class AppInitializer {
       print('خطأ في التحقق من تحسينات الإشعارات: $e');
     }
   }
-  
   /// التحقق وإعادة جدولة الإشعارات إذا لزم الأمر
   static Future<void> checkAndRescheduleNotifications() async {
     try {

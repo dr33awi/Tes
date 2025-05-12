@@ -5,7 +5,7 @@ import 'package:test_athkar_app/screens/favorites_screen/favorites_screen.dart';
 import 'package:test_athkar_app/screens/tasbih_screen.dart';
 import '../../hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary; // للحصول على الألوان الأساسية
-
+import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_screen.dart';
 
 import 'package:test_athkar_app/adhan/screens/prayer_times_screen.dart';
 
@@ -64,7 +64,7 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       icon: Icons.menu_book_rounded,
       color: Color(0xFF2E7D32),
       gradientColors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
-      screen: TasbihScreen(),
+      screen: AthkarScreen(),
     ),
     Category(
       title: 'المسبحة',

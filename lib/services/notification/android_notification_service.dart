@@ -1,4 +1,4 @@
-// lib/services/android_notification_service.dart
+// lib/services/notification/android_notification_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:test_athkar_app/services/permissions_service.dart';
 import 'package:test_athkar_app/services/notification/notification_service_interface.dart';
 import 'package:test_athkar_app/services/notification/notification_helpers.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 /// تنفيذ خدمة الإشعارات الموحدة لنظام Android
@@ -40,6 +41,9 @@ class AndroidNotificationService implements NotificationServiceInterface {
   // كائن التكوين
   NotificationConfig _config = NotificationConfig();
   
+  // متغير للتحقق من تهيئة timezone
+  static bool _timezoneInitialized = false;
+  
   // المنشئ
   AndroidNotificationService({
     required ErrorLoggingService errorLoggingService,
@@ -56,6 +60,13 @@ class AndroidNotificationService implements NotificationServiceInterface {
   Future<bool> initialize() async {
     try {
       print('بدء تهيئة خدمة إشعارات Android الموحدة...');
+      
+      // تهيئة التوقيت المحلي إذا لم يتم بعد
+      if (!_timezoneInitialized) {
+        tz_data.initializeTimeZones();
+        tz.setLocalLocation(tz.getLocation('Asia/Riyadh')); // أو المنطقة الزمنية المناسبة
+        _timezoneInitialized = true;
+      }
       
       // تهيئة مدير التنبيهات للاعتمادية
       await AndroidAlarmManager.initialize();
@@ -226,7 +237,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
       }
       
       // إعداد منصة Android
-      final androidInitSettings = AndroidInitializationSettings('app_icon');
+      final androidInitSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
       
       // إعداد الإشعارات
       final initSettings = InitializationSettings(
@@ -356,6 +367,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
         channelDescription: 'قناة التذكيرات المؤجلة',
         importance: Importance.high,
         priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
       );
       
       final notificationDetails = NotificationDetails(android: androidDetails);
@@ -544,6 +556,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
           playSound: true,
           showWhen: true,
           groupKey: groupKey, // إضافة مفتاح المجموعة
+          icon: '@mipmap/ic_launcher',
         );
         
         await flutterLocalNotificationsPlugin.show(
@@ -834,12 +847,19 @@ class AndroidNotificationService implements NotificationServiceInterface {
     String? payload,
   }) async {
     try {
+      // التحقق من تهيئة القنوات أولاً
+      await _initializeNotificationChannels();
+      
       final androidDetails = AndroidNotificationDetails(
         _defaultChannelId,
         'الإشعارات الافتراضية',
         channelDescription: 'قناة الإشعارات العامة',
         importance: Importance.high,
         priority: Priority.high,
+        icon: '@mipmap/ic_launcher', // استخدم أيقونة launcher
+        enableVibration: _config.enableVibration,
+        playSound: _config.enableSound,
+        enableLights: _config.enableLights,
       );
       
       final notificationDetails = NotificationDetails(android: androidDetails);
@@ -894,6 +914,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
         priority: Priority.high,
         groupKey: groupKey,
         setAsGroupSummary: true,
+        icon: '@mipmap/ic_launcher',
         styleInformation: InboxStyleInformation(
           ['اختبار مجموعة الإشعارات'],
           contentTitle: 'عدة إشعارات اختبارية',
@@ -921,6 +942,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
           priority: Priority.high,
           groupKey: groupKey,
           setAsGroupSummary: false,
+          icon: '@mipmap/ic_launcher',
         );
         
         final details = NotificationDetails(android: androidDetails);

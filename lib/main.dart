@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:test_athkar_app/services/app_initializer.dart';
 import 'package:test_athkar_app/services/notification/notification_navigation.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
@@ -72,11 +73,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     
     // تهيئة التطبيق
     _initializeApp();
-    
-    // فحص تحسينات الإشعارات بعد تحميل واجهة المستخدم
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkNotificationOptimizations();
-    });
   }
   
   @override
@@ -105,7 +101,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // التطبيق منفصل عن واجهة المستخدم
         _saveAppState();
         break;
-      default:
+      case AppLifecycleState.hidden:
+        // التطبيق مخفي (Flutter 3.13+)
         break;
     }
   }
@@ -120,6 +117,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       setState(() {
         _isLoading = false;
       });
+      
+      // فحص تحسينات الإشعارات بعد تحميل واجهة المستخدم
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkNotificationOptimizations();
+        });
+      }
     } catch (e) {
       print('خطأ أثناء تهيئة التطبيق: $e');
       await _errorLoggingService.logError(
@@ -151,7 +155,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       await Future.delayed(const Duration(seconds: 3));
       
       if (mounted && context.mounted) {
-// AppInitializer.checkAndRescheduleNotifications(); // علق هذا السطر
         await AppInitializer.checkNotificationOptimizations(context);
       }
     } catch (e) {
@@ -171,11 +174,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       navigatorKey: NotificationNavigation.navigatorKey,
       theme: ThemeData(
-        primarySwatch: Colors.green,
+        primarySwatch: _createMaterialColor(const Color(0xFF447055)),
         primaryColor: const Color(0xFF447055),
         fontFamily: 'Tajawal',
         appBarTheme: const AppBarTheme(
-          color: Color(0xFF447055),
+          backgroundColor: Color(0xFF447055),
           centerTitle: true,
           elevation: 0,
           iconTheme: IconThemeData(color: Colors.white),
@@ -207,10 +210,43 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ),
         useMaterial3: true,
       ),
+      // إضافة Localizations للتعامل مع اللغة العربية
+      locale: const Locale('ar', 'SA'),
+      supportedLocales: const [
+        Locale('ar', 'SA'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: [
+        // إضافة المحليات المطلوبة
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: _isLoading 
           ? const _SplashScreen() 
           : const HomeScreen(),
     );
+  }
+  
+  // دالة لإنشاء MaterialColor من لون واحد
+  MaterialColor _createMaterialColor(Color color) {
+    List strengths = <double>[.05];
+    Map<int, Color> swatch = <int, Color>{};
+    final int r = color.red, g = color.green, b = color.blue;
+
+    for (int i = 1; i < 10; i++) {
+      strengths.add(0.1 * i);
+    }
+    strengths.forEach((strength) {
+      final double ds = 0.5 - strength;
+      swatch[(strength * 1000).round()] = Color.fromRGBO(
+        r + ((ds < 0 ? r : (255 - r)) * ds).round(),
+        g + ((ds < 0 ? g : (255 - g)) * ds).round(),
+        b + ((ds < 0 ? b : (255 - b)) * ds).round(),
+        1,
+      );
+    });
+    return MaterialColor(color.value, swatch);
   }
 }
 
@@ -226,11 +262,19 @@ class _SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // يمكنك استخدام أيقونة افتراضية إذا لم يكن لديك logo.png
+            Icon(
+              Icons.access_time,
+              size: 120,
+              color: Colors.white,
+            ),
+            /* أو استخدم الصورة إذا كانت موجودة
             Image.asset(
-              'assets/images/logo.png', // تأكد من وجود هذا الملف
+              'assets/images/logo.png',
               width: 120,
               height: 120,
             ),
+            */
             const SizedBox(height: 24),
             const Text(
               'تطبيق الأذكار',

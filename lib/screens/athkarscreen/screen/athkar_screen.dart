@@ -1,11 +1,11 @@
-// lib/screens/athkarscreen/screen/athkar_screen.dart - محسّن
+// lib/screens/athkarscreen/screen/athkar_screen.dart - محسّن مع نظام الإشعارات الموحد
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
-import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart'; // إضافة استيراد شاشة إعدادات الإشعارات
-import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
+import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart';
+import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
@@ -27,7 +27,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'color2': const Color(0xFFFFA000),
     },
     {
-      'id': 'evening',
+      'id': 'evening', 
       'title': 'أذكار المساء',
       'icon': Icons.nightlight_round,
       'color1': const Color(0xFFAB47BC),
@@ -42,7 +42,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
     },
     {
       'id': 'wake',
-      'title': 'أذكار الاستيقاظ',
+      'title': 'أذكار الاستيقاظ', 
       'icon': Icons.alarm,
       'color1': const Color(0xFFFFB74D),
       'color2': const Color(0xFFFF9800),
