@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
-import 'package:test_athkar_app/services/notification_service.dart'; // استيراد خدمة الإشعارات الموحدة
+import 'package:test_athkar_app/services/notification_facade.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
@@ -24,7 +24,7 @@ class MultipleNotificationsScreen extends StatefulWidget {
 
 class _MultipleNotificationsScreenState extends State<MultipleNotificationsScreen> {
   final AthkarService _athkarService = AthkarService();
-  final NotificationService _notificationService = NotificationService(); // استخدام الخدمة الموحدة
+  final NotificationFacade _notificationFacade = NotificationFacade.instance;
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   
   List<String> _notificationTimes = [];
@@ -97,7 +97,7 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
     String displayHour = (time.hour > 12) ? (time.hour - 12).toString() : time.hour.toString();
     if (displayHour == '0') displayHour = '12';
     
-    return '$hours:$minutes $period';
+    return '$displayHour:$minutes $period';
   }
   
   // Add a new notification time
@@ -145,14 +145,25 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
         // Add to list
         await _athkarService.addAdditionalNotificationTime(widget.category.id, timeString);
         
-        // Rebuild category with updated times
-        final updatedCategory = widget.category.copyWith(
-          hasMultipleReminders: true,
-          additionalNotifyTimes: [..._notificationTimes, timeString],
-        );
+        // Get all times including the new one
+        final updatedTimes = _notificationTimes + [timeString];
+        final timeOfDayList = updatedTimes.map((timeStr) {
+          final parts = timeStr.split(':');
+          return TimeOfDay(
+            hour: int.parse(parts[0]),
+            minute: int.parse(parts[1]),
+          );
+        }).toList();
         
-        // Schedule the notification
-        await _notificationService.scheduleAdditionalNotifications(updatedCategory);
+        // Schedule the notifications using NotificationFacade
+        await _notificationFacade.scheduleAthkarNotifications(
+          categoryId: widget.category.id,
+          categoryTitle: widget.category.title,
+          times: timeOfDayList,
+          customTitle: widget.category.notifyTitle,
+          customBody: widget.category.notifyBody,
+          color: widget.category.color,
+        );
         
         // Refresh the list
         _loadNotificationTimes();
@@ -213,20 +224,29 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
         
         // Re-schedule all remaining notifications
         final updatedTimes = _notificationTimes.where((t) => t != timeString).toList();
-        final updatedCategory = widget.category.copyWith(
-          hasMultipleReminders: updatedTimes.isNotEmpty,
-          additionalNotifyTimes: updatedTimes,
-        );
         
-        // Re-schedule notifications using unified notification service
         if (updatedTimes.isNotEmpty) {
-          await _notificationService.scheduleAdditionalNotifications(updatedCategory);
+          // Convert strings to TimeOfDay
+          final timeOfDayList = updatedTimes.map((timeStr) {
+            final parts = timeStr.split(':');
+            return TimeOfDay(
+              hour: int.parse(parts[0]),
+              minute: int.parse(parts[1]),
+            );
+          }).toList();
+          
+          // Re-schedule notifications using NotificationFacade
+          await _notificationFacade.scheduleAthkarNotifications(
+            categoryId: widget.category.id,
+            categoryTitle: widget.category.title,
+            times: timeOfDayList,
+            customTitle: widget.category.notifyTitle,
+            customBody: widget.category.notifyBody,
+            color: widget.category.color,
+          );
         } else {
-          // If no additional times left, just keep the main notification
-          final mainTime = await _notificationService.getNotificationTime(widget.category.id);
-          if (mainTime != null) {
-            await _notificationService.scheduleAthkarNotification(updatedCategory, mainTime);
-          }
+          // If no additional times left, cancel all notifications for this category
+          await _notificationFacade.cancelAthkarNotifications(widget.category.id);
         }
         
         // Refresh the list
@@ -319,13 +339,24 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
             .toList()
           ..add(newTimeString);
         
-        final updatedCategory = widget.category.copyWith(
-          hasMultipleReminders: true,
-          additionalNotifyTimes: updatedTimes,
-        );
+        // Convert strings to TimeOfDay
+        final timeOfDayList = updatedTimes.map((timeStr) {
+          final parts = timeStr.split(':');
+          return TimeOfDay(
+            hour: int.parse(parts[0]),
+            minute: int.parse(parts[1]),
+          );
+        }).toList();
         
-        // Schedule all notifications
-        await _notificationService.scheduleAdditionalNotifications(updatedCategory);
+        // Schedule all notifications using NotificationFacade
+        await _notificationFacade.scheduleAthkarNotifications(
+          categoryId: widget.category.id,
+          categoryTitle: widget.category.title,
+          times: timeOfDayList,
+          customTitle: widget.category.notifyTitle,
+          customBody: widget.category.notifyBody,
+          color: widget.category.color,
+        );
         
         // Refresh the list
         _loadNotificationTimes();

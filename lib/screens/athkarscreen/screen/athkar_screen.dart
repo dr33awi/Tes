@@ -1,11 +1,10 @@
-// lib/screens/athkarscreen/screen/athkar_screen.dart
+// lib/screens/athkarscreen/screen/athkar_screen.dart - محسّن
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
-import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart';
-import 'package:test_athkar_app/services/notification_facade.dart';
+import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart'; // إضافة استيراد شاشة إعدادات الإشعارات
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -18,9 +17,6 @@ class AthkarScreen extends StatefulWidget {
 }
 
 class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderStateMixin {
-  // إضافة مرجع للواجهة الموحدة
-  final NotificationFacade _notificationFacade = NotificationFacade.instance;
-  
   // قائمة فئات الأذكار
   final List<Map<String, dynamic>> _athkarCategories = [
     {
@@ -103,9 +99,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       ),
     );
     
-    // تهيئة الإشعارات والتحقق من الأذونات
-    _initializeNotifications();
-    
     // محاكاة تحميل البيانات
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
@@ -114,20 +107,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
         });
       }
     });
-  }
-  
-  Future<void> _initializeNotifications() async {
-    // تهيئة نظام الإشعارات
-    await _notificationFacade.initialize();
-    
-    // التحقق من الأذونات عند بدء الشاشة
-    if (mounted) {
-      final status = await _notificationFacade.checkAllPermissions(context);
-      
-      if (!status.allPermissionsGranted) {
-        await _notificationFacade.requestAllPermissions(context);
-      }
-    }
   }
   
   @override

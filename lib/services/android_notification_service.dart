@@ -34,6 +34,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
   static const String _keyNotificationsEnabled = 'notifications_enabled';
   static const String _keyScheduledNotifications = 'scheduled_notifications';
   static const String _keyNotificationConfig = 'notification_config';
+  static const String _keyNotificationData = 'notification_data_';
   
   // كائن التكوين
   NotificationConfig _config = NotificationConfig();
@@ -435,18 +436,27 @@ class AndroidNotificationService implements NotificationServiceInterface {
         return false;
       }
       
-      await _saveNotificationTime(notificationId, notificationTime);
+      // حفظ معلومات الإشعار الكاملة
+      await _saveFullNotificationInfo(
+        notificationId: notificationId,
+        title: title,
+        body: body,
+        notificationTime: notificationTime,
+        channelId: channelId,
+        payload: payload,
+        color: color,
+        priority: priority,
+        repeat: repeat,
+      );
       
       final id = notificationId.hashCode.abs() % 100000;
-      
-      final channel = channelId ?? _scheduledChannelId;
       
       // استخدام Android Alarm Manager للجدولة الدقيقة
       if (repeat) {
         await AndroidAlarmManager.periodic(
           const Duration(days: 1),
           id,
-          () => _showNotificationCallback(id),
+          () => _showScheduledNotification(id),
           startAt: _getNextInstanceOfTime(notificationTime).toLocal(),
           exact: true,
           wakeup: true,
@@ -456,23 +466,12 @@ class AndroidNotificationService implements NotificationServiceInterface {
         await AndroidAlarmManager.oneShotAt(
           _getNextInstanceOfTime(notificationTime).toLocal(),
           id,
-          () => _showNotificationCallback(id),
+          () => _showScheduledNotification(id),
           exact: true,
           wakeup: true,
           rescheduleOnReboot: true,
         );
       }
-      
-      // حفظ معلومات الإشعار للعرض اللاحق
-      await _saveNotificationInfo(
-        id: id,
-        title: title,
-        body: body,
-        channelId: channel,
-        color: color,
-        priority: priority,
-        payload: payload,
-      );
       
       await _updateScheduledNotificationsList(notificationId);
       
@@ -487,68 +486,91 @@ class AndroidNotificationService implements NotificationServiceInterface {
     }
   }
   
-  /// حفظ معلومات الإشعار للعرض عند التشغيل
-  Future<void> _saveNotificationInfo({
-    required int id,
+  /// حفظ معلومات الإشعار الكاملة
+  Future<void> _saveFullNotificationInfo({
+    required String notificationId,
     required String title,
     required String body,
-    required String channelId,
+    required TimeOfDay notificationTime,
+    String? channelId,
+    String? payload,
     Color? color,
     int? priority,
-    String? payload,
+    bool repeat = true,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final id = notificationId.hashCode.abs() % 100000;
+      
       final info = {
+        'notificationId': notificationId,
         'title': title,
         'body': body,
-        'channelId': channelId,
+        'channelId': channelId ?? _scheduledChannelId,
         'color': color?.value,
         'priority': priority,
         'payload': payload,
+        'repeat': repeat,
+        'hour': notificationTime.hour,
+        'minute': notificationTime.minute,
       };
       
-      await prefs.setString('notification_info_$id', jsonEncode(info));
+      await prefs.setString('$_keyNotificationData$id', jsonEncode(info));
+      
+      // أيضاً حفظ الوقت بشكل منفصل للتوافق القديم
+      final timeString = '${notificationTime.hour.toString().padLeft(2, '0')}:${notificationTime.minute.toString().padLeft(2, '0')}';
+      await prefs.setString('notification_${notificationId}_time', timeString);
     } catch (e) {
       _errorLoggingService.logError(
         'AndroidNotificationService', 
-        'خطأ في حفظ معلومات الإشعار', 
+        'خطأ في حفظ معلومات الإشعار الكاملة', 
         e
       );
     }
   }
   
-  /// دالة الاستدعاء لعرض الإشعار
+  /// دالة الاستدعاء لعرض الإشعار المجدول
+  @pragma('vm:entry-point')
+  static void _showScheduledNotification(int alarmId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final infoString = prefs.getString('$_keyNotificationData$alarmId');
+      
+      if (infoString != null) {
+        final info = jsonDecode(infoString);
+        
+        final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+            FlutterLocalNotificationsPlugin();
+        
+        final androidDetails = AndroidNotificationDetails(
+          info['channelId'] ?? 'scheduled_channel',
+          'إشعار مجدول',
+          channelDescription: 'إشعار مجدول',
+          importance: Importance.high,
+          priority: Priority.high,
+          color: info['color'] != null ? Color(info['color']) : null,
+          enableVibration: true,
+          playSound: true,
+          showWhen: true,
+        );
+        
+        await flutterLocalNotificationsPlugin.show(
+          alarmId,
+          info['title'],
+          info['body'],
+          NotificationDetails(android: androidDetails),
+          payload: info['payload'],
+        );
+      }
+    } catch (e) {
+      print('خطأ في عرض الإشعار المجدول: $e');
+    }
+  }
+  
+  /// دالة الاستدعاء القديمة (للتوافق)
   @pragma('vm:entry-point')
   static void _showNotificationCallback(int alarmId) async {
-    // هنا يتم تشغيل الإشعار الفعلي
-    
-    final prefs = await SharedPreferences.getInstance();
-    final infoString = prefs.getString('notification_info_$alarmId');
-    
-    if (infoString != null) {
-      final info = jsonDecode(infoString);
-      
-      final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
-          FlutterLocalNotificationsPlugin();
-      
-      final androidDetails = AndroidNotificationDetails(
-        info['channelId'] ?? 'scheduled_channel',
-        'إشعار مجدول',
-        channelDescription: 'إشعار مجدول',
-        importance: Importance.high,
-        priority: Priority.high,
-        color: info['color'] != null ? Color(info['color']) : null,
-      );
-      
-      await flutterLocalNotificationsPlugin.show(
-        alarmId,
-        info['title'],
-        info['body'],
-        NotificationDetails(android: androidDetails),
-        payload: info['payload'],
-      );
-    }
+    _showScheduledNotification(alarmId);
   }
   
   @override
@@ -610,7 +632,8 @@ class AndroidNotificationService implements NotificationServiceInterface {
         await prefs.setStringList(_keyScheduledNotifications, scheduledList);
       }
       
-      await prefs.remove('notification_info_$id');
+      await prefs.remove('$_keyNotificationData$id');
+      await prefs.remove('notification_${notificationId}_time');
       
       return true;
     } catch (e) {
@@ -634,6 +657,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
       for (String notificationId in scheduledList) {
         final id = notificationId.hashCode.abs() % 100000;
         await AndroidAlarmManager.cancel(id);
+        await prefs.remove('$_keyNotificationData$id');
       }
       
       await prefs.setStringList(_keyScheduledNotifications, []);
@@ -646,21 +670,6 @@ class AndroidNotificationService implements NotificationServiceInterface {
         e
       );
       return false;
-    }
-  }
-  
-  /// حفظ وقت الإشعار في التخزين المحلي
-  Future<void> _saveNotificationTime(String notificationId, TimeOfDay time) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final timeString = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-      await prefs.setString('notification_${notificationId}_time', timeString);
-    } catch (e) {
-      _errorLoggingService.logError(
-        'AndroidNotificationService', 
-        'خطأ في حفظ وقت الإشعار: $notificationId', 
-        e
-      );
     }
   }
   
@@ -703,31 +712,45 @@ class AndroidNotificationService implements NotificationServiceInterface {
       }
       
       for (String notificationId in scheduledList) {
-        final timeString = prefs.getString('notification_${notificationId}_time');
-        if (timeString != null) {
-          final timeParts = timeString.split(':');
-          if (timeParts.length == 2) {
-            final hour = int.tryParse(timeParts[0]);
-            final minute = int.tryParse(timeParts[1]);
-            
-            if (hour != null && minute != null) {
-              final time = TimeOfDay(hour: hour, minute: minute);
+        final id = notificationId.hashCode.abs() % 100000;
+        final infoString = prefs.getString('$_keyNotificationData$id');
+        
+        if (infoString != null) {
+          final info = jsonDecode(infoString);
+          
+          final TimeOfDay time = TimeOfDay(
+            hour: info['hour'],
+            minute: info['minute'],
+          );
+          
+          await scheduleNotification(
+            notificationId: notificationId,
+            title: info['title'],
+            body: info['body'],
+            notificationTime: time,
+            channelId: info['channelId'],
+            payload: info['payload'],
+            color: info['color'] != null ? Color(info['color']) : null,
+            priority: info['priority'],
+            repeat: info['repeat'] ?? true,
+          );
+        } else {
+          // محاولة استرجاع من الطريقة القديمة
+          final timeString = prefs.getString('notification_${notificationId}_time');
+          if (timeString != null) {
+            final timeParts = timeString.split(':');
+            if (timeParts.length == 2) {
+              final hour = int.tryParse(timeParts[0]);
+              final minute = int.tryParse(timeParts[1]);
               
-              final id = notificationId.hashCode.abs() % 100000;
-              final infoString = prefs.getString('notification_info_$id');
-              
-              if (infoString != null) {
-                final info = jsonDecode(infoString);
+              if (hour != null && minute != null) {
+                final time = TimeOfDay(hour: hour, minute: minute);
                 
                 await scheduleNotification(
                   notificationId: notificationId,
-                  title: info['title'],
-                  body: info['body'],
+                  title: 'تذكير',
+                  body: 'حان وقت التذكير',
                   notificationTime: time,
-                  channelId: info['channelId'],
-                  payload: info['payload'],
-                  color: info['color'] != null ? Color(info['color']) : null,
-                  priority: info['priority'],
                   repeat: true,
                 );
               }
@@ -952,6 +975,16 @@ class AndroidNotificationService implements NotificationServiceInterface {
   Future<TimeOfDay?> getNotificationTime(String notificationId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final id = notificationId.hashCode.abs() % 100000;
+      
+      // محاولة استرجاع من الطريقة الجديدة أولاً
+      final infoString = prefs.getString('$_keyNotificationData$id');
+      if (infoString != null) {
+        final info = jsonDecode(infoString);
+        return TimeOfDay(hour: info['hour'], minute: info['minute']);
+      }
+      
+      // محاولة من الطريقة القديمة
       final timeString = prefs.getString('notification_${notificationId}_time');
       
       if (timeString != null) {

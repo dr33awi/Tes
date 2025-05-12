@@ -12,6 +12,10 @@ import 'package:test_athkar_app/screens/athkarscreen/screen/notification_diagnos
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_native_timezone_latest/flutter_native_timezone_latest.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -32,6 +36,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   // Variable for device timezone
   String _deviceTimeZone = '';
+  String _deviceTimeZoneName = '';
   
   // Maps to track notification settings
   Map<String, bool> _notificationsEnabled = {};
@@ -52,11 +57,36 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       vsync: this,
     );
     
+    // Initialize timezone data
+    tz_data.initializeTimeZones();
+    
     // Get device timezone
-    _deviceTimeZone = DateTime.now().timeZoneName;
+    _loadTimeZoneInfo();
     
     _checkPermissions();
     _loadData();
+  }
+  
+  // Load timezone information
+  Future<void> _loadTimeZoneInfo() async {
+    try {
+      final String timeZoneName = await FlutterNativeTimezoneLatest.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      
+      setState(() {
+        _deviceTimeZoneName = timeZoneName;
+        _deviceTimeZone = timeZoneName;
+      });
+    } catch (e) {
+      setState(() {
+        _deviceTimeZone = DateTime.now().timeZoneName;
+      });
+      _errorLoggingService.logError(
+        'NotificationSettingsScreen',
+        'Error loading timezone info',
+        e
+      );
+    }
   }
   
   @override
@@ -73,12 +103,36 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         await _notificationFacade.requestAllPermissions(context);
       }
     } catch (e) {
-      print('Error checking permissions: $e');
+      _errorLoggingService.logError(
+        'NotificationSettingsScreen',
+        'Error checking permissions',
+        e
+      );
+    }
+  }
+  
+  // Check and request permissions with result
+  Future<bool> _checkAndRequestPermissions() async {
+    try {
+      final status = await _notificationFacade.checkAllPermissions(context);
+      if (!status.allPermissionsGranted) {
+        final granted = await _notificationFacade.requestAllPermissions(context);
+        return granted;
+      }
+      return true;
+    } catch (e) {
+      _errorLoggingService.logError(
+        'NotificationSettingsScreen',
+        'Error checking and requesting permissions',
+        e
+      );
+      return false;
     }
   }
 
   // Load notification data
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     
     try {
@@ -91,14 +145,27 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       final Map<String, bool> multipleRemindersMap = {};
       final Map<String, int> additionalCountMap = {};
       
+      // Check global notifications state first
+      final prefs = await SharedPreferences.getInstance();
+      final globalNotificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      
       for (final category in categories) {
         // Get notification status from facade
         final status = await _notificationFacade.getAthkarNotificationStatus(category.id);
-        enabledMap[category.id] = status.isEnabled;
+        enabledMap[category.id] = status.isEnabled && globalNotificationsEnabled;
         
         // Get saved notification times
         if (status.scheduledTimes.isNotEmpty) {
           timeMap[category.id] = status.scheduledTimes.first;
+        } else {
+          // Try to get from category default time
+          final defaultTime = _getDefaultTimeForCategory(category);
+          if (defaultTime != null) {
+            timeMap[category.id] = defaultTime;
+          } else {
+            // Use suggested time as fallback
+            timeMap[category.id] = getSuggestedTimeForCategory(category.id);
+          }
         }
         
         // Check if category has multiple reminders
@@ -106,9 +173,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         multipleRemindersMap[category.id] = hasMultiple;
         
         // Count additional reminders
-        if (hasMultiple) {
-          final additionalTimes = await _athkarService.getAdditionalNotificationTimes(category.id);
-          additionalCountMap[category.id] = additionalTimes.length;
+        if (hasMultiple && status.isEnabled) {
+          final additionalTimes = status.scheduledTimes.length > 1 
+              ? status.scheduledTimes.length - 1 
+              : 0;
+          additionalCountMap[category.id] = additionalTimes;
         } else {
           additionalCountMap[category.id] = 0;
         }
@@ -123,8 +192,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _additionalRemindersCount = additionalCountMap;
           _isLoading = false;
           
-          // Update master switch based on enabled notifications
-          _updateMasterSwitch();
+          // Update master switch based on global state and enabled notifications
+          _masterSwitch = globalNotificationsEnabled && enabledMap.values.any((enabled) => enabled);
         });
       }
     } catch (e) {
@@ -166,48 +235,87 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     
     try {
       if (value) {
+        // Enable all notifications
+        bool permissionsGranted = await _checkAndRequestPermissions();
+        if (!permissionsGranted) {
+          setState(() => _masterSwitch = false);
+          return;
+        }
+        
         // تفعيل جميع الإشعارات
         await _notificationFacade.setAllNotificationsEnabled(true);
         
-        // جدولة الإشعارات الافتراضية
-        await _notificationFacade.scheduleDefaultAthkarNotifications();
+        // جدولة الإشعارات لكل فئة مع أوقاتها الافتراضية
+        for (final category in _categories) {
+          TimeOfDay? defaultTime = _getDefaultTimeForCategory(category) ?? 
+                                  getSuggestedTimeForCategory(category.id);
+          
+          if (defaultTime != null) {
+            await _notificationFacade.scheduleAthkarNotifications(
+              categoryId: category.id,
+              categoryTitle: category.title,
+              times: [defaultTime],
+              customTitle: category.notifyTitle,
+              customBody: category.notifyBody,
+              color: _getCategoryColor(category.id),
+            );
+            
+            setState(() {
+              _notificationsEnabled[category.id] = true;
+              _notificationTimes[category.id] = defaultTime;
+            });
+          }
+        }
       } else {
         // إيقاف جميع الإشعارات
-        await _notificationFacade.setAllNotificationsEnabled(false);
+        await _notificationFacade.cancelAllNotifications();
+        
+        // Clear all enabled states
+        setState(() {
+          for (final category in _categories) {
+            _notificationsEnabled[category.id] = false;
+          }
+        });
       }
       
       // إعادة تحميل البيانات
       await _loadData();
       
-      // Show message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(value ? 'تم تفعيل جميع الإشعارات' : 'تم إيقاف جميع الإشعارات'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: value ? Colors.green : Colors.redAccent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        // Show message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(value ? 'تم تفعيل جميع الإشعارات' : 'تم إيقاف جميع الإشعارات'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: value ? Colors.green : Colors.redAccent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
+      setState(() => _masterSwitch = !value);
+      
       _errorLoggingService.logError(
         'NotificationSettingsScreen', 
         'Error toggling all notifications', 
         e
       );
       
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ أثناء تبديل حالة الإشعارات'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء تبديل حالة الإشعارات'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -218,69 +326,49 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     
     try {
       if (value) {
+        // Check permissions first
+        bool permissionsGranted = await _checkAndRequestPermissions();
+        if (!permissionsGranted) {
+          setState(() {
+            _notificationsEnabled[category.id] = false;
+          });
+          return;
+        }
+        
         // Enable notifications
         TimeOfDay? selectedTime = _notificationTimes[category.id];
         
-        // If no saved time, use default time from category or show time picker
+        // If no time, get from category or use default
         if (selectedTime == null) {
-          if (category.notifyTime != null) {
-            // Use default time from category
-            final timeParts = category.notifyTime!.split(':');
-            if (timeParts.length == 2) {
-              final hour = int.tryParse(timeParts[0]);
-              final minute = int.tryParse(timeParts[1]);
-              
-              if (hour != null && minute != null) {
-                selectedTime = TimeOfDay(hour: hour, minute: minute);
-              }
-            }
+          selectedTime = _getDefaultTimeForCategory(category);
+          if (selectedTime == null) {
+            selectedTime = getSuggestedTimeForCategory(category.id);
           }
           
-          // If no default time, show time picker
-          if (selectedTime == null) {
-            // Show time picker
-            final pickedTime = await showTimePicker(
-              context: context,
-              initialTime: getSuggestedTimeForCategory(category.id),
-              builder: (context, child) {
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: ColorScheme.light(
-                      primary: kPrimary,
-                      onPrimary: Colors.white,
-                      onSurface: Colors.black,
-                    ),
-                    textButtonTheme: TextButtonThemeData(
-                      style: TextButton.styleFrom(
-                        foregroundColor: kPrimary,
-                      ),
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
-            );
-            
-            if (pickedTime == null) {
-              // User canceled time selection
-              setState(() {
-                _notificationsEnabled[category.id] = false;
-              });
-              return;
-            }
-            
-            selectedTime = pickedTime;
+          // Show time picker to confirm or change
+          final pickedTime = await _showTimePicker(
+            initialTime: selectedTime,
+          );
+          
+          if (pickedTime == null) {
+            // User canceled time selection
+            setState(() {
+              _notificationsEnabled[category.id] = false;
+            });
+            return;
           }
+          
+          selectedTime = pickedTime;
         }
         
         // Schedule notification using the facade
         final result = await _notificationFacade.scheduleAthkarNotifications(
           categoryId: category.id,
           categoryTitle: category.title,
-          times: [selectedTime!],
+          times: [selectedTime],
           customTitle: category.notifyTitle,
           customBody: category.notifyBody,
-          color: category.color,
+          color: _getCategoryColor(category.id),
         );
         
         if (result.success) {
@@ -291,18 +379,37 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           
           // Update master switch
           _updateMasterSwitch();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('تم تفعيل الإشعار لـ ${category.title}'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.green,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: EdgeInsets.all(16),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
         } else {
+          setState(() {
+            _notificationsEnabled[category.id] = false;
+          });
+          
           // Show error
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('حدث خطأ أثناء جدولة الإشعار'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              margin: EdgeInsets.all(16),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('حدث خطأ أثناء جدولة الإشعار'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: EdgeInsets.all(16),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
         }
       } else {
         // Cancel notifications
@@ -315,27 +422,105 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           
           // Update master switch
           _updateMasterSwitch();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('تم إيقاف الإشعار لـ ${category.title}'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: EdgeInsets.all(16),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          // Revert the switch if cancellation failed
+          setState(() {
+            _notificationsEnabled[category.id] = true;
+          });
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('حدث خطأ أثناء إيقاف الإشعار'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: EdgeInsets.all(16),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
+      // Revert state on error
+      setState(() {
+        _notificationsEnabled[category.id] = !value;
+      });
+      
       _errorLoggingService.logError(
         'NotificationSettingsScreen', 
         'Error toggling notification for ${category.id}', 
         e
       );
       
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ أثناء تبديل حالة الإشعار'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء تبديل حالة الإشعار'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
+  }
+
+  // Get default time for category
+  TimeOfDay? _getDefaultTimeForCategory(AthkarCategory category) {
+    if (category.notifyTime != null) {
+      final timeParts = category.notifyTime!.split(':');
+      if (timeParts.length == 2) {
+        final hour = int.tryParse(timeParts[0]);
+        final minute = int.tryParse(timeParts[1]);
+        if (hour != null && minute != null) {
+          return TimeOfDay(hour: hour, minute: minute);
+        }
+      }
+    }
+    return null;
+  }
+
+  // Show time picker
+  Future<TimeOfDay?> _showTimePicker({required TimeOfDay initialTime}) async {
+    return showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: kPrimary,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: kPrimary,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
   }
 
   // Edit notification time for a specific category
@@ -349,27 +534,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                          getSuggestedTimeForCategory(category.id);
       
       // Show time picker
-      final pickedTime = await showTimePicker(
-        context: context,
-        initialTime: initialTime,
-        builder: (context, child) {
-          return Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: ColorScheme.light(
-                primary: kPrimary,
-                onPrimary: Colors.white,
-                onSurface: Colors.black,
-              ),
-              textButtonTheme: TextButtonThemeData(
-                style: TextButton.styleFrom(
-                  foregroundColor: kPrimary,
-                ),
-              ),
-            ),
-            child: child!,
-          );
-        },
-      );
+      final pickedTime = await _showTimePicker(initialTime: initialTime);
       
       if (pickedTime != null) {
         // Update notification time
@@ -385,10 +550,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           times: [pickedTime],
           customTitle: category.notifyTitle,
           customBody: category.notifyBody,
-          color: category.color,
+          color: _getCategoryColor(category.id),
         );
         
-        if (result.success) {
+        if (result.success && mounted) {
           // Show message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -409,17 +574,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         e
       );
       
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ أثناء تعديل وقت الإشعار'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء تعديل وقت الإشعار'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -469,7 +636,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     String displayHour = (time.hour > 12) ? (time.hour - 12).toString() : time.hour.toString();
     if (displayHour == '0') displayHour = '12';
     
-    return '$hours:$minutes $period';
+    return '$displayHour:$minutes $period';
   }
   
   // Reset all notification settings
@@ -516,17 +683,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _masterSwitch = false;
         });
         
-        // Show message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم إعادة ضبط جميع إعدادات الإشعارات'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: EdgeInsets.all(16),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        if (mounted) {
+          // Show message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم إعادة ضبط جميع إعدادات الإشعارات'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.green,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: EdgeInsets.all(16),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
         
         setState(() => _isResetting = false);
       }
@@ -539,17 +708,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       
       setState(() => _isResetting = false);
       
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ أثناء إعادة ضبط الإشعارات'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء إعادة ضبط الإشعارات'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -558,7 +729,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     try {
       final success = await _notificationFacade.sendTestNotification();
       
-      if (success) {
+      if (success && mounted) {
         // Show message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -578,17 +749,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         e
       );
       
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ أثناء إرسال الإشعار التجريبي'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء إرسال الإشعار التجريبي'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -613,7 +786,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   // استخراج لون الفئة بناءً على معرف الفئة
-  Color _getCategoryColorWithId(String categoryId) {
+  Color _getCategoryColor(String categoryId) {
     // ألوان الفئات كما في athkar_screen
     switch (categoryId) {
       case 'morning':
@@ -822,7 +995,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                                     ),
                                                     SizedBox(height: 4),
                                                     Text(
-                                                      'المنطقة الزمنية الحالية: $_deviceTimeZone',
+                                                      'المنطقة الزمنية: ${_deviceTimeZoneName.isEmpty ? _deviceTimeZone : _deviceTimeZoneName}',
                                                       style: TextStyle(
                                                         fontSize: 12,
                                                         height: 1.4,
@@ -883,10 +1056,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                               final category = _categories[index];
                               final bool isNotificationEnabled = _notificationsEnabled[category.id] ?? false;
                               final TimeOfDay? notificationTime = _notificationTimes[category.id];
-                              // ignore: unused_local_variable
-                              final bool hasMultipleReminders = _hasMultipleReminders[category.id] ?? false;
                               final int additionalCount = _additionalRemindersCount[category.id] ?? 0;
-                              final Color color1 = _getCategoryColorWithId(category.id);
+                              final Color color1 = _getCategoryColor(category.id);
                               final Color color2 = Color(0xFF2D6852);
                               
                               return AnimationConfiguration.staggeredList(
@@ -1050,7 +1221,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                                         ],
                                                       ),
                                                     ],
-                                                  ),// إعدادات الإشعارات المتعددة (فقط إذا كانت الإشعارات مفعلة)
+                                                  ),
+                                                  // إعدادات الإشعارات المتعددة (فقط إذا كانت الإشعارات مفعلة)
                                                   if (isNotificationEnabled)
                                                     Padding(
                                                       padding: const EdgeInsets.only(top: 12),
