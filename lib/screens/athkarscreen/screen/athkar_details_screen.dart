@@ -1,4 +1,4 @@
-// lib/screens/athkarscreen/athkar_details_screen.dart
+// lib/screens/athkarscreen/screen/athkar_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
@@ -8,6 +8,8 @@ import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_h
     show kPrimary, kSurface;
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:test_athkar_app/services/di_container.dart';
+import 'package:test_athkar_app/services/notification/notification_manager.dart';
 
 class AthkarDetailsScreen extends StatefulWidget {
   final AthkarCategory category;
@@ -24,6 +26,7 @@ class AthkarDetailsScreen extends StatefulWidget {
 class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     with SingleTickerProviderStateMixin {
   final AthkarService _athkarService = AthkarService();
+  late final NotificationManager _notificationManager;
   
   // حالة المفضلة وعدادات الأذكار
   final Map<int, bool> _favorites = {};
@@ -33,6 +36,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   bool _showCompletionMessage = false; // لإظهار رسالة الإتمام
   late AthkarCategory _loadedCategory;
   ScrollController _scrollController = ScrollController();
+  bool _isNotificationEnabled = false;
   
   // متغيرات للتأثيرات البصرية
   late AnimationController _animationController;
@@ -69,6 +73,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
       ),
     );
     
+    // تهيئة خدمة الإشعارات
+    _notificationManager = serviceLocator<NotificationManager>();
+    
     _loadCategory();
   }
   
@@ -86,6 +93,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
       final category = await _athkarService.getAthkarCategory(widget.category.id);
       
       if (category != null) {
+        // التحقق من حالة الإشعارات لهذه الفئة
+        _isNotificationEnabled = await _notificationManager.isNotificationEnabled(widget.category.id);
+        
         if (mounted) {
           setState(() {
             _loadedCategory = category;
@@ -706,7 +716,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     }
   }
   
-  // زر الإجراء محدث بنفس نمط favorites_screen
+// زر الإجراء محدث بنفس نمط favorites_screen
   Widget _buildActionButton({
     required IconData icon,
     required String label,
@@ -828,6 +838,38 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
+          // مؤشر حالة الإشعارات
+          Container(
+            margin: EdgeInsets.only(right: 10),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: _isNotificationEnabled ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isNotificationEnabled ? Colors.green : Colors.red,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _isNotificationEnabled ? Icons.notifications_active : Icons.notifications_off,
+                  color: _isNotificationEnabled ? Colors.green : Colors.red,
+                  size: 16,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  _isNotificationEnabled ? 'الإشعارات مفعلة' : 'الإشعارات معطلة',
+                  style: TextStyle(
+                    color: _isNotificationEnabled ? Colors.green : Colors.red,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
           // زر إعادة تعيين الأذكار
           IconButton(
             icon: Icon(
