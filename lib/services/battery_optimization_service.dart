@@ -409,27 +409,33 @@ class BatteryOptimizationService {
   }
   
   /// فحص القيود الإضافية للبطارية التي قد تؤثر على الإشعارات
-  Future<void> checkForAdditionalBatteryRestrictions(BuildContext context) async {
-    if (!Platform.isAndroid) return;
+Future<void> checkForAdditionalBatteryRestrictions(BuildContext context) async {
+  if (!Platform.isAndroid) return;
+  
+  // التحقق من أن السياق ما زال صالحًا
+  if (!context.mounted) return;
+  
+  try {
+    // فحص دوري فقط
+    if (!await shouldCheckBatteryOptimization()) {
+      return;
+    }
     
-    try {
-      // فحص دوري فقط
-      if (!await shouldCheckBatteryOptimization()) {
-        return;
-      }
-      
-      final manufacturer = await _getDeviceManufacturer();
-      if (_isManufacturerWithSpecialRestrictions(manufacturer)) {
+    final manufacturer = await _getDeviceManufacturer();
+    if (_isManufacturerWithSpecialRestrictions(manufacturer)) {
+      // التأكد من أن السياق ما زال صالحًا قبل عرض الحوار
+      if (context.mounted) {
         _showManufacturerSpecificBatteryDialog(context, manufacturer);
       }
-    } catch (e) {
-      await _errorLoggingService.logError(
-        'BatteryOptimizationService', 
-        'خطأ في التحقق من قيود البطارية الإضافية', 
-        e
-      );
     }
+  } catch (e) {
+    await _errorLoggingService.logError(
+      'BatteryOptimizationService', 
+      'خطأ في التحقق من قيود البطارية الإضافية', 
+      e
+    );
   }
+}
   
   /// تحديد الشركة المصنعة للجهاز بدقة أكبر
   Future<String> _getDeviceManufacturer() async {

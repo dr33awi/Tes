@@ -72,13 +72,15 @@ class AppInitializer {
     return NotificationNavigation.navigatorKey;
   }
   
-  /// التحقق من تحسينات الإشعارات عند بدء التطبيق
+  /// التحقق من تحسينات الإشعارات عند بدء التطبيق - تم تحديثها
   static Future<void> checkNotificationOptimizations(BuildContext context) async {
+    // تأجيل التحقق حتى اكتمال بناء الواجهة
+    await Future.delayed(Duration(seconds: 2));
+    
+    if (!context.mounted) return;
+    
     try {
       final notificationManager = serviceLocator<NotificationManager>();
-      
-      // إضافة تأخير قصير لتجنب عرض حوارات متعددة
-      await Future.delayed(Duration(seconds: 1));
       
       await notificationManager.checkNotificationOptimizations(context);
     } catch (e) {
