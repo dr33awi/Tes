@@ -8,7 +8,8 @@ import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/do_not_disturb_service.dart';
 import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/services/permissions_service.dart';
-import 'package:test_athkar_app/services/notification_service_interface.dart';
+import 'package:test_athkar_app/services/notification/notification_service_interface.dart';
+import 'package:test_athkar_app/services/notification/notification_helpers.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -398,25 +399,6 @@ class AndroidNotificationService implements NotificationServiceInterface {
     }
   }
   
-  /// الحصول على الوقت التالي لجدولة الإشعار
-  tz.TZDateTime _getNextInstanceOfTime(TimeOfDay timeOfDay) {
-    final now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime scheduledDate = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      timeOfDay.hour,
-      timeOfDay.minute,
-    );
-    
-    if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
-    }
-    
-    return scheduledDate;
-  }
-  
   @override
   Future<bool> scheduleNotification({
     required String notificationId,
@@ -451,22 +433,31 @@ class AndroidNotificationService implements NotificationServiceInterface {
       
       final id = notificationId.hashCode.abs() % 100000;
       
+      // إضافة دعم التجميع إذا كان payload يحتوي على category ID
+      String? groupKey;
+      if (payload != null && payload.contains('athkar_')) {
+        final parts = payload.split('_');
+        if (parts.length > 1) {
+          groupKey = NotificationHelpers.getGroupKeyForCategory(parts[1]);
+        }
+      }
+      
       // استخدام Android Alarm Manager للجدولة الدقيقة
       if (repeat) {
         await AndroidAlarmManager.periodic(
           const Duration(days: 1),
           id,
-          () => _showScheduledNotification(id),
-          startAt: _getNextInstanceOfTime(notificationTime).toLocal(),
+          () => _showScheduledNotification(id, groupKey),
+          startAt: NotificationHelpers.getNextInstanceOfTime(notificationTime).toLocal(),
           exact: true,
           wakeup: true,
           rescheduleOnReboot: true,
         );
       } else {
         await AndroidAlarmManager.oneShotAt(
-          _getNextInstanceOfTime(notificationTime).toLocal(),
+          NotificationHelpers.getNextInstanceOfTime(notificationTime).toLocal(),
           id,
-          () => _showScheduledNotification(id),
+          () => _showScheduledNotification(id, groupKey),
           exact: true,
           wakeup: true,
           rescheduleOnReboot: true,
@@ -531,7 +522,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
   
   /// دالة الاستدعاء لعرض الإشعار المجدول
   @pragma('vm:entry-point')
-  static void _showScheduledNotification(int alarmId) async {
+  static void _showScheduledNotification(int alarmId, [String? groupKey]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final infoString = prefs.getString('$_keyNotificationData$alarmId');
@@ -552,6 +543,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
           enableVibration: true,
           playSound: true,
           showWhen: true,
+          groupKey: groupKey, // إضافة مفتاح المجموعة
         );
         
         await flutterLocalNotificationsPlugin.show(
@@ -565,12 +557,6 @@ class AndroidNotificationService implements NotificationServiceInterface {
     } catch (e) {
       print('خطأ في عرض الإشعار المجدول: $e');
     }
-  }
-  
-  /// دالة الاستدعاء القديمة (للتوافق)
-  @pragma('vm:entry-point')
-  static void _showNotificationCallback(int alarmId) async {
-    _showScheduledNotification(alarmId);
   }
   
   @override
@@ -897,14 +883,22 @@ class AndroidNotificationService implements NotificationServiceInterface {
   @override
   Future<bool> sendGroupedTestNotification() async {
     try {
+      final groupKey = 'test_athkar_group';
+      
+      // إنشاء إشعار ملخص
       final androidSummaryDetails = AndroidNotificationDetails(
         _defaultChannelId,
         'الإشعارات الافتراضية',
-        channelDescription: 'قناة الإشعارات العامة',
+        channelDescription: 'الإشعارات العامة للتطبيق',
         importance: Importance.high,
         priority: Priority.high,
-        groupKey: 'test_group',
+        groupKey: groupKey,
         setAsGroupSummary: true,
+        styleInformation: InboxStyleInformation(
+          ['اختبار مجموعة الإشعارات'],
+          contentTitle: 'عدة إشعارات اختبارية',
+          summaryText: 'إشعارات الاختبار',
+        ),
       );
       
       final summaryDetails = NotificationDetails(android: androidSummaryDetails);
@@ -917,14 +911,15 @@ class AndroidNotificationService implements NotificationServiceInterface {
         payload: 'test_group',
       );
       
+      // إنشاء إشعارات فردية في المجموعة
       for (int i = 1; i <= 3; i++) {
         final androidDetails = AndroidNotificationDetails(
           _defaultChannelId,
           'الإشعارات الافتراضية',
-          channelDescription: 'قناة الإشعارات العامة',
+          channelDescription: 'الإشعارات العامة للتطبيق',
           importance: Importance.high,
           priority: Priority.high,
-          groupKey: 'test_group',
+          groupKey: groupKey,
           setAsGroupSummary: false,
         );
         

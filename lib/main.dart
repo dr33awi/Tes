@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:test_athkar_app/services/app_initializer.dart';
-import 'package:test_athkar_app/services/notification_navigation.dart';
+import 'package:test_athkar_app/services/notification/notification_navigation.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart'; // قم بتعديلها للشاشة الرئيسية الخاصة بك
@@ -151,7 +151,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       await Future.delayed(const Duration(seconds: 3));
       
       if (mounted && context.mounted) {
-        // فحص إعدادات البطارية وإعدادات عدم الإزعاج
+// AppInitializer.checkAndRescheduleNotifications(); // علق هذا السطر
         await AppInitializer.checkNotificationOptimizations(context);
       }
     } catch (e) {

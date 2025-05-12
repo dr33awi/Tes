@@ -1,14 +1,29 @@
-// lib/services/notification_navigation.dart
+// lib/services/notification/notification_navigation.dart
+import 'dart:convert'; // أضف هذا السطر لاستيراد jsonDecode و jsonEncode
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 
 /// فئة مساعدة للتعامل مع التنقل من الإشعارات
 class NotificationNavigation {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
+  
+  // خريطة لتخزين معالجات التنقل المخصصة
+  static final Map<String, Function(BuildContext, String, Map<String, dynamic>?)> _navigationHandlers = {};
+  
+  /// تسجيل معالج تنقل مخصص
+  static void registerNavigationHandler(
+    String handlerId,
+    Function(BuildContext, String, Map<String, dynamic>?) handler,
+  ) {
+    _navigationHandlers[handlerId] = handler;
+  }
+  
+  /// إلغاء تسجيل معالج تنقل
+  static void unregisterNavigationHandler(String handlerId) {
+    _navigationHandlers.remove(handlerId);
+  }
   
   /// تهيئة التنقل من الإشعارات
   static Future<void> initialize() async {
@@ -86,9 +101,11 @@ class NotificationNavigation {
     if (payload.isEmpty) return;
     
     try {
-      // استخراج معرف الفئة وأي معلمات إضافية
-      final parts = payload.split(':');
-      final categoryId = parts[0];
+      // تحليل البيانات
+      final Map<String, dynamic> data = _parsePayload(payload);
+      final String navigationId = data['navigationId'] ?? 'default';
+      final String targetId = data['targetId'] ?? '';
+      final Map<String, dynamic>? extraData = data['extraData'];
       
       // الحصول على سياق التنقل
       final context = navigatorKey.currentState?.context;
@@ -101,24 +118,13 @@ class NotificationNavigation {
         return;
       }
       
-      // تحميل فئة الأذكار
-      final AthkarService athkarService = AthkarService();
-      final category = await athkarService.getAthkarCategory(categoryId);
-      
-      if (category != null) {
-        // التنقل إلى شاشة تفاصيل الأذكار
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AthkarDetailsScreen(category: category),
-          ),
-        );
+      // البحث عن معالج مسجل
+      final handler = _navigationHandlers[navigationId];
+      if (handler != null) {
+        handler(context, targetId, extraData);
       } else {
-        await _errorLoggingService.logError(
-          'NotificationNavigation', 
-          'تعذر العثور على الفئة: $categoryId', 
-          Exception('Category not found')
-        );
+        // معالج افتراضي
+        _defaultNavigationHandler(context, navigationId, targetId, extraData);
       }
     } catch (e) {
       await _errorLoggingService.logError(
@@ -129,80 +135,57 @@ class NotificationNavigation {
     }
   }
   
-  /// الحصول على أيقونة فئة الأذكار بناءً على المعرف
-  static IconData getCategoryIcon(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return Icons.wb_sunny;
-      case 'evening':
-        return Icons.nightlight_round;
-      case 'sleep':
-        return Icons.bedtime;
-      case 'wake':
-        return Icons.alarm;
-      case 'prayer':
-        return Icons.mosque;
-      case 'home':
-        return Icons.home;
-      case 'food':
-        return Icons.restaurant;
-      case 'quran':
-        return Icons.menu_book;
-      default:
-        return Icons.notifications;
+  /// تحليل بيانات الإشعار
+  static Map<String, dynamic> _parsePayload(String payload) {
+    try {
+      // محاولة تحليل JSON
+      return Map<String, dynamic>.from(jsonDecode(payload));
+    } catch (e) {
+      // إذا فشل، استخدم تحليل بسيط
+      final parts = payload.split(':');
+      return {
+        'navigationId': parts.isNotEmpty ? parts[0] : 'default',
+        'targetId': parts.length > 1 ? parts[1] : '',
+        'extraData': parts.length > 2 ? {'extra': parts.sublist(2).join(':')} : null,
+      };
     }
   }
   
-  /// الحصول على لون فئة الأذكار بناءً على المعرف
-  static Color getCategoryColor(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return const Color(0xFFFFD54F); // أصفر للصباح
-      case 'evening':
-        return const Color(0xFFAB47BC); // بنفسجي للمساء
-      case 'sleep':
-        return const Color(0xFF5C6BC0); // أزرق للنوم
-      case 'wake':
-        return const Color(0xFFFFB74D); // برتقالي للاستيقاظ
-      case 'prayer':
-        return const Color(0xFF4DB6AC); // أزرق فاتح للصلاة
-      case 'home':
-        return const Color(0xFF66BB6A); // أخضر للمنزل
-      case 'food':
-        return const Color(0xFFE57373); // أحمر للطعام
-      case 'quran':
-        return const Color(0xFF9575CD); // بنفسجي فاتح للقرآن
-      default:
-        return const Color(0xFF447055); // اللون الافتراضي للتطبيق
-    }
+  /// معالج التنقل الافتراضي
+  static void _defaultNavigationHandler(
+    BuildContext context,
+    String navigationId,
+    String targetId,
+    Map<String, dynamic>? extraData,
+  ) {
+    // يمكن تخصيص هذا حسب احتياجات التطبيق
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تم النقر على إشعار: $navigationId'),
+      ),
+    );
   }
   
   /// تنفيذ التنقل المخصص من الإشعار
-  static Future<void> navigateFromNotification(BuildContext context, String categoryId, {Map<String, dynamic>? extraData}) async {
+  static Future<void> navigateFromNotification(
+    BuildContext context,
+    String navigationId,
+    String targetId, {
+    Map<String, dynamic>? extraData,
+  }) async {
     try {
-      // تحميل فئة الأذكار
-      final AthkarService athkarService = AthkarService();
-      final category = await athkarService.getAthkarCategory(categoryId);
-      
-      if (category != null) {
-        // التنقل إلى شاشة تفاصيل الأذكار
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AthkarDetailsScreen(category: category),
-          ),
-        );
+      // البحث عن معالج مسجل
+      final handler = _navigationHandlers[navigationId];
+      if (handler != null) {
+        handler(context, targetId, extraData);
       } else {
-        await _errorLoggingService.logError(
-          'NotificationNavigation', 
-          'تعذر العثور على الفئة أثناء التنقل المخصص: $categoryId', 
-          Exception('Category not found')
-        );
+        // استخدام المعالج الافتراضي
+        _defaultNavigationHandler(context, navigationId, targetId, extraData);
       }
     } catch (e) {
       await _errorLoggingService.logError(
         'NotificationNavigation', 
-        'خطأ في التنقل المخصص من الإشعار: $categoryId', 
+        'خطأ في التنقل المخصص من الإشعار: $navigationId', 
         e
       );
     }
@@ -220,6 +203,28 @@ class NotificationNavigation {
         'خطأ في تخزين بيانات التنقل من الإشعار', 
         e
       );
+    }
+  }
+  
+  /// إنشاء بيانات موحدة للإشعار
+  static String createNavigationPayload({
+    required String navigationId,
+    required String targetId,
+    Map<String, dynamic>? extraData,
+  }) {
+    try {
+      final data = {
+        'navigationId': navigationId,
+        'targetId': targetId,
+        'extraData': extraData,
+      };
+      return jsonEncode(data);
+    } catch (e) {
+      // طريقة بديلة بسيطة
+      if (extraData != null && extraData.isNotEmpty) {
+        return '$navigationId:$targetId:${extraData.toString()}';
+      }
+      return '$navigationId:$targetId';
     }
   }
 }

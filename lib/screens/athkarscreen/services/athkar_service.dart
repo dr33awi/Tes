@@ -1,10 +1,8 @@
-// lib/screens/athkarscreen/services/athkar_service.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
-import 'package:test_athkar_app/services/notification_facade.dart';
 
 class AthkarService {
   // Singleton implementation
@@ -14,9 +12,6 @@ class AthkarService {
 
   // Cache for loaded athkar to avoid repeated file reads
   Map<String, AthkarCategory> _athkarCache = {};
-  
-  // استخدام NotificationFacade
-  final NotificationFacade _notificationFacade = NotificationFacade.instance;
 
   // Load athkar from JSON file
   Future<List<AthkarCategory>> loadAllAthkarCategories() async {
@@ -315,84 +310,102 @@ class AthkarService {
     }
   }
 
-  // =============== طرق الإشعارات الجديدة باستخدام NotificationFacade ===============
+  // تحسين نظام إعدادات الإشعارات
   
-  // جدولة إشعار لفئة أذكار
-  Future<bool> scheduleAthkarNotification(String categoryId, TimeOfDay time) async {
+  // الحصول على إعدادات الإشعارات الكاملة لفئة معينة
+  Future<NotificationSettings> getNotificationSettings(String categoryId) async {
     try {
-      final category = await getAthkarCategory(categoryId);
-      if (category == null) return false;
-
-      final result = await _notificationFacade.scheduleAthkarNotifications(
-        categoryId: categoryId,
-        categoryTitle: category.title,
-        times: [time],
-        customTitle: category.notifyTitle,
-        customBody: category.notifyBody,
-        color: category.color,
+      final prefs = await SharedPreferences.getInstance();
+      
+      // الحصول على الإعدادات الأساسية
+      final enabled = prefs.getBool('notification_${categoryId}_enabled') ?? true;
+      final customTime = prefs.getString('notification_${categoryId}_time');
+      final vibrate = prefs.getBool('notification_${categoryId}_vibrate') ?? true;
+      
+      // استرجاع أهمية الإشعار
+      final importance = prefs.getInt('notification_${categoryId}_importance') ?? 4;
+      
+      return NotificationSettings(
+        isEnabled: enabled,
+        customTime: customTime,
+        vibrate: vibrate,
+        importance: importance,
       );
-
-      return result.success;
     } catch (e) {
-      print('Error scheduling athkar notification: $e');
+      print('Error getting notification settings: $e');
+      return NotificationSettings();
+    }
+  }
+  
+  // حفظ إعدادات الإشعارات الكاملة لفئة معينة
+  Future<void> saveNotificationSettings(String categoryId, NotificationSettings settings) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      await prefs.setBool('notification_${categoryId}_enabled', settings.isEnabled);
+      
+      if (settings.customTime != null) {
+        await prefs.setString('notification_${categoryId}_time', settings.customTime!);
+      } else {
+        await prefs.remove('notification_${categoryId}_time');
+      }
+      
+      await prefs.setBool('notification_${categoryId}_vibrate', settings.vibrate);
+      
+      await prefs.setInt('notification_${categoryId}_importance', settings.importance ?? 4);
+    } catch (e) {
+      print('Error saving notification settings: $e');
+    }
+  }
+  
+  // تبسيط - الحصول على حالة تفعيل الإشعار
+  Future<bool> getNotificationEnabled(String categoryId) async {
+    try {
+      final settings = await getNotificationSettings(categoryId);
+      return settings.isEnabled;
+    } catch (e) {
+      print('Error checking if notification is enabled: $e');
       return false;
     }
   }
-
-  // جدولة إشعارات متعددة لفئة أذكار
-  Future<bool> scheduleMultipleAthkarNotifications(String categoryId, List<TimeOfDay> times) async {
+  
+  // تبسيط - ضبط حالة تفعيل الإشعار
+  Future<void> setNotificationEnabled(String categoryId, bool enabled) async {
     try {
-      final category = await getAthkarCategory(categoryId);
-      if (category == null) return false;
-
-      final result = await _notificationFacade.scheduleAthkarNotifications(
-        categoryId: categoryId,
-        categoryTitle: category.title,
-        times: times,
-        customTitle: category.notifyTitle,
-        customBody: category.notifyBody,
-        color: category.color,
+      final settings = await getNotificationSettings(categoryId);
+      await saveNotificationSettings(
+        categoryId, 
+        settings.copyWith(isEnabled: enabled)
       );
-
-      return result.success;
     } catch (e) {
-      print('Error scheduling multiple athkar notifications: $e');
-      return false;
+      print('Error setting notification enabled status: $e');
     }
   }
-
-  // إلغاء إشعارات فئة أذكار
-  Future<bool> cancelAthkarNotification(String categoryId) async {
+  
+  // تبسيط - الحصول على وقت الإشعار المخصص
+  Future<String?> getCustomNotificationTime(String categoryId) async {
     try {
-      return await _notificationFacade.cancelAthkarNotifications(categoryId);
+      final settings = await getNotificationSettings(categoryId);
+      return settings.customTime;
     } catch (e) {
-      print('Error canceling athkar notification: $e');
-      return false;
+      print('Error getting custom notification time: $e');
+      return null;
     }
   }
-
-  // التحقق مما إذا كانت الإشعارات مفعلة لفئة معينة
-  Future<bool> isNotificationEnabled(String categoryId) async {
+  
+  // تبسيط - ضبط وقت الإشعار المخصص
+  Future<void> setCustomNotificationTime(String categoryId, String time) async {
     try {
-      final status = await _notificationFacade.getAthkarNotificationStatus(categoryId);
-      return status.isEnabled;
+      final settings = await getNotificationSettings(categoryId);
+      await saveNotificationSettings(
+        categoryId, 
+        settings.copyWith(customTime: time)
+      );
     } catch (e) {
-      print('Error checking notification status: $e');
-      return false;
+      print('Error setting custom notification time: $e');
     }
   }
-
-  // الحصول على أوقات الإشعارات لفئة معينة
-  Future<List<TimeOfDay>> getNotificationTimes(String categoryId) async {
-    try {
-      final status = await _notificationFacade.getAthkarNotificationStatus(categoryId);
-      return status.scheduledTimes;
-    } catch (e) {
-      print('Error getting notification times: $e');
-      return [];
-    }
-  }
-
+  
   // الحصول على قائمة الأوقات الإضافية للإشعارات
   Future<List<String>> getAdditionalNotificationTimes(String categoryId) async {
     try {

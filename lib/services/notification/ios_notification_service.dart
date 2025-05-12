@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
-import 'package:test_athkar_app/services/notification_service_interface.dart';
+import 'package:test_athkar_app/services/notification/notification_service_interface.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,10 +12,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 class IOSNotificationService implements NotificationServiceInterface {
   // نمط Singleton للتنفيذ
   static final IOSNotificationService _instance = IOSNotificationService._internal();
-  factory IOSNotificationService() => _instance;
+  
+  factory IOSNotificationService({
+    ErrorLoggingService? errorLoggingService,
+  }) {
+    if (errorLoggingService != null) {
+      _instance._errorLoggingService = errorLoggingService;
+    }
+    return _instance;
+  }
   
   // التبعية المعكوسة
-  final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
+  ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   
   // كائن Flutter Local Notifications Plugin
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =

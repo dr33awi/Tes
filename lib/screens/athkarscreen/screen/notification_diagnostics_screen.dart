@@ -3,11 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/services/notification_facade.dart';
+import 'package:test_athkar_app/services/notification_service.dart'; // استيراد خدمة الإشعارات الموحدة
 import 'package:test_athkar_app/services/error_logging_service.dart';
+import 'package:test_athkar_app/services/battery_optimization_service.dart';
+import 'package:test_athkar_app/services/do_not_disturb_service.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:app_settings/app_settings.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:share_plus/share_plus.dart';
 
 class NotificationDiagnosticsScreen extends StatefulWidget {
@@ -18,16 +22,22 @@ class NotificationDiagnosticsScreen extends StatefulWidget {
 }
 
 class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsScreen> {
-  final NotificationFacade _notificationFacade = NotificationFacade.instance;
+  final NotificationService _notificationService = NotificationService(); // استخدام الخدمة الموحدة
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
+  final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
+  final DoNotDisturbService _doNotDisturbService = DoNotDisturbService();
   
   bool _isLoading = true;
   bool _isRunningDiagnostics = false;
   bool _isResetting = false;
   
   // Diagnostics results
-  NotificationPermissionsStatus? _permissionsStatus;
-  NotificationStatistics? _statistics;
+  bool _hasNotificationPermission = false;
+  bool _batteryOptimizationDisabled = false;
+  bool _canBypassDnd = false;
+  bool _isInDndMode = false;
+  int _pendingNotificationsCount = 0;
+  Map<String, dynamic> _notificationStats = {};
   Map<String, dynamic> _errorStats = {};
   String _deviceInfo = '';
   
@@ -61,11 +71,28 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
     setState(() => _isRunningDiagnostics = true);
     
     try {
-      // Check permissions
-      _permissionsStatus = await _notificationFacade.checkAllPermissions(context);
+      // Check notification permission
+      final flnp = FlutterLocalNotificationsPlugin();
+      _hasNotificationPermission = await flnp
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.areNotificationsEnabled() ?? false;
+      
+      // Check battery optimization (Android only)
+      if (Platform.isAndroid) {
+        _batteryOptimizationDisabled = !(await _batteryOptimizationService.isBatteryOptimizationEnabled());
+      }
+      
+      // Check Do Not Disturb status
+      _isInDndMode = await _doNotDisturbService.isInDoNotDisturbMode();
+      _canBypassDnd = await _doNotDisturbService.canBypassDoNotDisturb();
+      
+      // Count pending notifications
+      final pendingNotifications = await _notificationService.getPendingNotifications();
+      _pendingNotificationsCount = pendingNotifications.length;
       
       // Get notification statistics
-      _statistics = await _notificationFacade.getNotificationStatistics();
+      _notificationStats = await _notificationService.getNotificationStatistics();
       
       // Get error statistics
       _errorStats = await _errorLoggingService.getErrorStats();
@@ -86,7 +113,7 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
   // Get device info string
   String _getDeviceInfo() {
     return 'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n'
-           'Timezone: ${DateTime.now().timeZoneName}\n'
+           'Timezone: ${_notificationService.getCurrentTimezoneName()}\n'
            'Locale: ${Platform.localeName}';
   }
   
@@ -122,7 +149,7 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
       
       if (confirm) {
         // Cancel all notifications
-        await _notificationFacade.cancelAllNotifications();
+        await _notificationService.cancelAllNotifications();
         
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -167,11 +194,28 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
     try {
       setState(() => _isResetting = true);
       
-      // Request all permissions
-      await _notificationFacade.requestAllPermissions(context);
+      // Check permissions
+      if (!_hasNotificationPermission) {
+        // Request notification permission
+        final flnp = FlutterLocalNotificationsPlugin();
+        await flnp
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+      }
+      
+      // Configure notification channels for Do Not Disturb
+      if (Platform.isAndroid) {
+        await _doNotDisturbService.configureNotificationChannelsForDoNotDisturb();
+      }
+      
+      // Handle battery optimization
+      if (Platform.isAndroid && !_batteryOptimizationDisabled) {
+        await _batteryOptimizationService.requestDisableBatteryOptimization();
+      }
       
       // Re-schedule all notifications
-      await _notificationFacade.rescheduleAllSavedNotifications();
+      await _notificationService.scheduleAllSavedNotifications();
       
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,7 +257,7 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
   // Test notification
   Future<void> _testNotification() async {
     try {
-      await _notificationFacade.sendTestNotification();
+      await _notificationService.testImmediateNotification();
       
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -257,14 +301,13 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
           '==========================\n\n'
           'معلومات الجهاز:\n$_deviceInfo\n\n'
           'حالة الإشعارات:\n'
-          '- إذن الإشعارات: ${_permissionsStatus?.hasNotificationPermission ?? false ? 'ممنوح ✓' : 'غير ممنوح ✗'}\n'
-          '- تحسين البطارية معطل: ${_permissionsStatus?.isBatteryOptimized ?? false ? 'لا ✗' : 'نعم ✓'}\n'
-          '- يمكن تجاوز وضع عدم الإزعاج: ${_permissionsStatus?.canBypassDoNotDisturb ?? false ? 'نعم ✓' : 'لا ✗'}\n'
-          '- عدد الإشعارات المعلقة: ${_statistics?.totalPending ?? 0}\n\n'
+          '- إذن الإشعارات: ${_hasNotificationPermission ? 'ممنوح ✓' : 'غير ممنوح ✗'}\n'
+          '- تحسين البطارية معطل: ${_batteryOptimizationDisabled ? 'نعم ✓' : 'لا ✗'}\n'
+          '- وضع عدم الإزعاج: ${_isInDndMode ? 'مفعل ✗' : 'غير مفعل ✓'}\n'
+          '- يمكن تجاوز وضع عدم الإزعاج: ${_canBypassDnd ? 'نعم ✓' : 'لا ✗'}\n'
+          '- عدد الإشعارات المعلقة: $_pendingNotificationsCount\n\n'
           'إحصائيات الإشعارات:\n'
-          '- إجمالي المجدولة: ${_statistics?.totalScheduled ?? 0}\n'
-          '- النشطة: ${_statistics?.totalActive ?? 0}\n'
-          '- المعلقة: ${_statistics?.totalPending ?? 0}\n\n'
+          '$_notificationStats\n\n'
           '$report';
       
       // Share the report
@@ -289,7 +332,50 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
       );
     }
   }
-
+  
+  // Open notification settings
+  Future<void> _openNotificationSettings() async {
+    try {
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+    } catch (e) {
+      _errorLoggingService.logError(
+        'NotificationDiagnosticsScreen',
+        'Error opening notification settings',
+        e
+      );
+    }
+  }
+  
+  // Open battery settings
+  Future<void> _openBatterySettings() async {
+    try {
+      if (Platform.isAndroid) {
+        await _batteryOptimizationService.requestDisableBatteryOptimization();
+      } else {
+        await AppSettings.openAppSettings();
+      }
+    } catch (e) {
+      _errorLoggingService.logError(
+        'NotificationDiagnosticsScreen', 
+        'Error opening battery settings', 
+        e
+      );
+    }
+  }
+  
+  // Open Do Not Disturb settings
+  Future<void> _openDoNotDisturbSettings() async {
+    try {
+      await _doNotDisturbService.openDoNotDisturbSettings();
+    } catch (e) {
+      _errorLoggingService.logError(
+        'NotificationDiagnosticsScreen', 
+        'Error opening Do Not Disturb settings', 
+        e
+      );
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -500,6 +586,22 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
                     onPressed: _resetAllNotifications,
                     isDestructive: true,
                   ),
+                  _buildActionButton(
+                    icon: Icons.settings,
+                    label: 'إعدادات الإشعارات',
+                    onPressed: _openNotificationSettings,
+                  ),
+                  if (Platform.isAndroid)
+                    _buildActionButton(
+                      icon: Icons.battery_full,
+                      label: 'إعدادات البطارية',
+                      onPressed: _openBatterySettings,
+                    ),
+                  _buildActionButton(
+                    icon: Icons.do_not_disturb_on,
+                    label: 'وضع عدم الإزعاج',
+                    onPressed: _openDoNotDisturbSettings,
+                  ),
                 ],
               ),
             ],
@@ -576,7 +678,7 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
             _buildStatusItem(
               icon: Icons.notifications_active,
               title: 'أذونات الإشعارات',
-              status: _permissionsStatus?.hasNotificationPermission ?? false,
+              status: _hasNotificationPermission,
               description: 'إذن عرض الإشعارات من التطبيق',
             ),
             Divider(),
@@ -584,7 +686,7 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
               _buildStatusItem(
                 icon: Icons.battery_charging_full,
                 title: 'تحسين البطارية',
-                status: !(_permissionsStatus?.isBatteryOptimized ?? true),
+                status: _batteryOptimizationDisabled,
                 description: 'تعطيل تحسين البطارية للتطبيق',
               ),
             if (Platform.isAndroid)
@@ -592,15 +694,19 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
             _buildStatusItem(
               icon: Icons.do_not_disturb_on,
               title: 'وضع عدم الإزعاج',
-              status: _permissionsStatus?.canBypassDoNotDisturb ?? false,
-              description: 'القدرة على تجاوز وضع عدم الإزعاج',
+              status: !_isInDndMode || _canBypassDnd,
+              description: _isInDndMode 
+                  ? (_canBypassDnd 
+                      ? 'وضع عدم الإزعاج مفعل، ولكن التطبيق يمكنه تجاوزه'
+                      : 'وضع عدم الإزعاج مفعل، وقد يؤثر على الإشعارات')
+                  : 'وضع عدم الإزعاج غير مفعل',
             ),
             Divider(),
             _buildStatusItem(
               icon: Icons.notifications,
               title: 'الإشعارات المعلقة',
-              status: (_statistics?.totalPending ?? 0) > 0,
-              description: 'عدد الإشعارات المجدولة: ${_statistics?.totalPending ?? 0}',
+              status: _pendingNotificationsCount > 0,
+              description: 'عدد الإشعارات المجدولة: $_pendingNotificationsCount',
               showIcon: false,
             ),
           ],
@@ -702,25 +808,30 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
               ],
             ),
             SizedBox(height: 16),
-            _buildStatItem(
-              title: 'إجمالي المجدولة',
-              value: '${_statistics?.totalScheduled ?? 0}',
-            ),
-            _buildStatItem(
-              title: 'النشطة',
-              value: '${_statistics?.totalActive ?? 0}',
-            ),
-            _buildStatItem(
-              title: 'المعلقة',
-              value: '${_statistics?.totalPending ?? 0}',
-            ),
-            
-            if (_statistics?.categoriesCount != null)
-              ..._statistics!.categoriesCount.entries.map((entry) => 
-                _buildStatItem(
-                  title: 'فئة ${entry.key}',
-                  value: '${entry.value}',
-                ),
+            if (_notificationStats.containsKey('total_notifications'))
+              _buildStatItem(
+                title: 'إجمالي الإشعارات',
+                value: '${_notificationStats['total_notifications']}',
+              ),
+            if (_notificationStats.containsKey('pending_count'))
+              _buildStatItem(
+                title: 'الإشعارات المعلقة',
+                value: '${_notificationStats['pending_count']}',
+              ),
+            if (_notificationStats.containsKey('last_scheduled'))
+              _buildStatItem(
+                title: 'آخر جدولة',
+                value: '${_notificationStats['last_scheduled']}',
+              ),
+            if (_notificationStats.containsKey('last_scheduled_count'))
+              _buildStatItem(
+                title: 'عدد آخر جدولة',
+                value: '${_notificationStats['last_scheduled_count']}',
+              ),
+            if (_notificationStats.containsKey('last_reset'))
+              _buildStatItem(
+                title: 'آخر إعادة ضبط',
+                value: '${_notificationStats['last_reset']}',
               ),
           ],
         ),
