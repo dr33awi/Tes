@@ -10,12 +10,34 @@ class AppInitializer {
   // مؤشر لمعرفة ما إذا تمت تهيئة التطبيق بالفعل
   static bool _isInitialized = false;
   
+  // Future لضمان عدم تكرار التهيئة
+  static Future<bool>? _initializationFuture;
+  
   /// تهيئة جميع خدمات التطبيق
   static Future<bool> initialize() async {
+    // إذا كانت هناك عملية تهيئة جارية، انتظر اكتمالها
+    if (_initializationFuture != null) {
+      return _initializationFuture!;
+    }
+    
+    // إذا تمت التهيئة بالفعل، أرجع true
     if (_isInitialized) {
       return true;
     }
     
+    // بدء عملية التهيئة
+    _initializationFuture = _performInitialization();
+    
+    try {
+      final result = await _initializationFuture!;
+      return result;
+    } finally {
+      _initializationFuture = null;
+    }
+  }
+  
+  /// تنفيذ عملية التهيئة الفعلية
+  static Future<bool> _performInitialization() async {
     try {
       // تعيين اتجاه الشاشة
       await SystemChrome.setPreferredOrientations([
@@ -63,6 +85,7 @@ class AppInitializer {
       print('خطأ في التحقق من تحسينات الإشعارات: $e');
     }
   }
+  
   /// التحقق وإعادة جدولة الإشعارات إذا لزم الأمر
   static Future<void> checkAndRescheduleNotifications() async {
     try {

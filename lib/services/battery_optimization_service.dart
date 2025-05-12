@@ -9,7 +9,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-/// Datenklasse für Herstellerspezifische Anweisungen
+/// فئة بيانات لتعليمات الشركة المصنعة
 class ManufacturerInstructions {
   final String name;
   final String instructions;
@@ -24,9 +24,9 @@ class ManufacturerInstructions {
   });
 }
 
-/// Service zur Verwaltung von Batterieoptimierungseinstellungen
+/// خدمة لإدارة إعدادات تحسين البطارية
 class BatteryOptimizationService {
-  // Singleton-Pattern mit Dependency Injection
+  // تنفيذ نمط Singleton مع التبعية المعكوسة
   static final BatteryOptimizationService _instance = BatteryOptimizationService._internal();
   
   factory BatteryOptimizationService({
@@ -38,10 +38,10 @@ class BatteryOptimizationService {
   
   BatteryOptimizationService._internal();
   
-  // Abhängigkeiten
+  // التبعيات
   late ErrorLoggingService _errorLoggingService;
   
-  // Konstanten für lokale Speicherung
+  // الثوابت لتخزين البيانات محلياً
   static const String _keyBatteryOptimizationChecked = 'battery_optimization_checked';
   static const String _keyNeedsBatteryOptimization = 'needs_battery_optimization';
   static const String _keyLastCheckTime = 'battery_optimization_last_check';
@@ -49,19 +49,19 @@ class BatteryOptimizationService {
   static const String _keyDeviceModel = 'device_model';
   static const String _keyUserDismissed = 'battery_optimization_dismissed';
   
-  // Method Channel für native Kommunikation
+  // قناة الاتصال مع الكود الأصلي
   static const platform = MethodChannel('com.athkar.app/battery_optimization');
   
-  // Battery Objekt
+  // كائن البطارية
   final Battery _battery = Battery();
   
-  // DeviceInfoPlugin für bessere Geräteerkennung
+  // كائن معلومات الجهاز للكشف الأفضل عن الجهاز
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   
-  // Anwendungsname für Hinweise
+  // اسم التطبيق للتنبيهات
   String _appName = "Athkar App";
   
-  // Liste bekannter Hersteller und ihrer Anweisungen
+  // قائمة الشركات المصنعة المعروفة وتعليماتها
   final List<ManufacturerInstructions> _manufacturers = [
     ManufacturerInstructions(
       name: "Xiaomi",
@@ -105,14 +105,14 @@ class BatteryOptimizationService {
     ),
   ];
   
-  /// Initialisiert den Service
+  /// تهيئة الخدمة
   Future<void> initialize() async {
     try {
-      // App-Informationen laden
+      // تحميل معلومات التطبيق
       final packageInfo = await PackageInfo.fromPlatform();
       _appName = packageInfo.appName;
       
-      // Geräteinformationen speichern
+      // حفظ معلومات الجهاز
       if (Platform.isAndroid) {
         final androidInfo = await _deviceInfo.androidInfo;
         
@@ -129,31 +129,31 @@ class BatteryOptimizationService {
     }
   }
 
-  /// Prüft, ob Batterieoptimierung für die App aktiviert ist
+  /// فحص ما إذا كانت تحسينات البطارية مفعلة للتطبيق
   Future<bool> isBatteryOptimizationEnabled() async {
     if (!Platform.isAndroid) return false;
     
     try {
-      // Zuerst versuchen, die Method Channel zu nutzen
+      // محاولة استخدام قناة الاتصال أولاً
       try {
         final bool? result = await platform.invokeMethod<bool>('isBatteryOptimizationEnabled');
         if (result != null) return result;
       } catch (e) {
-        print('Method Channel خطأ: $e');
+        print('خطأ في قناة الاتصال: $e');
         await _errorLoggingService.logError(
           'BatteryOptimizationService', 
-          'خطأ في التحقق من تحسين البطارية عبر Method Channel', 
+          'خطأ في التحقق من تحسين البطارية عبر قناة الاتصال', 
           e
         );
       }
       
-      // Prüfen, ob Energiesparmodus als Alternative erkannt werden kann
+      // فحص ما إذا كان وضع توفير الطاقة مفعلاً كبديل
       final isLowPowerMode = await _battery.isInBatterySaveMode;
       
-      // Dies ist nicht optimal, kann aber Hinweise geben
+      // هذا ليس مثالياً ولكن يمكن أن يعطي مؤشرات
       final prefs = await SharedPreferences.getInstance();
       
-      // Ergebnis speichern
+      // حفظ النتيجة
       await prefs.setBool(_keyNeedsBatteryOptimization, isLowPowerMode ?? false);
       
       return isLowPowerMode ?? false;
@@ -167,25 +167,25 @@ class BatteryOptimizationService {
     }
   }
 
-  /// Bittet den Nutzer, Batterieoptimierung zu deaktivieren
+  /// طلب من المستخدم تعطيل تحسينات البطارية
   Future<bool> requestDisableBatteryOptimization() async {
     if (!Platform.isAndroid) return true;
     
     try {
-      // Zuerst versuchen, die Method Channel zu nutzen
+      // محاولة استخدام قناة الاتصال أولاً
       try {
         final bool? result = await platform.invokeMethod<bool>('requestBatteryOptimizationDisable');
         if (result != null) return result;
       } catch (e) {
-        print('Method Channel خطأ: $e');
+        print('خطأ في قناة الاتصال: $e');
         await _errorLoggingService.logError(
           'BatteryOptimizationService', 
-          'خطأ في إلغاء تفعيل تحسين البطارية عبر Method Channel', 
+          'خطأ في إلغاء تفعيل تحسين البطارية عبر قناة الاتصال', 
           e
         );
       }
       
-      // Batterieeinstellungen öffnen
+      // فتح إعدادات البطارية
       await AppSettings.openAppSettings();
       await _saveLastCheckTime();
       
@@ -200,26 +200,26 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Prüft und öffnet Batterieeinstellungen, wenn nötig
+  /// فحص وطلب تحسينات البطارية إذا لزم الأمر
   Future<void> checkAndRequestBatteryOptimization(BuildContext context) async {
     if (!Platform.isAndroid) return;
     
     try {
-      // Nur periodisch prüfen
+      // فحص دوري فقط
       if (!await shouldCheckBatteryOptimization()) {
         return;
       }
       
-      // Prüfen, ob der Nutzer diese Warnung bereits abgelehnt hat
+      // فحص ما إذا كان المستخدم قد رفض هذا التحذير بالفعل
       final prefs = await SharedPreferences.getInstance();
       final userDismissed = prefs.getBool(_keyUserDismissed) ?? false;
       
       if (userDismissed) {
-        // Wenn der Nutzer die Warnung verworfen hat, nur selten erneut prüfen (einmal pro Monat)
+        // إذا رفض المستخدم التحذير، فحص نادر فقط (مرة في الشهر)
         final lastCheckTime = prefs.getInt(_keyLastCheckTime) ?? 0;
         final now = DateTime.now().millisecondsSinceEpoch;
         
-        // 30 Tage (in Millisekunden) 
+        // 30 يوماً (بالميلي ثانية) 
         if (now - lastCheckTime < 30 * 24 * 60 * 60 * 1000) {
           return;
         }
@@ -238,7 +238,7 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Zeigt einen Dialog zur Batterieoptimierung an
+  /// عرض نافذة حوار تحسينات البطارية
   void showBatteryOptimizationDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -289,7 +289,7 @@ class BatteryOptimizationService {
     );
   }
   
-  /// Erstellt einen herstellerspezifischen Hinweis
+  /// إنشاء ملاحظة خاصة بالشركة المصنعة
   Widget _buildManufacturerSpecificNote() {
     return FutureBuilder<String>(
       future: _getDeviceManufacturer(),
@@ -326,7 +326,7 @@ class BatteryOptimizationService {
     );
   }
   
-  /// Markiert, dass der Nutzer den Dialog abgelehnt hat
+  /// وضع علامة على أن المستخدم رفض الحوار
   Future<void> _markUserDismissed() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -341,13 +341,13 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Markiert, dass der Nutzer den Dialog permanent ablehnt
+  /// وضع علامة على أن المستخدم رفض الحوار بشكل دائم
   Future<void> _markUserDismissedPermanently() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyUserDismissed, true);
       
-      // Sehr weit in der Zukunft als letzten Prüfzeitpunkt setzen
+      // تعيين وقت الفحص الأخير لتاريخ بعيد جداً في المستقبل
       final farFuture = DateTime.now().add(Duration(days: 365)).millisecondsSinceEpoch;
       await prefs.setInt(_keyLastCheckTime, farFuture);
     } catch (e) {
@@ -359,7 +359,7 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Öffnet die Batterieeinstellungen direkt
+  /// فتح إعدادات البطارية مباشرة
   Future<void> _openBatterySettings() async {
     try {
       await requestDisableBatteryOptimization();
@@ -370,12 +370,12 @@ class BatteryOptimizationService {
         'خطأ في فتح إعدادات البطارية', 
         e
       );
-      // Fallback zu App-Einstellungen
+      // البديل هو فتح إعدادات التطبيق
       AppSettings.openAppSettings();
     }
   }
   
-  /// Speichert den Zeitpunkt der letzten Prüfung
+  /// حفظ وقت آخر فحص
   Future<void> _saveLastCheckTime() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -389,14 +389,14 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Prüft, ob wir den Nutzer erneut fragen sollten (nicht zu häufig)
+  /// فحص ما إذا كان يجب أن نسأل المستخدم مرة أخرى (ليس بشكل متكرر جداً)
   Future<bool> shouldCheckBatteryOptimization() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastCheckTime = prefs.getInt(_keyLastCheckTime) ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
       
-      // Nur einmal pro Woche (604800000 Millisekunden) prüfen
+      // فحص مرة واحدة فقط كل أسبوع (604800000 ميلي ثانية)
       return (now - lastCheckTime) > 604800000;
     } catch (e) {
       await _errorLoggingService.logError(
@@ -408,12 +408,12 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Prüft auf zusätzliche Batterieeinschränkungen, die Benachrichtigungen beeinflussen könnten
+  /// فحص القيود الإضافية للبطارية التي قد تؤثر على الإشعارات
   Future<void> checkForAdditionalBatteryRestrictions(BuildContext context) async {
     if (!Platform.isAndroid) return;
     
     try {
-      // Nur periodisch prüfen
+      // فحص دوري فقط
       if (!await shouldCheckBatteryOptimization()) {
         return;
       }
@@ -431,10 +431,10 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Ermittelt den Gerätehersteller genauer
+  /// تحديد الشركة المصنعة للجهاز بدقة أكبر
   Future<String> _getDeviceManufacturer() async {
     try {
-      // Aus den gespeicherten Daten abrufen
+      // استرجاع من البيانات المحفوظة
       final prefs = await SharedPreferences.getInstance();
       final manufacturer = prefs.getString(_keyDeviceManufacturer);
       
@@ -442,12 +442,12 @@ class BatteryOptimizationService {
         return manufacturer;
       }
       
-      // Fallback: Neu abrufen
+      // البديل: استرجاع جديد
       if (Platform.isAndroid) {
         final androidInfo = await _deviceInfo.androidInfo;
         final newManufacturer = androidInfo.manufacturer.toLowerCase();
         
-        // Für künftige Verwendung speichern
+        // حفظ للاستخدام المستقبلي
         await prefs.setString(_keyDeviceManufacturer, newManufacturer);
         
         return newManufacturer;
@@ -464,14 +464,14 @@ class BatteryOptimizationService {
     }
   }
   
-  /// Prüft, ob der Hersteller besondere Einschränkungen hat
+  /// فحص ما إذا كانت الشركة المصنعة لديها قيود خاصة
   bool _isManufacturerWithSpecialRestrictions(String manufacturer) {
     return _manufacturers.any(
       (m) => m.keywords.any((keyword) => manufacturer.toLowerCase().contains(keyword))
     );
   }
   
-  /// Gibt die herstellerspezifischen Anweisungen zurück
+  /// الحصول على تعليمات خاصة بالشركة المصنعة
   ManufacturerInstructions? _getManufacturerInstructions(String manufacturer) {
     for (var m in _manufacturers) {
       if (m.keywords.any((keyword) => manufacturer.toLowerCase().contains(keyword))) {
@@ -481,7 +481,7 @@ class BatteryOptimizationService {
     return null;
   }
   
-  /// Zeigt einen herstellerspezifischen Dialog an
+  /// عرض حوار خاص بالشركة المصنعة
   void _showManufacturerSpecificBatteryDialog(BuildContext context, String manufacturer) {
     final instructions = _getManufacturerInstructions(manufacturer);
     
@@ -530,11 +530,11 @@ class BatteryOptimizationService {
     );
   }
   
-  /// Öffnet herstellerspezifische Einstellungen
+  /// فتح إعدادات خاصة بالشركة المصنعة
   Future<void> _openManufacturerSpecificSettings(String manufacturer) async {
     try {
-      // Versuch, spezifische Einstellungsbildschirme zu öffnen
-      // Dies erfordert zusätzliche native Implementierung
+      // محاولة فتح شاشات إعدادات محددة
+      // هذا يتطلب تنفيذاً أصلياً إضافياً
       
       try {
         final result = await platform.invokeMethod<bool>(
@@ -543,15 +543,15 @@ class BatteryOptimizationService {
         );
         
         if (result == true) {
-          // Erfolgreich geöffnet
+          // تم الفتح بنجاح
           await _saveLastCheckTime();
           return;
         }
       } catch (e) {
-        print('Method Channel خطأ: $e');
+        print('خطأ في قناة الاتصال: $e');
       }
       
-      // Fallback: Batterieeinstellungen öffnen
+      // البديل: فتح إعدادات البطارية
       await AppSettings.openAppSettings();
       await _saveLastCheckTime();
     } catch (e) {
@@ -560,7 +560,7 @@ class BatteryOptimizationService {
         'خطأ في فتح إعدادات الشركة المصنعة', 
         e
       );
-      // Fallback zu allgemeinen App-Einstellungen
+      // البديل هو إعدادات التطبيق العامة
       AppSettings.openAppSettings();
     }
   }

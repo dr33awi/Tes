@@ -14,6 +14,57 @@ import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+/// آلية تخزين مؤقت للإعدادات لتحسين الأداء
+class NotificationConfigCache {
+  static NotificationConfig? _cachedConfig;
+  static DateTime? _lastCacheTime;
+  static const Duration _cacheValidity = Duration(minutes: 5);
+  
+  static NotificationConfig? getCachedConfig() {
+    if (_cachedConfig != null && _lastCacheTime != null) {
+      if (DateTime.now().difference(_lastCacheTime!) < _cacheValidity) {
+        return _cachedConfig;
+      }
+    }
+    return null;
+  }
+  
+  static void cacheConfig(NotificationConfig config) {
+    _cachedConfig = config;
+    _lastCacheTime = DateTime.now();
+  }
+  
+  static void clearCache() {
+    _cachedConfig = null;
+    _lastCacheTime = null;
+  }
+}
+
+/// فئة بيانات للدفعة
+class NotificationBatchItem {
+  final String notificationId;
+  final String title;
+  final String body;
+  final TimeOfDay notificationTime;
+  final String? channelId;
+  final String? payload;
+  final Color? color;
+  final int? priority;
+  final String? groupKey;
+  
+  NotificationBatchItem({
+    required this.notificationId,
+    required this.title,
+    required this.body,
+    required this.notificationTime,
+    this.channelId,
+    this.payload,
+    this.color,
+    this.priority,
+    this.groupKey,
+  });
+}
+
 /// تنفيذ خدمة الإشعارات الموحدة لنظام Android
 class AndroidNotificationService implements NotificationServiceInterface {
   // كائن FlutterLocalNotificationsPlugin
@@ -83,6 +134,9 @@ class AndroidNotificationService implements NotificationServiceInterface {
       // تكوين وضع عدم الإزعاج للإشعارات
       await _doNotDisturbService.configureNotificationChannelsForDoNotDisturb();
       
+      // تنظيف الإشعارات القديمة
+      await cleanupOldNotifications();
+      
       print('اكتملت تهيئة خدمة إشعارات Android بنجاح');
       return true;
     } catch (e) {
@@ -114,6 +168,13 @@ class AndroidNotificationService implements NotificationServiceInterface {
   /// تحميل تكوين الإشعارات من التخزين المحلي
   Future<void> _loadNotificationConfig() async {
     try {
+      // التحقق من الكاش أولاً
+      final cachedConfig = NotificationConfigCache.getCachedConfig();
+      if (cachedConfig != null) {
+        _config = cachedConfig;
+        return;
+      }
+      
       final prefs = await SharedPreferences.getInstance();
       final configString = prefs.getString(_keyNotificationConfig);
       
@@ -126,6 +187,9 @@ class AndroidNotificationService implements NotificationServiceInterface {
       } else {
         _config = NotificationConfig();
       }
+      
+      // حفظ في الكاش
+      NotificationConfigCache.cacheConfig(_config);
     } catch (e) {
       _errorLoggingService.logError(
         'AndroidNotificationService', 
@@ -140,6 +204,9 @@ class AndroidNotificationService implements NotificationServiceInterface {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyNotificationConfig, jsonEncode(_config.toJson()));
+      
+      // تحديث الكاش
+      NotificationConfigCache.cacheConfig(_config);
     } catch (e) {
       _errorLoggingService.logError(
         'AndroidNotificationService', 
@@ -516,6 +583,7 @@ class AndroidNotificationService implements NotificationServiceInterface {
         'repeat': repeat,
         'hour': notificationTime.hour,
         'minute': notificationTime.minute,
+        'lastScheduled': DateTime.now().toIso8601String(),
       };
       
       await prefs.setString('$_keyNotificationData$id', jsonEncode(info));
@@ -609,6 +677,81 @@ class AndroidNotificationService implements NotificationServiceInterface {
       _errorLoggingService.logError(
         'AndroidNotificationService', 
         'خطأ في جدولة إشعارات متعددة', 
+        e
+      );
+      return false;
+    }
+  }
+  
+  /// جدولة إشعارات متعددة بشكل دفعات لتحسين الأداء
+  Future<bool> scheduleMultipleNotificationsBatch({
+    required List<NotificationBatchItem> items,
+    bool repeat = true,
+  }) async {
+    try {
+      final hasPermission = await _permissionsService.checkNotificationPermission();
+      if (!hasPermission) {
+        return false;
+      }
+      
+      // معالجة دفعات كبيرة بكفاءة
+      const int batchSize = 10;
+      
+      for (int i = 0; i < items.length; i += batchSize) {
+        final batch = items.skip(i).take(batchSize).toList();
+        
+        await Future.wait(batch.map((item) async {
+          final id = item.notificationId.hashCode.abs() % 100000;
+          
+          // حفظ معلومات الإشعار
+          await _saveFullNotificationInfo(
+            notificationId: item.notificationId,
+            title: item.title,
+            body: item.body,
+            notificationTime: item.notificationTime,
+            channelId: item.channelId,
+            payload: item.payload,
+            color: item.color,
+            priority: item.priority,
+            repeat: repeat,
+          );
+          
+          // جدولة الإشعار
+          if (repeat) {
+            await AndroidAlarmManager.periodic(
+              const Duration(days: 1),
+              id,
+              () => _showScheduledNotification(id, item.groupKey),
+              startAt: NotificationHelpers.getNextInstanceOfTime(item.notificationTime).toLocal(),
+              exact: true,
+              wakeup: true,
+              rescheduleOnReboot: true,
+            );
+          } else {
+            await AndroidAlarmManager.oneShotAt(
+              NotificationHelpers.getNextInstanceOfTime(item.notificationTime).toLocal(),
+              id,
+              () => _showScheduledNotification(id, item.groupKey),
+              exact: true,
+              wakeup: true,
+              rescheduleOnReboot: true,
+            );
+          }
+          
+          await _updateScheduledNotificationsList(item.notificationId);
+        }));
+        
+        // تأخير بسيط بين الدفعات لتجنب إرهاق النظام
+        if (i + batchSize < items.length) {
+          await Future.delayed(Duration(milliseconds: 50));
+        }
+      }
+      
+      return true;
+    } catch (e) {
+      _errorLoggingService.logError(
+        'AndroidNotificationService',
+        'خطأ في جدولة دفعة الإشعارات',
         e
       );
       return false;
@@ -1024,6 +1167,46 @@ class AndroidNotificationService implements NotificationServiceInterface {
         e
       );
       return null;
+    }
+  }
+  
+  /// تنظيف الإشعارات القديمة لتحسين الأداء
+  Future<void> cleanupOldNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> scheduledList = prefs.getStringList(_keyScheduledNotifications) ?? [];
+      final List<String> activeNotifications = [];
+      
+      // التحقق من كل إشعار محفوظ
+      for (String notificationId in scheduledList) {
+        final id = notificationId.hashCode.abs() % 100000;
+        final infoString = prefs.getString('$_keyNotificationData$id');
+        
+        if (infoString != null) {
+          final info = jsonDecode(infoString);
+          final lastScheduled = info['lastScheduled'];
+          
+          // إزالة الإشعارات التي لم تُجدول منذ 30 يوماً
+          if (lastScheduled != null) {
+            final lastDate = DateTime.parse(lastScheduled);
+            if (DateTime.now().difference(lastDate).inDays > 30) {
+              await prefs.remove('$_keyNotificationData$id');
+              continue;
+            }
+          }
+          
+          activeNotifications.add(notificationId);
+        }
+      }
+      
+      // تحديث القائمة
+      await prefs.setStringList(_keyScheduledNotifications, activeNotifications);
+    } catch (e) {
+      _errorLoggingService.logError(
+        'AndroidNotificationService',
+        'خطأ في تنظيف الإشعارات القديمة',
+        e
+      );
     }
   }
 }
