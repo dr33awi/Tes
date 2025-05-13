@@ -4,9 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
-import 'package:test_athkar_app/services/di_container.dart';
-import 'package:test_athkar_app/services/notification/notification_manager.dart';
-import 'package:test_athkar_app/services/notification/notification_navigation.dart';
 import 'package:test_athkar_app/services/app_initializer.dart';
 
 

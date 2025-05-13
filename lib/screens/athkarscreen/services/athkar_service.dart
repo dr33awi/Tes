@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/services/notification/notification_manager.dart';
 import 'package:test_athkar_app/services/di_container.dart';
-import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart';
+
 
 class AthkarService {
   // Singleton implementation
