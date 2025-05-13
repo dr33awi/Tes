@@ -4,7 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
-import 'package:test_athkar_app/screens/athkarscreen/notification_settings_screen.dart'; // إضافة استيراد شاشة إعدادات الإشعارات
+import 'package:test_athkar_app/services/notification/notification_manager.dart'; // استخدام النظام الموحد
+import 'package:test_athkar_app/services/di_container.dart'; // إضافة DI container
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -17,6 +18,9 @@ class AthkarScreen extends StatefulWidget {
 }
 
 class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderStateMixin {
+  // استخدام NotificationManager الموحد
+  late final NotificationManager _notificationManager;
+  
   // قائمة فئات الأذكار
   final List<Map<String, dynamic>> _athkarCategories = [
     {
@@ -83,6 +87,9 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     
+    // الحصول على NotificationManager من DI container
+    _notificationManager = serviceLocator<NotificationManager>();
+    
     // إعداد الأنيميشن
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -138,7 +145,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // إضافة زر إعدادات الإشعارات
+        // زر إعدادات الإشعارات
         actions: [
           IconButton(
             icon: const Icon(
@@ -184,7 +191,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
                                     end: Alignment.bottomLeft,
                                     colors: [
                                       kPrimary,
-                                      Color(0xFF2D6852) // لون غامق لمزيد من العمق
+                                      Color(0xFF2D6852)
                                     ],
                                     stops: const [0.3, 1.0],
                                   ),
@@ -340,13 +347,54 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
   }
 
   // التنقل إلى شاشة إعدادات الإشعارات
-  void _navigateToNotificationSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const NotificationSettingsScreen(),
+  void _navigateToNotificationSettings() async {
+    // فتح صفحة إعدادات الإشعارات مع النظام الموحد
+    await Navigator.pushNamed(context, '/notification_settings');
+    
+    // يمكنك أيضاً استخدام قائمة بسيطة للإعدادات
+    /*
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.notifications_active),
+              title: Text('جدولة الإشعارات الافتراضية'),
+              onTap: () async {
+                await _notificationManager.scheduleDefaultAthkarNotifications();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('تم جدولة الإشعارات الافتراضية')),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.notifications_off),
+              title: Text('إلغاء جميع الإشعارات'),
+              onTap: () async {
+                await _notificationManager.cancelAllNotifications();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('تم إلغاء جميع الإشعارات')),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.notifications),
+              title: Text('اختبار الإشعارات'),
+              onTap: () async {
+                await _notificationManager.sendTestNotification();
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
       ),
     );
+    */
   }
 
   // بناء قائمة الأذكار المحسنة
@@ -508,8 +556,8 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       title: category['title'] as String,
       icon: category['icon'] as IconData,
       color: category['color1'] as Color,
-      description: '', // قيمة فارغة للوصف حيث تم إزالته
-      athkar: [], // سيتم تحميل الأذكار في صفحة التفاصيل
+      description: '',
+      athkar: [],
     );
     
     Navigator.push(

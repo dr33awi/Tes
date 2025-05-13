@@ -1,14 +1,29 @@
+// lib/screens/athkarscreen/services/athkar_service.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
+import 'package:test_athkar_app/services/notification/notification_manager.dart';
+import 'package:test_athkar_app/services/di_container.dart';
 
 class AthkarService {
   // Singleton implementation
   static final AthkarService _instance = AthkarService._internal();
   factory AthkarService() => _instance;
-  AthkarService._internal();
+  
+  // إضافة NotificationManager
+  late final NotificationManager _notificationManager;
+  
+  AthkarService._internal() {
+    // الحصول على NotificationManager من DI container
+    try {
+      _notificationManager = serviceLocator<NotificationManager>();
+    } catch (e) {
+      print('Error getting NotificationManager from DI: $e');
+      // سيتم التعامل مع هذا الخطأ في setupDependencies
+    }
+  }
 
   // Cache for loaded athkar to avoid repeated file reads
   Map<String, AthkarCategory> _athkarCache = {};
@@ -310,7 +325,7 @@ class AthkarService {
     }
   }
 
-  // تحسين نظام إعدادات الإشعارات
+  // تحسين نظام إعدادات الإشعارات - متوافق مع النظام الموحد
   
   // الحصول على إعدادات الإشعارات الكاملة لفئة معينة
   Future<NotificationSettings> getNotificationSettings(String categoryId) async {
@@ -461,6 +476,103 @@ class AthkarService {
       await saveAdditionalNotificationTimes(categoryId, times);
     } catch (e) {
       print('Error removing additional notification time: $e');
+    }
+  }
+
+  // دوال جديدة للتكامل مع النظام الموحد للإشعارات
+  
+  // جدولة إشعارات فئة كاملة مع النظام الموحد
+  Future<void> scheduleCategoryNotifications(String categoryId) async {
+    try {
+      final category = await getAthkarCategory(categoryId);
+      if (category == null) return;
+      
+      // الحصول على إعدادات الإشعارات
+      final settings = await getNotificationSettings(categoryId);
+      if (!settings.isEnabled) return;
+      
+      // تحديد الأوقات
+      List<TimeOfDay> times = [];
+      
+      // الوقت المخصص أو الافتراضي
+      if (settings.customTime != null) {
+        final parts = settings.customTime!.split(':');
+        if (parts.length == 2) {
+          final hour = int.tryParse(parts[0]) ?? 0;
+          final minute = int.tryParse(parts[1]) ?? 0;
+          times.add(TimeOfDay(hour: hour, minute: minute));
+        }
+      } else if (category.notifyTime != null) {
+        final parts = category.notifyTime!.split(':');
+        if (parts.length == 2) {
+          final hour = int.tryParse(parts[0]) ?? 0;
+          final minute = int.tryParse(parts[1]) ?? 0;
+          times.add(TimeOfDay(hour: hour, minute: minute));
+        }
+      }
+      
+      // إضافة أوقات إضافية
+      final additionalTimes = await getAdditionalNotificationTimes(categoryId);
+      for (final timeStr in additionalTimes) {
+        final parts = timeStr.split(':');
+        if (parts.length == 2) {
+          final hour = int.tryParse(parts[0]) ?? 0;
+          final minute = int.tryParse(parts[1]) ?? 0;
+          times.add(TimeOfDay(hour: hour, minute: minute));
+        }
+      }
+      
+      if (times.isEmpty) {
+        // وقت افتراضي
+        times.add(_getDefaultTimeForCategory(categoryId));
+      }
+      
+      // جدولة الإشعارات باستخدام NotificationManager
+      await _notificationManager.scheduleAthkarNotifications(
+        categoryId: categoryId,
+        categoryTitle: category.title,
+        times: times,
+        customTitle: category.notifyTitle,
+        customBody: category.notifyBody,
+        color: category.color,
+      );
+      
+      // حفظ حالة التفعيل
+      await setNotificationEnabled(categoryId, true);
+    } catch (e) {
+      print('Error scheduling category notifications: $e');
+    }
+  }
+  
+  // إلغاء إشعارات فئة
+  Future<void> cancelCategoryNotifications(String categoryId) async {
+    try {
+      await _notificationManager.cancelAthkarNotifications(categoryId);
+      await setNotificationEnabled(categoryId, false);
+    } catch (e) {
+      print('Error canceling category notifications: $e');
+    }
+  }
+  
+  // الحصول على الوقت الافتراضي لكل فئة
+  TimeOfDay _getDefaultTimeForCategory(String categoryId) {
+    switch (categoryId) {
+      case 'morning':
+        return TimeOfDay(hour: 6, minute: 0);
+      case 'evening':
+        return TimeOfDay(hour: 18, minute: 0);
+      case 'sleep':
+        return TimeOfDay(hour: 22, minute: 0);
+      case 'wake':
+        return TimeOfDay(hour: 5, minute: 30);
+      case 'prayer':
+        return TimeOfDay(hour: 12, minute: 0);
+      case 'home':
+        return TimeOfDay(hour: 18, minute: 0);
+      case 'food':
+        return TimeOfDay(hour: 13, minute: 0);
+      default:
+        return TimeOfDay(hour: 8, minute: 0);
     }
   }
 

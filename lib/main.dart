@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-
-import 'package:test_athkar_app/screens/athkarscreen/services/app_initializer.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
-import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:test_athkar_app/services/di_container.dart';
+import 'package:test_athkar_app/services/notification/notification_manager.dart';
+import 'package:test_athkar_app/services/notification/notification_navigation.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -18,11 +18,15 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
-  // Initialize Android Alarm Manager
-  await AndroidAlarmManager.initialize();
+  // تهيئة DI container
+  await setupDependencies();
   
-  // Initialize app services (includes notification services)
-  await AppInitializer.initialize();
+  // تهيئة NotificationManager
+  final notificationManager = serviceLocator<NotificationManager>();
+  await notificationManager.initialize();
+  
+  // تهيئة التنقل من الإشعارات
+  await NotificationNavigation.initialize();
   
   // Run the app
   runApp(const MyApp());
@@ -52,7 +56,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Check if notifications need to be updated when app is resumed
-      AppInitializer.checkAndRescheduleNotifications();
+      // You can add notification check logic here if needed
     }
   }
 
@@ -67,7 +71,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return MaterialApp(
           title: 'تطبيق الأذكار',
           debugShowCheckedModeBanner: false,
-          navigatorKey: AppInitializer.getNavigatorKey(), // Use navigatorKey from AppInitializer
+          navigatorKey: NotificationNavigation.navigatorKey,
           locale: const Locale('ar'),
           supportedLocales: const [
             Locale('ar', ''),
