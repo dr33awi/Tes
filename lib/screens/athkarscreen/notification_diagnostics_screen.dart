@@ -1,17 +1,18 @@
-// lib/screens/athkarscreen/screen/notification_diagnostics_screen.dart
+// lib/screens/athkarscreen/notification_diagnostics_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/services/notification_service.dart'; // استيراد خدمة الإشعارات الموحدة
-import 'package:test_athkar_app/services/error_logging_service.dart';
-import 'package:test_athkar_app/services/battery_optimization_service.dart';
-import 'package:test_athkar_app/services/do_not_disturb_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/error_logging_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/battery_optimization_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/do_not_disturb_service.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
 class NotificationDiagnosticsScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class NotificationDiagnosticsScreen extends StatefulWidget {
 }
 
 class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsScreen> {
-  final NotificationService _notificationService = NotificationService(); // استخدام الخدمة الموحدة
+  final NotificationService _notificationService = NotificationService();
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
   final DoNotDisturbService _doNotDisturbService = DoNotDisturbService();
@@ -336,11 +337,11 @@ class _NotificationDiagnosticsScreenState extends State<NotificationDiagnosticsS
   // Open notification settings
   Future<void> _openNotificationSettings() async {
     try {
-      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+      await AppSettings.openNotificationSettings();
     } catch (e) {
       _errorLoggingService.logError(
-        'NotificationDiagnosticsScreen',
-        'Error opening notification settings',
+        'NotificationDiagnosticsScreen', 
+        'Error opening notification settings', 
         e
       );
     }

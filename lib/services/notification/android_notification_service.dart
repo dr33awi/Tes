@@ -66,7 +66,7 @@ class NotificationBatchItem {
 }
 
 /// تنفيذ خدمة الإشعارات الموحدة لنظام Android
-    class AndroidNotificationService implements NotificationServiceInterface {
+class AndroidNotificationService implements NotificationServiceInterface {
   // كائن FlutterLocalNotificationsPlugin
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = 
       FlutterLocalNotificationsPlugin();
@@ -338,8 +338,8 @@ class NotificationBatchItem {
       // طلب أذونات الإشعارات إذا لزم الأمر (Android 13+)
       if (Platform.isAndroid) {
         final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-            _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation
-                AndroidFlutterLocalNotificationsPlugin>();
+            _flutterLocalNotificationsPlugin
+                .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
         
         if (androidImplementation != null) {
           final bool? granted = await androidImplementation.requestNotificationsPermission();
@@ -1101,6 +1101,141 @@ class NotificationBatchItem {
         'خطأ في تنظيف الإشعارات القديمة',
         e
       );
+    }
+  }
+  
+  // الطرق الجديدة المطلوبة لحل أخطاء البناء
+  
+  @override
+  Future<void> showSimpleNotification(
+    String title,
+    String body,
+    int notificationId, {
+    String? payload,
+  }) async {
+    try {
+      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        _defaultChannelId,
+        'الإشعارات الافتراضية',
+        channelDescription: 'الإشعارات العامة للتطبيق',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      );
+      
+      const NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+      );
+      
+      await _flutterLocalNotificationsPlugin.show(
+        notificationId,
+        title,
+        body,
+        notificationDetails,
+        payload: payload,
+      );
+    } catch (e) {
+      _errorLoggingService.logError(
+        'AndroidNotificationService',
+        'خطأ في إظهار الإشعار البسيط',
+        e
+      );
+    }
+  }
+  
+  @override
+  Future<bool> testImmediateNotification() async {
+    try {
+      await showSimpleNotification(
+        'اختبار الإشعارات',
+        'هذا إشعار تجريبي فوري للتأكد من عمل النظام',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      return true;
+    } catch (e) {
+      _errorLoggingService.logError(
+        'AndroidNotificationService',
+        'خطأ في اختبار الإشعار الفوري',
+        e
+      );
+      return false;
+    }
+  }
+  
+  @override
+  Future<bool> sendGroupedTestNotification() async {
+    try {
+      const String groupKey = 'test_grouped_notifications';
+      const String groupChannelId = 'grouped_notifications';
+      
+      // إنشاء قناة للإشعارات المجمعة
+      const AndroidNotificationChannel groupChannel = AndroidNotificationChannel(
+        groupChannelId,
+        'إشعارات مجمعة',
+        description: 'قناة الإشعارات المجمعة',
+        importance: Importance.high,
+      );
+      
+      await _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(groupChannel);
+      
+      // إرسال عدة إشعارات فردية في المجموعة
+      for (int i = 0; i < 3; i++) {
+        final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+          groupChannelId,
+          'إشعارات مجمعة',
+          channelDescription: 'قناة الإشعارات المجمعة',
+          importance: Importance.high,
+          priority: Priority.high,
+          groupKey: groupKey,
+          setAsGroupSummary: false,
+          icon: '@mipmap/ic_launcher',
+        );
+        
+        final NotificationDetails notificationDetails = NotificationDetails(
+          android: androidDetails,
+        );
+        
+        await _flutterLocalNotificationsPlugin.show(
+          i + 1000, // IDs فريدة للإشعارات
+          'إشعار مجمع ${i + 1}',
+          'هذا هو الإشعار المجمع رقم ${i + 1}',
+          notificationDetails,
+        );
+      }
+      
+      // إرسال إشعار ملخص المجموعة
+      const AndroidNotificationDetails summaryDetails = AndroidNotificationDetails(
+        groupChannelId,
+        'إشعارات مجمعة',
+        channelDescription: 'قناة الإشعارات المجمعة',
+        importance: Importance.high,
+        priority: Priority.high,
+        groupKey: groupKey,
+        setAsGroupSummary: true,
+        icon: '@mipmap/ic_launcher',
+      );
+      
+      const NotificationDetails summaryNotificationDetails = NotificationDetails(
+        android: summaryDetails,
+      );
+      
+      await _flutterLocalNotificationsPlugin.show(
+        2000, // ID فريد لملخص المجموعة
+        'ملخص الإشعارات المجمعة',
+        'لديك 3 إشعارات جديدة',
+        summaryNotificationDetails,
+      );
+      
+      return true;
+    } catch (e) {
+      _errorLoggingService.logError(
+        'AndroidNotificationService',
+        'خطأ في إرسال الإشعارات المجمعة التجريبية',
+        e
+      );
+      return false;
     }
   }
 }

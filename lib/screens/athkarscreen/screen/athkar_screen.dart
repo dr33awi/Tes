@@ -1,17 +1,13 @@
-// lib/screens/athkarscreen/screen/athkar_screen.dart
+// lib/screens/athkarscreen/screen/athkar_screen.dart - محسّن
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/athkar_details_screen.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
-import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart';
+import 'package:test_athkar_app/screens/athkarscreen/notification_settings_screen.dart'; // إضافة استيراد شاشة إعدادات الإشعارات
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart' 
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:test_athkar_app/services/di_container.dart';
-import 'package:test_athkar_app/services/notification/notification_manager.dart';
-import 'package:test_athkar_app/services/permissions_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
 
 class AthkarScreen extends StatefulWidget {
   const AthkarScreen({Key? key}) : super(key: key);
@@ -29,7 +25,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'icon': Icons.wb_sunny,
       'color1': const Color(0xFFFFD54F),
       'color2': const Color(0xFFFFA000),
-      'defaultTime': '06:00',
     },
     {
       'id': 'evening',
@@ -37,7 +32,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'icon': Icons.nightlight_round,
       'color1': const Color(0xFFAB47BC),
       'color2': const Color(0xFF7B1FA2),
-      'defaultTime': '17:00',
     },
     {
       'id': 'sleep',
@@ -45,7 +39,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'icon': Icons.bedtime,
       'color1': const Color(0xFF5C6BC0),
       'color2': const Color(0xFF3949AB),
-      'defaultTime': '22:00',
     },
     {
       'id': 'wake',
@@ -53,7 +46,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'icon': Icons.alarm,
       'color1': const Color(0xFFFFB74D),
       'color2': const Color(0xFFFF9800),
-      'defaultTime': '05:30',
     },
     {
       'id': 'prayer',
@@ -61,7 +53,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'icon': Icons.mosque,
       'color1': const Color(0xFF4DB6AC),
       'color2': const Color(0xFF00695C),
-      'defaultTime': '07:00',
     },
     {
       'id': 'home',
@@ -69,7 +60,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'icon': Icons.home,
       'color1': const Color(0xFF66BB6A),
       'color2': const Color(0xFF2E7D32),
-      'defaultTime': '08:00',
     },
     {
       'id': 'food',
@@ -77,13 +67,11 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       'icon': Icons.restaurant,
       'color1': const Color(0xFFE57373),
       'color2': const Color(0xFFC62828),
-      'defaultTime': '12:00',
     },
   ];
   
   // للتحكم في حالة التحميل
   bool _isLoading = true;
-  bool _notificationsEnabled = false;
   
   // متغيرات للتأثيرات البصرية
   late AnimationController _animationController;
@@ -91,19 +79,9 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
   int? _pressedIndex;
   bool _isPressed = false;
 
-  // خدمات النظام
-  late final NotificationManager _notificationManager;
-  late final PermissionsService _permissionsService;
-  late final AthkarService _athkarService;
-
   @override
   void initState() {
     super.initState();
-    
-    // تهيئة الخدمات
-    _notificationManager = serviceLocator<NotificationManager>();
-    _permissionsService = serviceLocator<PermissionsService>();
-    _athkarService = AthkarService();
     
     // إعداد الأنيميشن
     _animationController = AnimationController(
@@ -121,130 +99,20 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       ),
     );
     
-    // تحميل البيانات وتفعيل الإشعارات
-    _initializeScreen();
+    // محاكاة تحميل البيانات
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
   }
   
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
-  }
-
-  // تهيئة الشاشة وتفعيل الإشعارات
-  Future<void> _initializeScreen() async {
-    try {
-      // التحقق من حالة الإشعارات
-      await _checkNotificationsStatus();
-      
-      // إذا كانت هذه هي المرة الأولى، قم بتفعيل الإشعارات الافتراضية
-      await _setupDefaultNotificationsIfNeeded();
-      
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('خطأ في تهيئة الشاشة: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  // التحقق من حالة الإشعارات
-  Future<void> _checkNotificationsStatus() async {
-    try {
-      // التحقق من أي إشعارات مفعلة
-      bool anyNotificationEnabled = false;
-      for (final category in _athkarCategories) {
-        final isEnabled = await _notificationManager.isNotificationEnabled(category['id']);
-        if (isEnabled) {
-          anyNotificationEnabled = true;
-          break;
-        }
-      }
-      
-      setState(() {
-        _notificationsEnabled = anyNotificationEnabled;
-      });
-    } catch (e) {
-      print('خطأ في التحقق من حالة الإشعارات: $e');
-    }
-  }
-
-  // إعداد الإشعارات الافتراضية إذا لزم الأمر
-  Future<void> _setupDefaultNotificationsIfNeeded() async {
-    try {
-      // التحقق من الأذونات أولاً
-      final hasPermission = await _permissionsService.checkNotificationsPermissions(
-        context,
-        showDialogs: false,
-      );
-      
-      if (!hasPermission) {
-        // طلب الأذونات إذا لم تكن موجودة
-        await Future.delayed(Duration(seconds: 1));
-        if (mounted) {
-          final granted = await _permissionsService.showNotificationPermissionDialog(context);
-          if (!granted) return;
-        }
-      }
-      
-      // التحقق من وجود إشعارات مجدولة
-      final pendingNotifications = await _notificationManager.getPendingNotifications();
-      final hasAthkarNotifications = pendingNotifications.any(
-        (notification) => notification.payload?.contains('athkar_') ?? false,
-      );
-      
-      if (!hasAthkarNotifications) {
-        // جدولة الإشعارات الافتراضية لجميع أقسام الأذكار
-        for (final category in _athkarCategories) {
-          final timeParts = category['defaultTime'].split(':');
-          final hour = int.parse(timeParts[0]);
-          final minute = int.parse(timeParts[1]);
-          final time = TimeOfDay(hour: hour, minute: minute);
-          
-          final result = await _notificationManager.scheduleAthkarNotifications(
-            categoryId: category['id'] as String,
-            categoryTitle: category['title'] as String,
-            times: [time],
-            customTitle: 'حان وقت ${category['title']}',
-            customBody: 'اضغط هنا لقراءة ${category['title']}',
-            color: category['color1'] as Color,
-          );
-          
-          if (result.success) {
-            print('تم جدولة إشعار ${category['title']}');
-          }
-        }
-        
-        setState(() {
-          _notificationsEnabled = true;
-        });
-        
-        // عرض رسالة نجاح
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 10),
-                  Text('تم تفعيل إشعارات الأذكار تلقائياً'),
-                ],
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.green,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              margin: EdgeInsets.all(16),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print('خطأ في إعداد الإشعارات الافتراضية: $e');
-    }
   }
 
   @override
@@ -270,38 +138,15 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // إضافة أيقونة إشعارات مع مؤشر الحالة
+        // إضافة زر إعدادات الإشعارات
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: Icon(
-                  _notificationsEnabled 
-                    ? Icons.notifications_active 
-                    : Icons.notifications_off,
-                  color: kPrimary,
-                ),
-                tooltip: 'إعدادات الإشعارات',
-                onPressed: () => _navigateToNotificationSettings(),
-              ),
-              if (_notificationsEnabled)
-                Positioned(
-                  right: 11,
-                  top: 11,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: kSurface,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: const Icon(
+              Icons.notifications_active,
+              color: kPrimary,
+            ),
+            tooltip: 'إشعارات',
+            onPressed: () => _navigateToNotificationSettings(),
           ),
         ],
       ),
@@ -339,7 +184,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
                                     end: Alignment.bottomLeft,
                                     colors: [
                                       kPrimary,
-                                      Color(0xFF2D6852), // لون غامق لمزيد من العمق
+                                      Color(0xFF2D6852) // لون غامق لمزيد من العمق
                                     ],
                                     stops: const [0.3, 1.0],
                                   ),
@@ -470,40 +315,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
                                           ),
                                         ),
                                       ),
-                                      
-                                      // إضافة تنبيه الإشعارات إذا لم تكن مفعلة
-                                      if (!_notificationsEnabled)
-                                        Container(
-                                          margin: EdgeInsets.only(top: 12),
-                                          padding: EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: Colors.orange.withOpacity(0.4),
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.notifications_off,
-                                                color: Colors.white,
-                                                size: 20,
-                                              ),
-                                              SizedBox(width: 10),
-                                              Expanded(
-                                                child: Text(
-                                                  'الإشعارات غير مفعلة. اضغط على أيقونة الإشعارات في الأعلى للتفعيل.',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
                                     ],
                                   ),
                                 ),
@@ -529,18 +340,13 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
   }
 
   // التنقل إلى شاشة إعدادات الإشعارات
-  void _navigateToNotificationSettings() async {
-    final result = await Navigator.push(
+  void _navigateToNotificationSettings() {
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const NotificationSettingsScreen(),
       ),
     );
-    
-    // تحديث حالة الإشعارات بعد العودة
-    if (result != null || true) {
-      await _checkNotificationsStatus();
-    }
   }
 
   // بناء قائمة الأذكار المحسنة

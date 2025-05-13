@@ -1,18 +1,17 @@
-// lib/screens/athkarscreen/screen/notification_settings_screen.dart
+// lib/screens/athkarscreen/notification_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
-import 'package:test_athkar_app/services/notification/notification_manager.dart'; // استيراد مدير الإشعارات الموحد
-import 'package:test_athkar_app/services/error_logging_service.dart';
-import 'package:test_athkar_app/services/battery_optimization_service.dart';
-import 'package:test_athkar_app/screens/athkarscreen/screen/notification_info_screen.dart';
-import 'package:test_athkar_app/screens/athkarscreen/screen/multiple_notifications_screen.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/error_logging_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/battery_optimization_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/notification_info_screen.dart';
+import 'package:test_athkar_app/screens/athkarscreen/multiple_notifications_screen.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:test_athkar_app/services/di_container.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -23,7 +22,7 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> with SingleTickerProviderStateMixin {
   final AthkarService _athkarService = AthkarService();
-  late final NotificationManager _notificationManager; // استخدام مدير الإشعارات
+  final NotificationService _notificationService = NotificationService();
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
   
@@ -43,6 +42,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   // Animation controllers
   late AnimationController _animationController;
+  int? _pressedIndex;
+  bool _isPressed = false;
 
   @override
   void initState() {
@@ -54,11 +55,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       vsync: this,
     );
     
-    // تهيئة مدير الإشعارات
-    _notificationManager = serviceLocator<NotificationManager>();
-    
     // Get device timezone
-    _deviceTimeZone = DateTime.now().timeZoneName;
+    _deviceTimeZone = _notificationService.getCurrentTimezoneName();
     
     _loadData();
     
@@ -102,11 +100,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       
       for (final category in categories) {
         // Load notification status
-        final isEnabled = await _notificationManager.isNotificationEnabled(category.id);
+        final isEnabled = await _notificationService.isNotificationEnabled(category.id);
         enabledMap[category.id] = isEnabled;
         
         // Load saved notification time
-        final savedTime = await _notificationManager.getNotificationTime(category.id);
+        final savedTime = await _notificationService.getNotificationTime(category.id);
         timeMap[category.id] = savedTime;
         
         // Check if category has multiple reminders
@@ -243,7 +241,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           // If no default time, show time picker
           if (selectedTime == null) {
             // Suggest time based on category type
-            TimeOfDay suggestedTime = _getSuggestedTimeForCategory(category.id);
+            TimeOfDay suggestedTime = NotificationService.getSuggestedTimeForCategory(category.id);
             
             // Show time picker
             final pickedTime = await showTimePicker(
@@ -284,34 +282,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           }
         }
         
-        // Schedule notification using the notification manager
-        await _notificationManager.scheduleAthkarNotifications(
-          categoryId: category.id,
-          categoryTitle: category.title,
-          times: [selectedTime!],
-          customTitle: category.notifyTitle,
-          customBody: category.notifyBody,
-          color: category.color,
-        );
+        // Schedule notification
+        await _notificationService.scheduleAthkarNotification(category, selectedTime!);
         
         // Schedule additional notifications if category has multiple reminders
         if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
-          final times = category.additionalNotifyTimes!.map((timeStr) {
-            final parts = timeStr.split(':');
-            return TimeOfDay(
-              hour: int.parse(parts[0]),
-              minute: int.parse(parts[1]),
-            );
-          }).toList();
-          
-          await _notificationManager.scheduleAthkarNotifications(
-            categoryId: category.id,
-            categoryTitle: category.title,
-            times: times,
-            customTitle: category.notifyTitle,
-            customBody: category.notifyBody,
-            color: category.color,
-          );
+          await _notificationService.scheduleAdditionalNotifications(category);
         }
         
         if (updateState) {
@@ -328,7 +304,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _updateMasterSwitch();
       } else {
         // Cancel notifications
-        await _notificationManager.cancelAthkarNotifications(category.id);
+        await _notificationService.cancelAthkarNotification(category.id);
         
         if (updateState) {
           setState(() {
@@ -362,28 +338,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
   }
 
-  // Get suggested time for category
-  TimeOfDay _getSuggestedTimeForCategory(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return TimeOfDay(hour: 6, minute: 0);
-      case 'evening':
-        return TimeOfDay(hour: 17, minute: 0);
-      case 'sleep':
-        return TimeOfDay(hour: 22, minute: 0);
-      case 'wake':
-        return TimeOfDay(hour: 5, minute: 30);
-      case 'prayer':
-        return TimeOfDay(hour: 7, minute: 0);
-      case 'home':
-        return TimeOfDay(hour: 8, minute: 0);
-      case 'food':
-        return TimeOfDay(hour: 12, minute: 0);
-      default:
-        return TimeOfDay(hour: 9, minute: 0);
-    }
-  }
-
   // Edit notification time for a specific category
   Future<void> _editNotificationTime(AthkarCategory category) async {
     // Haptic feedback
@@ -392,7 +346,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     try {
       // Get current time
       TimeOfDay initialTime = _notificationTimes[category.id] ?? 
-                         _getSuggestedTimeForCategory(category.id);
+                           NotificationService.getSuggestedTimeForCategory(category.id);
       
       // Show time picker
       final pickedTime = await showTimePicker(
@@ -425,33 +379,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         });
         
         // Schedule notification with new time
-        await _notificationManager.scheduleAthkarNotifications(
-          categoryId: category.id,
-          categoryTitle: category.title,
-          times: [pickedTime],
-          customTitle: category.notifyTitle,
-          customBody: category.notifyBody,
-          color: category.color,
-        );
+        await _notificationService.scheduleAthkarNotification(category, pickedTime);
         
         // Schedule additional notifications if category has multiple reminders
         if (category.hasMultipleReminders && category.additionalNotifyTimes != null) {
-          final times = category.additionalNotifyTimes!.map((timeStr) {
-            final parts = timeStr.split(':');
-            return TimeOfDay(
-              hour: int.parse(parts[0]),
-              minute: int.parse(parts[1]),
-            );
-          }).toList();
-          
-          await _notificationManager.scheduleAthkarNotifications(
-            categoryId: category.id,
-            categoryTitle: category.title,
-            times: times,
-            customTitle: category.notifyTitle,
-            customBody: category.notifyBody,
-            color: category.color,
-          );
+          await _notificationService.scheduleAdditionalNotifications(category);
         }
         
         // Show message
@@ -545,7 +477,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         setState(() => _isResetting = true);
         
         // Cancel all notifications
-        await _notificationManager.cancelAllNotifications();
+        await _notificationService.cancelAllNotifications();
         
         // Clear all settings
         setState(() {
@@ -601,7 +533,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       setState(() => _isResetting = true);
       
       // Get pending notifications
-      final pendingNotifications = await _notificationManager.getPendingNotifications();
+      final pendingNotifications = await _notificationService.getPendingNotifications();
       
       // Check if notifications match saved settings
       bool needsFix = false;
@@ -623,7 +555,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       
       if (needsFix) {
         // Re-schedule all notifications
-        await _notificationManager.rescheduleAllNotifications();
+        await _notificationService.scheduleAllSavedNotifications();
         
         // Show message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -700,7 +632,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   // Test notification
   Future<void> _testNotification() async {
     try {
-      await _notificationManager.sendTestNotification();
+      await _notificationService.testImmediateNotification();
       
       // Show message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -994,7 +926,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                               final category = _categories[index];
                               final bool isNotificationEnabled = _notificationsEnabled[category.id] ?? false;
                               final TimeOfDay? notificationTime = _notificationTimes[category.id];
-                              // ignore: unused_local_variable
                               final bool hasMultipleReminders = _hasMultipleReminders[category.id] ?? false;
                               final int additionalCount = _additionalRemindersCount[category.id] ?? 0;
                               final Color color1 = _getCategoryColorWithId(category.id);

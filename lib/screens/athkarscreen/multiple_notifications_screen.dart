@@ -1,15 +1,14 @@
-// lib/screens/athkarscreen/screen/multiple_notifications_screen.dart
+// lib/screens/athkarscreen/multiple_notifications_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/screens/athkarscreen/services/athkar_service.dart';
-import 'package:test_athkar_app/services/notification/notification_manager.dart'; // استيراد مدير الإشعارات
-import 'package:test_athkar_app/services/error_logging_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/notification_service.dart';
+import 'package:test_athkar_app/screens/athkarscreen/services/error_logging_service.dart';
 import 'package:test_athkar_app/screens/hijri_date_time_header/hijri_date_time_header.dart'
     show kPrimary, kSurface;
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:test_athkar_app/services/di_container.dart';
 
 class MultipleNotificationsScreen extends StatefulWidget {
   final AthkarCategory category;
@@ -25,7 +24,7 @@ class MultipleNotificationsScreen extends StatefulWidget {
 
 class _MultipleNotificationsScreenState extends State<MultipleNotificationsScreen> {
   final AthkarService _athkarService = AthkarService();
-  late final NotificationManager _notificationManager; // استخدام مدير الإشعارات
+  final NotificationService _notificationService = NotificationService();
   final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
   
   List<String> _notificationTimes = [];
@@ -34,7 +33,6 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
   @override
   void initState() {
     super.initState();
-    _notificationManager = serviceLocator<NotificationManager>();
     _loadNotificationTimes();
   }
   
@@ -154,14 +152,7 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
         );
         
         // Schedule the notification
-        await _notificationManager.scheduleAthkarNotifications(
-          categoryId: updatedCategory.id,
-          categoryTitle: updatedCategory.title,
-          times: [pickedTime],
-          customTitle: updatedCategory.notifyTitle,
-          customBody: updatedCategory.notifyBody,
-          color: updatedCategory.color,
-        );
+        await _notificationService.scheduleAdditionalNotifications(updatedCategory);
         
         // Refresh the list
         _loadNotificationTimes();
@@ -220,6 +211,9 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
         // Remove from list
         await _athkarService.removeAdditionalNotificationTime(widget.category.id, timeString);
         
+        // Cancel the associated notification
+        // This is handled when re-scheduling all notifications
+        
         // Re-schedule all remaining notifications
         final updatedTimes = _notificationTimes.where((t) => t != timeString).toList();
         final updatedCategory = widget.category.copyWith(
@@ -227,39 +221,14 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
           additionalNotifyTimes: updatedTimes,
         );
         
-        // Re-schedule notifications using notification manager
+        // We need to re-schedule the main notification and all additional ones
+        final mainTime = await _notificationService.getNotificationTime(widget.category.id);
+        if (mainTime != null) {
+          await _notificationService.scheduleAthkarNotification(updatedCategory, mainTime);
+        }
+        
         if (updatedTimes.isNotEmpty) {
-          final times = updatedTimes.map((timeStr) {
-            final parts = timeStr.split(':');
-            return TimeOfDay(
-              hour: int.parse(parts[0]),
-              minute: int.parse(parts[1]),
-            );
-          }).toList();
-          
-          await _notificationManager.scheduleAthkarNotifications(
-            categoryId: updatedCategory.id,
-            categoryTitle: updatedCategory.title,
-            times: times,
-            customTitle: updatedCategory.notifyTitle,
-            customBody: updatedCategory.notifyBody,
-            color: updatedCategory.color,
-          );
-        } else {
-          // If no additional times left, just keep the main notification
-          await _notificationManager.cancelAthkarNotifications(widget.category.id);
-          
-          final mainTime = await _notificationManager.getNotificationTime(widget.category.id);
-          if (mainTime != null) {
-            await _notificationManager.scheduleAthkarNotifications(
-              categoryId: widget.category.id,
-              categoryTitle: widget.category.title,
-              times: [mainTime],
-              customTitle: widget.category.notifyTitle,
-              customBody: widget.category.notifyBody,
-              color: widget.category.color,
-            );
-          }
+          await _notificationService.scheduleAdditionalNotifications(updatedCategory);
         }
         
         // Refresh the list
@@ -352,28 +321,13 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
             .toList()
           ..add(newTimeString);
         
-        final times = updatedTimes.map((timeStr) {
-          final parts = timeStr.split(':');
-          return TimeOfDay(
-            hour: int.parse(parts[0]),
-            minute: int.parse(parts[1]),
-          );
-        }).toList();
-        
         final updatedCategory = widget.category.copyWith(
           hasMultipleReminders: true,
           additionalNotifyTimes: updatedTimes,
         );
         
         // Schedule all notifications
-        await _notificationManager.scheduleAthkarNotifications(
-          categoryId: updatedCategory.id,
-          categoryTitle: updatedCategory.title,
-          times: times,
-          customTitle: updatedCategory.notifyTitle,
-          customBody: updatedCategory.notifyBody,
-          color: updatedCategory.color,
-        );
+        await _notificationService.scheduleAdditionalNotifications(updatedCategory);
         
         // Refresh the list
         _loadNotificationTimes();
@@ -451,224 +405,225 @@ class _MultipleNotificationsScreenState extends State<MultipleNotificationsScree
                 children: [
                   // Header
                   Padding(
-                    padding: const EdgeInsets.all(16.0),child: Card(
-                     elevation: 4,
-                     shape: RoundedRectangleBorder(
-                       borderRadius: BorderRadius.circular(16),
-                     ),
-                     child: Container(
-                       padding: EdgeInsets.all(16),
-                       decoration: BoxDecoration(
-                         gradient: LinearGradient(
-                           colors: [
-                             _getCategoryColor(),
-                             _getCategoryColor().withOpacity(0.7),
-                           ],
-                           begin: Alignment.topRight,
-                           end: Alignment.bottomLeft,
-                         ),
-                         borderRadius: BorderRadius.circular(16),
-                       ),
-                       child: Column(
-                         children: [
-                           Row(
-                             children: [
-                               Icon(
-                                 widget.category.icon,
-                                 color: Colors.white,
-                                 size: 24,
-                               ),
-                               SizedBox(width: 8),
-                               Text(
-                                 widget.category.title,
-                                 style: TextStyle(
-                                   color: Colors.white,
-                                   fontWeight: FontWeight.bold,
-                                   fontSize: 18,
-                                 ),
-                               ),
-                             ],
-                           ),
-                           SizedBox(height: 16),
-                           Text(
-                             'يمكنك إضافة أوقات متعددة لتلقي إشعارات ${widget.category.title}. اضغط على زر الإضافة لتحديد وقت جديد.',
-                             style: TextStyle(
-                               color: Colors.white,
-                               fontSize: 14,
-                             ),
-                           ),
-                           SizedBox(height: 8),
-                           Text(
-                             'قم بالضغط على أي وقت في القائمة لتعديله، أو اسحب لليسار للحذف.',
-                             style: TextStyle(
-                               color: Colors.white.withOpacity(0.9),
-                               fontSize: 12,
-                               fontStyle: FontStyle.italic,
-                             ),
-                           ),
-                         ],
-                       ),
-                     ),
-                   ),
-                 ),
-                 
-                 // Notification times list
-                 Expanded(
-                   child: _notificationTimes.isEmpty
-                       ? _buildEmptyState()
-                       : _buildNotificationTimesList(),
-                 ),
-               ],
-             ),
-           ),
-   );
- }
- 
- // Empty state when no notification times are set
- Widget _buildEmptyState() {
-   return Center(
-     child: Column(
-       mainAxisAlignment: MainAxisAlignment.center,
-       children: [
-         Icon(
-           Icons.notifications_off,
-           size: 80,
-           color: Colors.grey[400],
-         ),
-         SizedBox(height: 16),
-         Text(
-           'لا توجد أوقات إشعارات إضافية',
-           style: TextStyle(
-             fontSize: 18,
-             fontWeight: FontWeight.bold,
-             color: Colors.grey[600],
-           ),
-         ),
-         SizedBox(height: 8),
-         Text(
-           'اضغط على زر الإضافة لتحديد وقت جديد',
-           style: TextStyle(
-             fontSize: 14,
-             color: Colors.grey[500],
-           ),
-         ),
-       ],
-     ),
-   );
- }
- 
- // List of notification times
- Widget _buildNotificationTimesList() {
-   return AnimationLimiter(
-     child: ListView.builder(
-       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-       itemCount: _notificationTimes.length,
-       itemBuilder: (context, index) {
-         final timeString = _notificationTimes[index];
-         final formattedTime = _formatTimeString(timeString);
-         
-         return AnimationConfiguration.staggeredList(
-           position: index,
-           duration: const Duration(milliseconds: 375),
-           child: SlideAnimation(
-             verticalOffset: 50.0,
-             child: FadeInAnimation(
-               child: Card(
-                 elevation: 2,
-                 margin: EdgeInsets.symmetric(vertical: 8),
-                 shape: RoundedRectangleBorder(
-                   borderRadius: BorderRadius.circular(12),
-                 ),
-                 child: Dismissible(
-                   key: Key('time_$timeString'),
-                   direction: DismissDirection.endToStart,
-                   background: Container(
-                     alignment: Alignment.centerRight,
-                     padding: EdgeInsets.only(right: 20),
-                     decoration: BoxDecoration(
-                       color: Colors.red,
-                       borderRadius: BorderRadius.circular(12),
-                     ),
-                     child: Icon(
-                       Icons.delete,
-                       color: Colors.white,
-                     ),
-                   ),
-                   confirmDismiss: (direction) async {
-                     return await showDialog<bool>(
-                       context: context,
-                       builder: (context) => AlertDialog(
-                         title: Text('حذف وقت الإشعار'),
-                         content: Text('هل أنت متأكد من حذف وقت الإشعار $formattedTime؟'),
-                         actions: [
-                           TextButton(
-                             onPressed: () => Navigator.of(context).pop(false),
-                             child: Text('إلغاء'),
-                           ),
-                           TextButton(
-                             onPressed: () => Navigator.of(context).pop(true),
-                             child: Text('حذف'),
-                             style: TextButton.styleFrom(
-                               foregroundColor: Colors.red,
-                             ),
-                           ),
-                         ],
-                       ),
-                     ) ?? false;
-                   },
-                   onDismissed: (direction) {
-                     _removeNotificationTime(timeString);
-                   },
-                   child: ListTile(
-                     onTap: () => _editNotificationTime(timeString),
-                     leading: CircleAvatar(
-                       backgroundColor: _getCategoryColor().withOpacity(0.2),
-                       child: Icon(
-                         Icons.access_time,
-                         color: _getCategoryColor(),
-                       ),
-                     ),
-                     title: Text(
-                       formattedTime,
-                       style: TextStyle(
-                         fontWeight: FontWeight.bold,
-                       ),
-                     ),
-                     subtitle: Text(
-                       'اضغط للتعديل',
-                       style: TextStyle(
-                         fontSize: 12,
-                       ),
-                     ),
-                     trailing: Row(
-                       mainAxisSize: MainAxisSize.min,
-                       children: [
-                         IconButton(
-                           icon: Icon(
-                             Icons.edit,
-                             color: Colors.blue,
-                           ),
-                           onPressed: () => _editNotificationTime(timeString),
-                           tooltip: 'تعديل',
-                         ),
-                         IconButton(
-                           icon: Icon(
-                             Icons.delete,
-                             color: Colors.red,
-                           ),
-                           onPressed: () => _removeNotificationTime(timeString),
-                           tooltip: 'حذف',
-                         ),
-                       ],
-                     ),
-                   ),
-                 ),
-               ),
-             ),
-           ),
-         );
-       },
-     ),
-   );
- }
+                    padding: const EdgeInsets.all(16.0),
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Container(
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              _getCategoryColor(),
+                              _getCategoryColor().withOpacity(0.7),
+                            ],
+                            begin: Alignment.topRight,
+                            end: Alignment.bottomLeft,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  widget.category.icon,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  widget.category.title,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'يمكنك إضافة أوقات متعددة لتلقي إشعارات ${widget.category.title}. اضغط على زر الإضافة لتحديد وقت جديد.',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'قم بالضغط على أي وقت في القائمة لتعديله، أو اسحب لليسار للحذف.',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Notification times list
+                  Expanded(
+                    child: _notificationTimes.isEmpty
+                        ? _buildEmptyState()
+                        : _buildNotificationTimesList(),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+  
+  // Empty state when no notification times are set
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.notifications_off,
+            size: 80,
+            color: Colors.grey[400],
+          ),
+          SizedBox(height: 16),
+          Text(
+            'لا توجد أوقات إشعارات إضافية',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'اضغط على زر الإضافة لتحديد وقت جديد',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // List of notification times
+  Widget _buildNotificationTimesList() {
+    return AnimationLimiter(
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: _notificationTimes.length,
+        itemBuilder: (context, index) {
+          final timeString = _notificationTimes[index];
+          final formattedTime = _formatTimeString(timeString);
+          
+          return AnimationConfiguration.staggeredList(
+            position: index,
+            duration: const Duration(milliseconds: 375),
+            child: SlideAnimation(
+              verticalOffset: 50.0,
+              child: FadeInAnimation(
+                child: Card(
+                  elevation: 2,
+                  margin: EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Dismissible(
+                    key: Key('time_$timeString'),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: EdgeInsets.only(right: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.delete,
+                        color: Colors.white,
+                      ),
+                    ),
+                    confirmDismiss: (direction) async {
+                      return await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text('حذف وقت الإشعار'),
+                          content: Text('هل أنت متأكد من حذف وقت الإشعار $formattedTime؟'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: Text('إلغاء'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: Text('حذف'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ) ?? false;
+                    },
+                    onDismissed: (direction) {
+                      _removeNotificationTime(timeString);
+                    },
+                    child: ListTile(
+                      onTap: () => _editNotificationTime(timeString),
+                      leading: CircleAvatar(
+                        backgroundColor: _getCategoryColor().withOpacity(0.2),
+                        child: Icon(
+                          Icons.access_time,
+                          color: _getCategoryColor(),
+                        ),
+                      ),
+                      title: Text(
+                        formattedTime,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'اضغط للتعديل',
+                        style: TextStyle(
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.edit,
+                              color: Colors.blue,
+                            ),
+                            onPressed: () => _editNotificationTime(timeString),
+                            tooltip: 'تعديل',
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.delete,
+                              color: Colors.red,
+                            ),
+                            onPressed: () => _removeNotificationTime(timeString),
+                            tooltip: 'حذف',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
