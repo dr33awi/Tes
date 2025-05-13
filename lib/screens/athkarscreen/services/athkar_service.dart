@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/screens/athkarscreen/model/athkar_model.dart';
 import 'package:test_athkar_app/services/notification/notification_manager.dart';
 import 'package:test_athkar_app/services/di_container.dart';
+import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart';
 
 class AthkarService {
   // Singleton implementation
@@ -328,7 +329,7 @@ class AthkarService {
   // تحسين نظام إعدادات الإشعارات - متوافق مع النظام الموحد
   
   // الحصول على إعدادات الإشعارات الكاملة لفئة معينة
-  Future<NotificationSettings> getNotificationSettings(String categoryId) async {
+  Future<AthkarNotificationSettings> getNotificationSettings(String categoryId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
@@ -340,7 +341,7 @@ class AthkarService {
       // استرجاع أهمية الإشعار
       final importance = prefs.getInt('notification_${categoryId}_importance') ?? 4;
       
-      return NotificationSettings(
+      return AthkarNotificationSettings(
         isEnabled: enabled,
         customTime: customTime,
         vibrate: vibrate,
@@ -348,12 +349,12 @@ class AthkarService {
       );
     } catch (e) {
       print('Error getting notification settings: $e');
-      return NotificationSettings();
+      return AthkarNotificationSettings();
     }
   }
   
   // حفظ إعدادات الإشعارات الكاملة لفئة معينة
-  Future<void> saveNotificationSettings(String categoryId, NotificationSettings settings) async {
+  Future<void> saveNotificationSettings(String categoryId, AthkarNotificationSettings settings) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
@@ -372,7 +373,6 @@ class AthkarService {
       print('Error saving notification settings: $e');
     }
   }
-  
   // تبسيط - الحصول على حالة تفعيل الإشعار
   Future<bool> getNotificationEnabled(String categoryId) async {
     try {

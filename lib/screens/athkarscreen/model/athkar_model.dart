@@ -202,13 +202,13 @@ class Thikr {
 }
 
 // نموذج لإعدادات الإشعارات - تبسيط بإزالة خيارات الصوت المخصصة
-class NotificationSettings {
+class AthkarNotificationSettings {
   final bool isEnabled;
   final String? customTime;
   final bool vibrate;
   final int? importance; // أهمية الإشعار (0-5)
 
-  NotificationSettings({
+  AthkarNotificationSettings({
     this.isEnabled = true,
     this.customTime,
     this.vibrate = true,
@@ -216,8 +216,8 @@ class NotificationSettings {
   });
   
   // Factory constructor to create settings from JSON data
-  factory NotificationSettings.fromJson(Map<String, dynamic> json) {
-    return NotificationSettings(
+  factory AthkarNotificationSettings.fromJson(Map<String, dynamic> json) {
+    return AthkarNotificationSettings(
       isEnabled: json['is_enabled'] ?? true,
       customTime: json['custom_time'],
       vibrate: json['vibrate'] ?? true,
@@ -236,13 +236,13 @@ class NotificationSettings {
   }
   
   // إنشاء نسخة جديدة من الإعدادات مع تعديل بعض الخصائص
-  NotificationSettings copyWith({
+  AthkarNotificationSettings copyWith({
     bool? isEnabled,
     String? customTime,
     bool? vibrate,
     int? importance,
   }) {
-    return NotificationSettings(
+    return AthkarNotificationSettings(
       isEnabled: isEnabled ?? this.isEnabled,
       customTime: customTime ?? this.customTime,
       vibrate: vibrate ?? this.vibrate,

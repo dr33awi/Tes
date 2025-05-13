@@ -7,6 +7,10 @@ import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
 import 'package:test_athkar_app/services/di_container.dart';
 import 'package:test_athkar_app/services/notification/notification_manager.dart';
 import 'package:test_athkar_app/services/notification/notification_navigation.dart';
+import 'package:test_athkar_app/services/app_initializer.dart';
+
+
+import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -18,15 +22,12 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
-  // تهيئة DI container
-  await setupDependencies();
+  // تهيئة التطبيق بالكامل (تتضمن DI container والإشعارات)
+  final initSuccess = await AppInitializer.initialize();
   
-  // تهيئة NotificationManager
-  final notificationManager = serviceLocator<NotificationManager>();
-  await notificationManager.initialize();
-  
-  // تهيئة التنقل من الإشعارات
-  await NotificationNavigation.initialize();
+  if (!initSuccess) {
+    print('تحذير: فشلت بعض عمليات التهيئة، لكن التطبيق سيستمر');
+  }
   
   // Run the app
   runApp(const MyApp());
@@ -44,6 +45,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // التحقق من التحسينات بعد بناء الواجهة
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppInitializer.checkNotificationOptimizations(context);
+    });
   }
 
   @override
@@ -55,8 +61,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Check if notifications need to be updated when app is resumed
-      // You can add notification check logic here if needed
+      // التحقق من الإشعارات عند استئناف التطبيق
+      AppInitializer.checkAndRescheduleNotifications();
     }
   }
 
@@ -71,7 +77,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return MaterialApp(
           title: 'تطبيق الأذكار',
           debugShowCheckedModeBanner: false,
-          navigatorKey: NotificationNavigation.navigatorKey,
+          navigatorKey: AppInitializer.getNavigatorKey(),
           locale: const Locale('ar'),
           supportedLocales: const [
             Locale('ar', ''),
@@ -104,9 +110,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               ),
             ),
           ),
-          home: const HomeScreen(),
+          // إضافة المسارات المحتاجة
+          routes: {
+            '/': (context) => const HomeScreen(),
+            '/notification_settings': (context) => const NotificationSettingsScreen(),
+          },
+          // تكوين التنقل من الإشعارات
+          onGenerateRoute: _onGenerateRoute,
         );
       },
     );
+  }
+  
+  // دالة مساعدة للتنقل من الإشعارات
+  Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
+    // يمكن إضافة منطق تنقل مخصص هنا إذا لزم الأمر
+    return null;
   }
 }

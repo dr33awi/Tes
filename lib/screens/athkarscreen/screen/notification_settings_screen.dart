@@ -1,4 +1,4 @@
-// lib/screens/notification_settings_screen.dart
+// lib/screens/athkarscreen/screen/notification_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:test_athkar_app/services/notification/notification_manager.dart';
 import 'package:test_athkar_app/services/di_container.dart';
