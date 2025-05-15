@@ -8,7 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
 import 'package:test_athkar_app/adhan/widgets/location_permission_dialog.dart';
-import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
+import 'package:test_athkar_app/services/notification/notification_manager.dart';
+import 'package:test_athkar_app/services/di_container.dart';
 
 /// Service for managing prayer times
 /// 
@@ -47,8 +48,8 @@ class PrayerTimesService {
   // Initialization flag
   bool _isInitialized = false;
   
-  // Notification service instance
-  final PrayerNotificationService _notificationService = PrayerNotificationService();
+  // Notification manager instance from the unified system
+  late NotificationManager _notificationManager;
   
   /// Initialize the service
   Future<bool> initialize() async {
@@ -61,8 +62,8 @@ class PrayerTimesService {
       // Load saved settings
       await _loadSettings();
       
-      // Initialize notification service
-      await _notificationService.initialize();
+      // Initialize notification manager from service locator
+      _notificationManager = serviceLocator<NotificationManager>();
       
       _isInitialized = true;
       debugPrint('Prayer times service initialized successfully');
@@ -522,8 +523,6 @@ class PrayerTimesService {
   /// Set context for showing dialogs
   void setContext(BuildContext context) {
     _context = context;
-    // Also set context in notification service
-    _notificationService.setContext(context);
   }
   
   /// Get prayer times from API or location
@@ -757,7 +756,7 @@ class PrayerTimesService {
     return defaultPrayers;
   }
   
-  /// Schedule prayer notifications
+  /// Schedule prayer notifications using the unified notification system
   Future<bool> schedulePrayerNotifications() async {
     try {
       // Get prayer times
@@ -777,34 +776,51 @@ class PrayerTimesService {
         }
       }
       
-      // Prepare list of prayer times for scheduling notifications
-      final List<Map<String, dynamic>> notificationTimes = [];
-      
       final now = DateTime.now();
       
       for (final prayer in prayerTimes) {
-        // Ignore Sunrise since it's not a real prayer time
-        // and times that have already passed
-        if (prayer.name != 'الشروق' && prayer.time.isAfter(now)) {
-          notificationTimes.add({
-            'name': prayer.name,
-            'time': prayer.time,
-          });
+        // Skip Sunrise as it's not a prayer time
+        if (prayer.name == 'الشروق') continue;
+        
+        // Only schedule future prayers
+        if (prayer.time.isAfter(now)) {
+          // Schedule each prayer notification
+          await _notificationManager.scheduleNotification(
+            notificationId: 'prayer_${prayer.name}',
+            title: 'حان وقت صلاة ${prayer.name}',
+            body: _getNotificationBody(prayer.name),
+            notificationTime: TimeOfDay.fromDateTime(prayer.time),
+            channelId: 'prayer_channel',
+            payload: 'prayer_${prayer.name}',
+            color: prayer.color,
+            priority: 5, // High priority for prayer notifications
+            repeat: true,
+          );
         }
       }
       
-      // Schedule notifications for all future prayer times today
-      if (notificationTimes.isNotEmpty) {
-        final scheduledCount = await _notificationService.scheduleAllPrayerNotifications(notificationTimes);
-        debugPrint('Scheduled $scheduledCount prayer notifications');
-        return scheduledCount > 0;
-      } else {
-        debugPrint('No future prayer times today to schedule notifications for');
-        return false;
-      }
+      return true;
     } catch (e) {
       debugPrint('Error scheduling prayer notifications: $e');
       return false;
+    }
+  }
+  
+  /// Get notification body text for prayer
+  String _getNotificationBody(String prayerName) {
+    switch (prayerName) {
+      case 'الفجر':
+        return 'حان الآن وقت صلاة الفجر. قم وصلِ قبل طلوع الشمس';
+      case 'الظهر':
+        return 'حان الآن وقت صلاة الظهر. حي على الصلاة';
+      case 'العصر':
+        return 'حان الآن وقت صلاة العصر. حي على الفلاح';
+      case 'المغرب':
+        return 'حان الآن وقت صلاة المغرب. وَسَبِّحْ بِحَمْدِ رَبِّكَ قَبْلَ غُرُوبِ الشَّمْسِ';
+      case 'العشاء':
+        return 'حان الآن وقت صلاة العشاء. أقم الصلاة لدلوك الشمس إلى غسق الليل';
+      default:
+        return 'حان الآن وقت الصلاة';
     }
   }
   

@@ -1,8 +1,11 @@
 // lib/adhan/screens/notification_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:test_athkar_app/services/notification/notification_manager.dart';
 import 'package:test_athkar_app/adhan/services/prayer_times_service.dart';
+import 'package:test_athkar_app/services/di_container.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -12,8 +15,9 @@ class NotificationSettingsScreen extends StatefulWidget {
 }
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-  final PrayerNotificationService _notificationService = PrayerNotificationService();
-  final PrayerTimesService _prayerService = PrayerTimesService();
+  late final NotificationManager _notificationManager;
+  late final PrayerTimesService _prayerService;
+  late final PermissionsService _permissionsService;
   
   bool _isLoading = true;
   bool _notificationsEnabled = true;
@@ -28,6 +32,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   @override
   void initState() {
     super.initState();
+    _notificationManager = serviceLocator<NotificationManager>();
+    _prayerService = PrayerTimesService();
+    _permissionsService = serviceLocator<PermissionsService>();
     _loadSettings();
   }
   
@@ -48,11 +55,28 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       });
       
       // Verificar permisos de notificación
-      _hasPermissions = await _notificationService.checkNotificationPermission();
+      _hasPermissions = await _permissionsService.checkNotificationPermission();
       
       // Cargar configuración del servicio
-      _notificationsEnabled = _notificationService.isNotificationEnabled;
-      _prayerSettings = Map.from(_notificationService.prayerNotificationSettings);
+      final settings = _notificationManager.settings;
+      _notificationsEnabled = settings.enabled;
+      
+      // أسماء الصلوات
+      final prayerNames = [
+        'الفجر',
+        'الشروق',
+        'الظهر',
+        'العصر',
+        'المغرب',
+        'العشاء',
+      ];
+      
+      // تحميل إعدادات كل صلاة من SharedPreferences
+      for (final prayer in prayerNames) {
+        final isEnabled = await _notificationManager.isNotificationEnabled('prayer_$prayer');
+        _prayerSettings[prayer] = isEnabled;
+      }
+      
     } catch (e) {
       debugPrint('Error al cargar configuración: $e');
       _showErrorSnackBar('حدث خطأ أثناء تحميل الإعدادات');
@@ -71,8 +95,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _isLoading = true;
       });
       
-      // Solicitar permisos de notificación
-      _hasPermissions = await _notificationService.requestNotificationPermission();
+      // Solicitar permisos de notificación usando PermissionsService
+      _hasPermissions = await _permissionsService.checkAndRequestNotificationPermission();
       
       setState(() {
         _isLoading = false;
@@ -125,19 +149,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
   
   // Función para abrir configuración de la aplicación
-  void openAppSettings() {
+  void openAppSettings() async {
     try {
-      // Usar apertura estándar de Flutter para la configuración de la aplicación
+      // Usar PermissionsService para abrir configuración
+      await _permissionsService.openNotificationSettings();
       debugPrint('Abriendo configuración de la aplicación...');
-      // Notificar al usuario
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى تمكين الإشعارات في إعدادات التطبيق'),
-          duration: Duration(seconds: 5),
-        ),
-      );
     } catch (e) {
       debugPrint('Error al abrir configuración: $e');
+      _showErrorSnackBar('لا يمكن فتح إعدادات التطبيق');
     }
   }
   
@@ -459,14 +478,16 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     });
     
     try {
-      _notificationService.isNotificationEnabled = value;
+      await _notificationManager.setNotificationsEnabled(value);
       
       if (value) {
         // Reprogramar notificaciones al activarlas
         await _prayerService.schedulePrayerNotifications();
       } else {
         // Cancelar todas las notificaciones al desactivarlas
-        await _notificationService.cancelAllNotifications();
+        for (final prayer in _prayerSettings.keys) {
+          await _notificationManager.cancelNotification('prayer_$prayer');
+        }
       }
     } catch (e) {
       debugPrint('Error al cambiar estado de notificaciones: $e');
@@ -556,8 +577,16 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     });
     
     try {
-      await _notificationService.setPrayerNotificationEnabled(prayer, value);
-      await _prayerService.schedulePrayerNotifications();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('prayer_${prayer}_notifications_enabled', value);
+      
+      if (value) {
+        // جدولة الإشعار لهذه الصلاة
+        await _prayerService.schedulePrayerNotifications();
+      } else {
+        // إلغاء الإشعار لهذه الصلاة
+        await _notificationManager.cancelNotification('prayer_$prayer');
+      }
     } catch (e) {
       debugPrint('Error al cambiar configuración de $prayer: $e');
       _showErrorSnackBar('حدث خطأ أثناء تغيير إعدادات الإشعار');
@@ -723,7 +752,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       
       // Verificar permisos de notificación
       if (!_hasPermissions) {
-        _hasPermissions = await _notificationService.requestNotificationPermission();
+        _hasPermissions = await _permissionsService.checkAndRequestNotificationPermission();
         if (!_hasPermissions) {
           setState(() {
             _isLoading = false;
