@@ -8,8 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
 import 'package:test_athkar_app/adhan/widgets/location_permission_dialog.dart';
-import 'package:test_athkar_app/services/notification/notification_manager.dart';
-import 'package:test_athkar_app/services/di_container.dart';
+import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
 
 /// Service for managing prayer times
 /// 
@@ -48,8 +47,8 @@ class PrayerTimesService {
   // Initialization flag
   bool _isInitialized = false;
   
-  // Notification manager instance from the unified system
-  late NotificationManager _notificationManager;
+  // Notification service instance
+  final PrayerNotificationService _notificationService = PrayerNotificationService();
   
   /// Initialize the service
   Future<bool> initialize() async {
@@ -62,21 +61,11 @@ class PrayerTimesService {
       // Load saved settings
       await _loadSettings();
       
-      // Initialize notification manager from service locator
-      _notificationManager = serviceLocator<NotificationManager>();
+      // Initialize notification service
+      await _notificationService.initialize();
       
       _isInitialized = true;
       debugPrint('Prayer times service initialized successfully');
-      
-      // Schedule prayer notifications after initialization
-      try {
-        await schedulePrayerNotifications();
-        debugPrint('Prayer notifications scheduled during initialization');
-      } catch (e) {
-        debugPrint('Error scheduling notifications during initialization: $e');
-        // Continue despite notification error
-      }
-      
       return true;
     } catch (e, stackTrace) {
       debugPrint('Error initializing prayer times service: $e');
@@ -533,6 +522,8 @@ class PrayerTimesService {
   /// Set context for showing dialogs
   void setContext(BuildContext context) {
     _context = context;
+    // Also set context in notification service
+    _notificationService.setContext(context);
   }
   
   /// Get prayer times from API or location
@@ -766,11 +757,9 @@ class PrayerTimesService {
     return defaultPrayers;
   }
   
-  /// Schedule prayer notifications using the unified notification system
+  /// Schedule prayer notifications
   Future<bool> schedulePrayerNotifications() async {
     try {
-      debugPrint('Starting to schedule prayer notifications...');
-      
       // Get prayer times
       List<PrayerTimeModel> prayerTimes;
       try {
@@ -788,86 +777,34 @@ class PrayerTimesService {
         }
       }
       
+      // Prepare list of prayer times for scheduling notifications
+      final List<Map<String, dynamic>> notificationTimes = [];
+      
       final now = DateTime.now();
-      int scheduledCount = 0;
       
-      // Cancel all existing prayer notifications first
       for (final prayer in prayerTimes) {
-        await _notificationManager.cancelNotification('prayer_${prayer.name}');
-      }
-      
-      // Schedule new notifications
-      for (final prayer in prayerTimes) {
-        // Skip Sunrise as it's not a prayer time
-        if (prayer.name == 'الشروق') continue;
-        
-        // Check if this prayer notification is enabled
-        final prefs = await SharedPreferences.getInstance();
-        final isEnabled = prefs.getBool('prayer_${prayer.name}_notifications_enabled') ?? true;
-        
-        if (!isEnabled) {
-          debugPrint('Notification for ${prayer.name} is disabled');
-          continue;
-        }
-        
-        // Calculate the next occurrence of this prayer time
-        DateTime scheduledTime = prayer.time;
-        
-        // If the time has already passed today, schedule for tomorrow
-        if (scheduledTime.isBefore(now)) {
-          scheduledTime = scheduledTime.add(Duration(days: 1));
-        }
-        
-        // Format the time for saving
-        final timeString = '${scheduledTime.hour.toString().padLeft(2, '0')}:${scheduledTime.minute.toString().padLeft(2, '0')}';
-        
-        // Save the notification time in the format expected by the notification service
-        await prefs.setString('notification_prayer_${prayer.name}_time', timeString);
-        
-        // Schedule the notification
-        final success = await _notificationManager.scheduleNotification(
-          notificationId: 'prayer_${prayer.name}',
-          title: 'حان وقت صلاة ${prayer.name}',
-          body: _getNotificationBody(prayer.name),
-          notificationTime: TimeOfDay.fromDateTime(scheduledTime),
-          channelId: 'prayer_channel',
-          payload: 'prayer_${prayer.name}',
-          color: prayer.color,
-          priority: 5, // High priority for prayer notifications
-          repeat: true, // Daily repeat
-        );
-        
-        if (success) {
-          scheduledCount++;
-          debugPrint('Scheduled notification for ${prayer.name} at ${scheduledTime.hour}:${scheduledTime.minute}');
-        } else {
-          debugPrint('Failed to schedule notification for ${prayer.name}');
+        // Ignore Sunrise since it's not a real prayer time
+        // and times that have already passed
+        if (prayer.name != 'الشروق' && prayer.time.isAfter(now)) {
+          notificationTimes.add({
+            'name': prayer.name,
+            'time': prayer.time,
+          });
         }
       }
       
-      debugPrint('Scheduled $scheduledCount prayer notifications successfully');
-      return scheduledCount > 0;
+      // Schedule notifications for all future prayer times today
+      if (notificationTimes.isNotEmpty) {
+        final scheduledCount = await _notificationService.scheduleAllPrayerNotifications(notificationTimes);
+        debugPrint('Scheduled $scheduledCount prayer notifications');
+        return scheduledCount > 0;
+      } else {
+        debugPrint('No future prayer times today to schedule notifications for');
+        return false;
+      }
     } catch (e) {
       debugPrint('Error scheduling prayer notifications: $e');
       return false;
-    }
-  }
-  
-  /// Get notification body text for prayer
-  String _getNotificationBody(String prayerName) {
-    switch (prayerName) {
-      case 'الفجر':
-        return 'حان الآن وقت صلاة الفجر. قم وصلِ قبل طلوع الشمس';
-      case 'الظهر':
-        return 'حان الآن وقت صلاة الظهر. حي على الصلاة';
-      case 'العصر':
-        return 'حان الآن وقت صلاة العصر. حي على الفلاح';
-      case 'المغرب':
-        return 'حان الآن وقت صلاة المغرب. وَسَبِّحْ بِحَمْدِ رَبِّكَ قَبْلَ غُرُوبِ الشَّمْسِ';
-      case 'العشاء':
-        return 'حان الآن وقت صلاة العشاء. أقم الصلاة لدلوك الشمس إلى غسق الليل';
-      default:
-        return 'حان الآن وقت الصلاة';
     }
   }
   
