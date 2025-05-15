@@ -67,6 +67,16 @@ class PrayerTimesService {
       
       _isInitialized = true;
       debugPrint('Prayer times service initialized successfully');
+      
+      // Schedule prayer notifications after initialization
+      try {
+        await schedulePrayerNotifications();
+        debugPrint('Prayer notifications scheduled during initialization');
+      } catch (e) {
+        debugPrint('Error scheduling notifications during initialization: $e');
+        // Continue despite notification error
+      }
+      
       return true;
     } catch (e, stackTrace) {
       debugPrint('Error initializing prayer times service: $e');
@@ -759,6 +769,8 @@ class PrayerTimesService {
   /// Schedule prayer notifications using the unified notification system
   Future<bool> schedulePrayerNotifications() async {
     try {
+      debugPrint('Starting to schedule prayer notifications...');
+      
       // Get prayer times
       List<PrayerTimeModel> prayerTimes;
       try {
@@ -793,7 +805,10 @@ class PrayerTimesService {
         final prefs = await SharedPreferences.getInstance();
         final isEnabled = prefs.getBool('prayer_${prayer.name}_notifications_enabled') ?? true;
         
-        if (!isEnabled) continue;
+        if (!isEnabled) {
+          debugPrint('Notification for ${prayer.name} is disabled');
+          continue;
+        }
         
         // Calculate the next occurrence of this prayer time
         DateTime scheduledTime = prayer.time;
@@ -802,6 +817,12 @@ class PrayerTimesService {
         if (scheduledTime.isBefore(now)) {
           scheduledTime = scheduledTime.add(Duration(days: 1));
         }
+        
+        // Format the time for saving
+        final timeString = '${scheduledTime.hour.toString().padLeft(2, '0')}:${scheduledTime.minute.toString().padLeft(2, '0')}';
+        
+        // Save the notification time in the format expected by the notification service
+        await prefs.setString('notification_prayer_${prayer.name}_time', timeString);
         
         // Schedule the notification
         final success = await _notificationManager.scheduleNotification(

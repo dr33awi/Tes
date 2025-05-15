@@ -731,7 +731,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       ],
     );
   }
-  
   // Update prayer notifications
   Future<void> _updateNotifications() async {
     try {
