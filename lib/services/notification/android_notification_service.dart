@@ -273,6 +273,17 @@ class AndroidNotificationService implements NotificationServiceInterface {
           showBadge: true,
           bypassDnd: true,
         ),
+          AndroidNotificationChannel(
+          'prayer_channel',
+            'إشعارات الصلاة', 
+            description: 'إشعارات مواقيت الصلاة',
+            importance: Importance.max,
+            enableVibration: true,
+            playSound: true,
+            enableLights: true,
+            showBadge: true,
+            bypassDnd: true,
+        ),
         
         // قناة ذات أولوية عالية
         AndroidNotificationChannel(

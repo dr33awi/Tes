@@ -5,9 +5,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:test_athkar_app/screens/home_screen/home_screen.dart';
 import 'package:test_athkar_app/services/app_initializer.dart';
-
-
+import 'package:test_athkar_app/services/notification/notification_navigation.dart';
 import 'package:test_athkar_app/screens/athkarscreen/screen/notification_settings_screen.dart';
+import 'package:test_athkar_app/adhan/screens/prayer_times_screen.dart';
+import 'package:test_athkar_app/adhan/screens/prayer_settings_screen.dart';
+import 'package:test_athkar_app/adhan/screens/notification_settings_screen.dart' as prayer;
 
 void main() async {
   // Ensure Flutter is initialized
@@ -74,7 +76,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return MaterialApp(
           title: 'تطبيق الأذكار',
           debugShowCheckedModeBanner: false,
-          navigatorKey: AppInitializer.getNavigatorKey(),
+          navigatorKey: NotificationNavigation.navigatorKey,
           locale: const Locale('ar'),
           supportedLocales: const [
             Locale('ar', ''),
@@ -111,6 +113,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           routes: {
             '/': (context) => const HomeScreen(),
             '/notification_settings': (context) => const NotificationSettingsScreen(),
+            '/prayer_times': (context) => const PrayerTimesScreen(),
+            '/prayer_settings': (context) => const PrayerSettingsScreen(),
+            '/prayer_notification_settings': (context) => const prayer.NotificationSettingsScreen(),
           },
           // تكوين التنقل من الإشعارات
           onGenerateRoute: _onGenerateRoute,
@@ -121,7 +126,58 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   
   // دالة مساعدة للتنقل من الإشعارات
   Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
-    // يمكن إضافة منطق تنقل مخصص هنا إذا لزم الأمر
+    // التعامل مع مسارات الأذكار المخصصة
+    if (settings.name == '/athkar_category') {
+      final args = settings.arguments as Map<String, dynamic>?;
+      
+      return MaterialPageRoute(
+        builder: (context) {
+          // هنا يمكن إضافة شاشة فئة الأذكار إذا كانت موجودة
+          // مثال: return AthkarCategoryScreen(categoryId: args?['categoryId']);
+          
+          // حالياً نعود للصفحة الرئيسية مع رسالة
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('تم النقر على إشعار الأذكار: ${args?['categoryId']}'),
+              ),
+            );
+          });
+          return const HomeScreen();
+        },
+      );
+    }
+    
+    // التعامل مع مسارات الصلاة المخصصة مع معاملات
+    if (settings.name == '/prayer_times_detail') {
+      final args = settings.arguments as Map<String, dynamic>?;
+      final prayerName = args?['prayer'] as String?;
+      
+      return MaterialPageRoute(
+        builder: (context) => PrayerTimesScreen(),
+        settings: RouteSettings(
+          arguments: {'prayer': prayerName},
+        ),
+      );
+    }
+    
+    // إضافة مسارات أخرى حسب الحاجة
+    switch (settings.name) {
+      case '/about':
+        return MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: const Text('حول التطبيق'),
+            ),
+            body: const Center(
+              child: Text('صفحة حول التطبيق'),
+            ),
+          ),
+        );
+      
+      // يمكن إضافة المزيد من المسارات هنا
+    }
+    
     return null;
   }
 }

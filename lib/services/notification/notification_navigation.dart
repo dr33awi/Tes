@@ -1,5 +1,5 @@
 // lib/services/notification/notification_navigation.dart
-import 'dart:convert'; // أضف هذا السطر لاستيراد jsonDecode و jsonEncode
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_athkar_app/services/error_logging_service.dart';
@@ -118,13 +118,23 @@ class NotificationNavigation {
         return;
       }
       
-      // البحث عن معالج مسجل
-      final handler = _navigationHandlers[navigationId];
-      if (handler != null) {
-        handler(context, targetId, extraData);
-      } else {
-        // معالج افتراضي
-        _defaultNavigationHandler(context, navigationId, targetId, extraData);
+      // التعامل مع أنواع الإشعارات المختلفة
+      switch (navigationId) {
+        case 'prayer':
+          await _handlePrayerNotification(context, targetId, extraData);
+          break;
+        case 'athkar':
+          await _handleAthkarNotification(context, targetId, extraData);
+          break;
+        default:
+          // البحث عن معالج مسجل
+          final handler = _navigationHandlers[navigationId];
+          if (handler != null) {
+            handler(context, targetId, extraData);
+          } else {
+            // معالج افتراضي
+            _defaultNavigationHandler(context, navigationId, targetId, extraData);
+          }
       }
     } catch (e) {
       await _errorLoggingService.logError(
@@ -135,9 +145,84 @@ class NotificationNavigation {
     }
   }
   
+  /// معالجة إشعار الصلاة
+  static Future<void> _handlePrayerNotification(
+    BuildContext context,
+    String targetId,
+    Map<String, dynamic>? extraData,
+  ) async {
+    try {
+      // استيراد الشاشة بشكل مشروط
+      if (context.mounted) {
+        // التنقل إلى شاشة مواقيت الصلاة
+        Navigator.pushNamed(
+          context,
+          '/prayer_times',
+          arguments: {
+            'prayer': targetId,
+            'data': extraData,
+          },
+        );
+      }
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationNavigation',
+        'خطأ في التنقل إلى شاشة الصلاة',
+        e
+      );
+    }
+  }
+  
+  /// معالجة إشعار الأذكار
+  static Future<void> _handleAthkarNotification(
+    BuildContext context,
+    String targetId,
+    Map<String, dynamic>? extraData,
+  ) async {
+    try {
+      if (context.mounted) {
+        // التنقل إلى شاشة الأذكار
+        Navigator.pushNamed(
+          context,
+          '/athkar_category',
+          arguments: {
+            'categoryId': targetId,
+            'data': extraData,
+          },
+        );
+      }
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationNavigation',
+        'خطأ في التنقل إلى شاشة الأذكار',
+        e
+      );
+    }
+  }
+  
   /// تحليل بيانات الإشعار
   static Map<String, dynamic> _parsePayload(String payload) {
     try {
+      // معالجة payload بسيط مثل "prayer_الفجر"
+      if (payload.startsWith('prayer_')) {
+        final prayerName = payload.substring(7); // إزالة "prayer_"
+        return {
+          'navigationId': 'prayer',
+          'targetId': prayerName,
+          'extraData': null,
+        };
+      }
+      
+      // معالجة payload بسيط مثل "athkar_morning"
+      if (payload.startsWith('athkar_')) {
+        final categoryId = payload.substring(7); // إزالة "athkar_"
+        return {
+          'navigationId': 'athkar',
+          'targetId': categoryId,
+          'extraData': null,
+        };
+      }
+      
       // محاولة تحليل JSON
       return Map<String, dynamic>.from(jsonDecode(payload));
     } catch (e) {

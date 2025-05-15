@@ -777,29 +777,55 @@ class PrayerTimesService {
       }
       
       final now = DateTime.now();
+      int scheduledCount = 0;
       
+      // Cancel all existing prayer notifications first
+      for (final prayer in prayerTimes) {
+        await _notificationManager.cancelNotification('prayer_${prayer.name}');
+      }
+      
+      // Schedule new notifications
       for (final prayer in prayerTimes) {
         // Skip Sunrise as it's not a prayer time
         if (prayer.name == 'الشروق') continue;
         
-        // Only schedule future prayers
-        if (prayer.time.isAfter(now)) {
-          // Schedule each prayer notification
-          await _notificationManager.scheduleNotification(
-            notificationId: 'prayer_${prayer.name}',
-            title: 'حان وقت صلاة ${prayer.name}',
-            body: _getNotificationBody(prayer.name),
-            notificationTime: TimeOfDay.fromDateTime(prayer.time),
-            channelId: 'prayer_channel',
-            payload: 'prayer_${prayer.name}',
-            color: prayer.color,
-            priority: 5, // High priority for prayer notifications
-            repeat: true,
-          );
+        // Check if this prayer notification is enabled
+        final prefs = await SharedPreferences.getInstance();
+        final isEnabled = prefs.getBool('prayer_${prayer.name}_notifications_enabled') ?? true;
+        
+        if (!isEnabled) continue;
+        
+        // Calculate the next occurrence of this prayer time
+        DateTime scheduledTime = prayer.time;
+        
+        // If the time has already passed today, schedule for tomorrow
+        if (scheduledTime.isBefore(now)) {
+          scheduledTime = scheduledTime.add(Duration(days: 1));
+        }
+        
+        // Schedule the notification
+        final success = await _notificationManager.scheduleNotification(
+          notificationId: 'prayer_${prayer.name}',
+          title: 'حان وقت صلاة ${prayer.name}',
+          body: _getNotificationBody(prayer.name),
+          notificationTime: TimeOfDay.fromDateTime(scheduledTime),
+          channelId: 'prayer_channel',
+          payload: 'prayer_${prayer.name}',
+          color: prayer.color,
+          priority: 5, // High priority for prayer notifications
+          repeat: true, // Daily repeat
+        );
+        
+        if (success) {
+          scheduledCount++;
+          debugPrint('Scheduled notification for ${prayer.name} at ${scheduledTime.hour}:${scheduledTime.minute}');
+        } else {
+          debugPrint('Failed to schedule notification for ${prayer.name}');
         }
       }
       
-      return true;
+      debugPrint('Scheduled $scheduledCount prayer notifications successfully');
+      return scheduledCount > 0;
     } catch (e) {
       debugPrint('Error scheduling prayer notifications: $e');
       return false;
