@@ -14,8 +14,15 @@ import 'package:flutter_native_timezone_latest/flutter_native_timezone_latest.da
 import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/battery_optimization_service.dart';
 import 'package:test_athkar_app/services/do_not_disturb_service.dart';
+import 'package:test_athkar_app/services/notification/notification_manager.dart';
+import 'package:test_athkar_app/services/notification/notification_navigation.dart';
+import 'package:test_athkar_app/services/retry_service.dart';
+import 'package:test_athkar_app/services/di_container.dart';
 
 /// خدمة إشعارات مواعيد الصلاة المحسنة
+/// 
+/// توفر هذه الخدمة وظائف متكاملة لإدارة إشعارات مواقيت الصلاة بطريقة موثوقة
+/// مع دعم تقنيات مختلفة لضمان وصول الإشعارات في الأوقات المحددة بدقة
 class PrayerNotificationService {
   // تطبيق نمط Singleton
   static final PrayerNotificationService _instance = PrayerNotificationService._internal();
@@ -23,10 +30,12 @@ class PrayerNotificationService {
   PrayerNotificationService._internal();
 
   // المكونات المساعدة
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
-  final ErrorLoggingService _errorLoggingService = ErrorLoggingService();
-  final BatteryOptimizationService _batteryOptimizationService = BatteryOptimizationService();
-  final DoNotDisturbService _doNotDisturbService = DoNotDisturbService();
+  late final FlutterLocalNotificationsPlugin _notificationsPlugin;
+  late final ErrorLoggingService _errorLoggingService;
+  late final BatteryOptimizationService _batteryOptimizationService;
+  late final DoNotDisturbService _doNotDisturbService;
+  late final NotificationManager _notificationManager;
+  late final RetryService _retryService;
   
   // مُعرّفات الإنذار للعمل في الخلفية
   static const int fajrAlarmId = 2001;
@@ -62,6 +71,16 @@ class PrayerNotificationService {
     }
     
     try {
+      // الحصول على التبعيات من حاوية التبعيات
+      _errorLoggingService = serviceLocator<ErrorLoggingService>();
+      _batteryOptimizationService = serviceLocator<BatteryOptimizationService>();
+      _doNotDisturbService = serviceLocator<DoNotDisturbService>();
+      _notificationManager = serviceLocator<NotificationManager>();
+      _retryService = serviceLocator<RetryService>();
+      
+      // تهيئة مكوّن الإشعارات
+      _notificationsPlugin = FlutterLocalNotificationsPlugin();
+      
       // تهيئة المناطق الزمنية
       tz_data.initializeTimeZones();
       
@@ -78,30 +97,8 @@ class PrayerNotificationService {
         tz.setLocalLocation(tz.getLocation('UTC'));
       }
       
-      // تهيئة إعدادات الإشعارات لنظام Android
-      const AndroidInitializationSettings androidSettings = 
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-          
-      // إعدادات نظام iOS
-      const DarwinInitializationSettings iosSettings = 
-          DarwinInitializationSettings(
-            requestAlertPermission: true,
-            requestBadgePermission: true,
-            requestSoundPermission: true,
-            requestCriticalPermission: true, // للسماح بتجاوز وضع عدم الإزعاج
-          );
-          
-      // دمج الإعدادات
-      const InitializationSettings initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      );
-      
-      // تهيئة مكون الإشعارات
-      await _notificationsPlugin.initialize(
-        initSettings,
-        onDidReceiveNotificationResponse: _onNotificationResponse,
-      );
+      // تهيئة إعدادات الإشعارات
+      await _initializeNotificationSettings();
       
       // طلب الأذونات
       await _requestPermissions();
@@ -132,6 +129,43 @@ class PrayerNotificationService {
         e
       );
       return false;
+    }
+  }
+  
+  /// تهيئة إعدادات الإشعارات
+  Future<void> _initializeNotificationSettings() async {
+    try {
+      // إعدادات نظام Android
+      const AndroidInitializationSettings androidSettings = 
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+          
+      // إعدادات نظام iOS
+      const DarwinInitializationSettings iosSettings = 
+          DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+            requestCriticalPermission: true, // للسماح بتجاوز وضع عدم الإزعاج
+          );
+          
+      // دمج الإعدادات
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+      
+      // تهيئة مكون الإشعارات
+      await _notificationsPlugin.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: _onNotificationResponse,
+      );
+    } catch (e) {
+      _errorLoggingService.logError(
+        'PrayerNotificationService', 
+        'Error initializing notification settings', 
+        e
+      );
+      rethrow;
     }
   }
   
@@ -227,6 +261,28 @@ class PrayerNotificationService {
           ledColor: Color(0xFF4DB6AC),
         );
         
+        // قناة للصلوات العادية
+        const AndroidNotificationChannel prayerChannel = AndroidNotificationChannel(
+          'prayer_standard_channel',
+          'إشعارات الصلوات العادية',
+          description: 'إشعارات جميع الصلوات عدا الفجر',
+          importance: Importance.high,
+          enableVibration: true,
+          playSound: true,
+        );
+        
+        // قناة خاصة لصلاة الفجر (أولوية عالية)
+        const AndroidNotificationChannel fajrChannel = AndroidNotificationChannel(
+          'prayer_fajr_channel',
+          'إشعارات صلاة الفجر',
+          description: 'إشعارات مخصصة لصلاة الفجر',
+          importance: Importance.max,
+          enableVibration: true,
+          playSound: true,
+          enableLights: true,
+          ledColor: Color(0xFF5B68D9),
+        );
+        
         // قناة للإشعارات الاختبارية
         const AndroidNotificationChannel testChannel = AndroidNotificationChannel(
           'prayer_test_channel',
@@ -237,6 +293,8 @@ class PrayerNotificationService {
         
         // إنشاء القنوات
         await androidPlugin.createNotificationChannel(mainChannel);
+        await androidPlugin.createNotificationChannel(prayerChannel);
+        await androidPlugin.createNotificationChannel(fajrChannel);
         await androidPlugin.createNotificationChannel(testChannel);
       }
     } catch (e) {
@@ -353,7 +411,7 @@ class PrayerNotificationService {
     }
   }
   
-  /// جدولة إشعار لصلاة محددة
+  /// جدولة إشعار لصلاة محددة باستخدام خدمة الإشعارات الموحدة
   Future<bool> schedulePrayerNotification({
     required String prayerName,
     required DateTime prayerTime,
@@ -371,62 +429,54 @@ class PrayerNotificationService {
     }
     
     try {
-      // إعداد تفاصيل الإشعار
-      final androidDetails = AndroidNotificationDetails(
-        'prayer_times_channel',
-        'مواقيت الصلاة',
-        channelDescription: 'إشعارات مواقيت الصلاة',
-        importance: Importance.high,
-        priority: Priority.high,
-        styleInformation: const BigTextStyleInformation(''),
-        playSound: true,
-        enableVibration: true,
-        color: _getPrayerColor(prayerName),
-        ledColor: _getPrayerColor(prayerName),
-        ledOnMs: 1000,
-        ledOffMs: 500,
-        category: AndroidNotificationCategory.alarm,
-        fullScreenIntent: true, // للظهور حتى على شاشة القفل
-        visibility: NotificationVisibility.public,
+      // استخدام RetryService للمحاولة مع إعادة المحاولة في حالة الفشل
+      final result = await _retryService.executeWithRetry<bool>(
+        operation: () async {
+          // استخدام خدمة الإشعارات الموحدة
+          final timeOfDay = TimeOfDay(hour: prayerTime.hour, minute: prayerTime.minute);
+          
+          final success = await _notificationManager.scheduleNotification(
+            notificationId: 'prayer_$prayerName',
+            title: _getNotificationTitle(prayerName),
+            body: _getNotificationBody(prayerName),
+            notificationTime: timeOfDay,
+            channelId: _getChannelIdForPrayer(prayerName),
+            payload: '$prayerName:${prayerTime.millisecondsSinceEpoch}',
+            color: _getPrayerColor(prayerName),
+            priority: _getPriorityForPrayer(prayerName),
+          );
+          
+          // أيضًا جدولة إنذار في الخلفية لنظام Android للمزيد من الموثوقية
+          if (Platform.isAndroid && success) {
+            await _scheduleBackgroundAlarm(
+              prayerName, 
+              prayerTime, 
+              _getNotificationTitle(prayerName), 
+              _getNotificationBody(prayerName)
+            );
+          }
+          
+          // تتبع نجاح الجدولة
+          if (success) {
+            await _trackScheduledNotification(prayerName, prayerTime);
+          }
+          
+          return success;
+        },
+        operationName: 'schedule_prayer_notification_$prayerName',
+        config: RetryConfig(
+          maxAttempts: 3,
+          initialDelay: const Duration(seconds: 1),
+          strategy: RetryStrategy.exponentialBackoff,
+        ),
       );
       
-      final iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        interruptionLevel: InterruptionLevel.active, // لتجاوز وضع التركيز
-        threadIdentifier: 'prayer_times', // تجميع إشعارات الصلاة
-      );
-      
-      final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
-      
-      // محتوى الإشعار
-      final title = 'حان وقت صلاة $prayerName';
-      final body = _getNotificationBody(prayerName);
-      
-      // تحويل وقت الصلاة إلى TZDateTime
-      final scheduledDate = tz.TZDateTime.from(prayerTime, tz.local);
-      
-      // جدولة الإشعار
-      await _notificationsPlugin.zonedSchedule(
-        notificationId,
-        title,
-        body,
-        scheduledDate,
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: '$prayerName:${prayerTime.millisecondsSinceEpoch}',
-      );
-      
-      // جدولة إنذار في الخلفية لنظام Android للمزيد من الموثوقية
-      if (Platform.isAndroid) {
-        await _scheduleBackgroundAlarm(prayerName, prayerTime, title, body);
+      if (result.success) {
+        return result.value ?? false;
+      } else {
+        // محاولة طريقة النسخ الاحتياطي
+        return await _scheduleBackupNotification(prayerName, prayerTime);
       }
-      
-      // تتبع نجاح الجدولة
-      await _trackScheduledNotification(prayerName, prayerTime);
-      
-      return true;
     } catch (e) {
       _errorLoggingService.logError(
         'PrayerNotificationService', 
@@ -436,8 +486,7 @@ class PrayerNotificationService {
       
       // محاولة طريقة النسخ الاحتياطي
       try {
-        await _scheduleBackupNotification(prayerName, prayerTime);
-        return true;
+        return await _scheduleBackupNotification(prayerName, prayerTime);
       } catch (backupError) {
         _errorLoggingService.logError(
           'PrayerNotificationService', 
@@ -449,8 +498,28 @@ class PrayerNotificationService {
     }
   }
   
+  /// الحصول على عنوان الإشعار المناسب
+  String _getNotificationTitle(String prayerName) {
+    switch (prayerName) {
+      case 'الفجر':
+        return 'حان وقت صلاة الفجر';
+      case 'الشروق':
+        return 'الشمس تشرق الآن';
+      case 'الظهر':
+        return 'حان وقت صلاة الظهر';
+      case 'العصر':
+        return 'حان وقت صلاة العصر';
+      case 'المغرب':
+        return 'حان وقت صلاة المغرب';
+      case 'العشاء':
+        return 'حان وقت صلاة العشاء';
+      default:
+        return 'حان وقت الصلاة';
+    }
+  }
+  
   /// جدولة إشعار احتياطي
-  Future<void> _scheduleBackupNotification(String prayerName, DateTime prayerTime) async {
+  Future<bool> _scheduleBackupNotification(String prayerName, DateTime prayerTime) async {
     try {
       // استخدام معرّف مختلف للإشعار الاحتياطي
       final int notificationId = _getNotificationIdFromPrayerName(prayerName) + 50000;
@@ -486,12 +555,34 @@ class PrayerNotificationService {
       await _trackBackupNotification(prayerName);
       
       debugPrint('Backup notification scheduled for $prayerName');
+      return true;
     } catch (e) {
       _errorLoggingService.logError(
         'PrayerNotificationService', 
         'Error scheduling backup notification for $prayerName', 
         e
       );
+      return false;
+    }
+  }
+  
+  /// الحصول على قناة الإشعار المناسبة للصلاة
+  String _getChannelIdForPrayer(String prayerName) {
+    if (prayerName == 'الفجر') {
+      return 'prayer_fajr_channel';
+    } else {
+      return 'prayer_standard_channel';
+    }
+  }
+  
+  /// الحصول على أولوية الإشعار المناسبة للصلاة
+  int _getPriorityForPrayer(String prayerName) {
+    if (prayerName == 'الفجر') {
+      return 5; // أعلى أولوية للفجر
+    } else if (prayerName == 'المغرب') {
+      return 4; // أولوية عالية للمغرب
+    } else {
+      return 3; // أولوية متوسطة للصلوات الأخرى
     }
   }
   
@@ -574,6 +665,52 @@ class PrayerNotificationService {
     }
   }
   
+  /// تحسين لجدولة إشعارات عدة مرات في اليوم (للصلوات التي تتكرر)
+  Future<bool> scheduleDailyRecurringPrayerNotification({
+    required String prayerName,
+    required List<TimeOfDay> times,
+  }) async {
+    try {
+      bool allSuccess = true;
+      
+      for (int i = 0; i < times.length; i++) {
+        // تحويل TimeOfDay إلى DateTime لليوم الحالي
+        final now = DateTime.now();
+        final prayerTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          times[i].hour,
+          times[i].minute,
+        );
+        
+        // إذا كان الوقت سابقًا لليوم الحالي، جدوله لليوم التالي
+        final adjustedTime = prayerTime.isBefore(now) 
+            ? prayerTime.add(const Duration(days: 1)) 
+            : prayerTime;
+            
+        final success = await schedulePrayerNotification(
+          prayerName: prayerName,
+          prayerTime: adjustedTime,
+          notificationId: _getNotificationIdFromPrayerName(prayerName) + i,
+        );
+        
+        if (!success) {
+          allSuccess = false;
+        }
+      }
+      
+      return allSuccess;
+    } catch (e) {
+      _errorLoggingService.logError(
+        'PrayerNotificationService', 
+        'Error scheduling recurring prayer notification for $prayerName', 
+        e
+      );
+      return false;
+    }
+  }
+  
   /// جدولة إشعارات مواقيت الصلاة
   Future<int> scheduleAllPrayerNotifications(List<Map<String, dynamic>> prayerTimes) async {
     if (!_isInitialized) {
@@ -589,20 +726,41 @@ class PrayerNotificationService {
       return 0;
     }
     
+    // تأكيد تحسينات البطارية وإعدادات عدم الإزعاج
+    if (Platform.isAndroid && _context != null) {
+      // فحص حالة البطارية وتحسيناتها
+      await _batteryOptimizationService.checkAndRequestBatteryOptimization(_context!);
+      
+      // التحقق من وضع عدم الإزعاج
+      final shouldPromptDnd = await _doNotDisturbService.shouldPromptAboutDoNotDisturb();
+      if (shouldPromptDnd) {
+        await _doNotDisturbService.showDoNotDisturbDialog(_context!);
+      }
+    }
+    
     // عداد الإشعارات المجدولة
     int scheduledCount = 0;
     
-    // جدولة الإشعارات الجديدة
-    for (int i = 0; i < prayerTimes.length; i++) {
-      final prayer = prayerTimes[i];
-      final success = await schedulePrayerNotification(
-        prayerName: prayer['name'],
-        prayerTime: prayer['time'],
-        notificationId: i,
-      );
+    // استخدام الدفعات لتجنب المشاكل المحتملة
+    const int batchSize = 3;
+    for (int i = 0; i < prayerTimes.length; i += batchSize) {
+      final batch = prayerTimes.skip(i).take(batchSize).toList();
       
-      if (success) {
-        scheduledCount++;
+      await Future.wait(batch.map((prayer) async {
+        final success = await schedulePrayerNotification(
+          prayerName: prayer['name'],
+          prayerTime: prayer['time'],
+          notificationId: i,
+        );
+        
+        if (success) {
+          scheduledCount++;
+        }
+      }));
+      
+      // تأخير بسيط بين الدفعات لتجنب إرهاق النظام
+      if (i + batchSize < prayerTimes.length) {
+        await Future.delayed(const Duration(milliseconds: 300));
       }
     }
     
@@ -699,8 +857,12 @@ class PrayerNotificationService {
       final body = params['body'] as String;
       
       // تفاصيل الإشعار المعززة
+      final String channelId = prayerName == 'الفجر' 
+          ? 'prayer_fajr_channel' 
+          : 'prayer_standard_channel';
+          
       final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'prayer_times_channel',
+        channelId,
         'مواقيت الصلاة',
         channelDescription: 'إشعارات مواقيت الصلاة',
         importance: Importance.high,
@@ -928,6 +1090,11 @@ class PrayerNotificationService {
         'last_schedule_count': prefs.getInt('prayer_notifications_scheduled_count') ?? 0,
         'last_reset': prefs.getString('prayer_notifications_reset') ?? 'Never',
         'device_timezone': _deviceTimeZone,
+        'has_permission': await checkNotificationPermission(),
+        'has_battery_optimization': Platform.isAndroid ? 
+            await _batteryOptimizationService.isBatteryOptimizationEnabled() : false,
+        'has_dnd_bypass': Platform.isAndroid ? 
+            await _doNotDisturbService.canBypassDoNotDisturb() : false,
       };
       
       return stats;
@@ -943,6 +1110,57 @@ class PrayerNotificationService {
       };
     }
   }
+  
+  /// عرض معلومات مفصلة للتصحيح
+  Future<Map<String, dynamic>> getDetailedDebugInfo() async {
+    try {
+      final stats = await getNotificationStatistics();
+      
+      // استرجاع معلومات التتبع
+      final prefs = await SharedPreferences.getInstance();
+      final Map<String, dynamic> trackingInfo = {};
+      
+      // معلومات الجدولة
+      for (final prayer in _prayerNotificationSettings.keys) {
+        final key = 'prayer_notification_scheduled_$prayer';
+        final data = prefs.getString(key);
+        if (data != null) {
+          trackingInfo['scheduled_$prayer'] = json.decode(data);
+        }
+        
+        // معلومات الإشعارات الاحتياطية
+        final backupKey = 'prayer_notification_backup_$prayer';
+        final backupData = prefs.getString(backupKey);
+        if (backupData != null) {
+          trackingInfo['backup_$prayer'] = json.decode(backupData);
+        }
+        
+        // إحصائيات التفاعل
+        final interactionCountKey = 'prayer_notification_interaction_count_$prayer';
+        final count = prefs.getInt(interactionCountKey);
+        if (count != null) {
+          trackingInfo['interaction_count_$prayer'] = count;
+        }
+      }
+      
+      // دمج المعلومات
+      return {
+        ...stats,
+        'tracking_info': trackingInfo,
+      };
+    } catch (e) {
+      _errorLoggingService.logError(
+        'PrayerNotificationService', 
+        'Error getting detailed debug info', 
+        e
+      );
+      return {
+        'error': e.toString(),
+      };
+    }
+  }
+  
+  // تصدير الإعدادات وضبطها
   
   // الخصائص العامة
   
@@ -963,4 +1181,67 @@ class PrayerNotificationService {
   }
   
   bool get isInitialized => _isInitialized;
+  
+  /// إجراء فحص شامل وإصلاح لمشاكل الإشعارات
+  Future<Map<String, dynamic>> performHealthCheck(BuildContext context) async {
+    try {
+      setContext(context);
+      
+      final results = <String, dynamic>{};
+      
+      // فحص الأذونات
+      final hasPermission = await checkNotificationPermission();
+      results['has_permission'] = hasPermission;
+      
+      if (!hasPermission) {
+        final permissionRequested = await requestNotificationPermission();
+        results['permission_requested'] = permissionRequested;
+      }
+      
+      // فحص قنوات الإشعارات
+      await _createNotificationChannels();
+      results['channels_created'] = true;
+      
+      // فحص تحسين البطارية
+      if (Platform.isAndroid) {
+        final batteryOptEnabled = await _batteryOptimizationService.isBatteryOptimizationEnabled();
+        results['battery_optimization_enabled'] = batteryOptEnabled;
+        
+        if (batteryOptEnabled && context.mounted) {
+          await _batteryOptimizationService.checkAndRequestBatteryOptimization(context);
+          results['battery_optimization_checked'] = true;
+        }
+      }
+      
+      // فحص وضع عدم الإزعاج
+      if (Platform.isAndroid) {
+        final dndEnabled = await _doNotDisturbService.isInDoNotDisturbMode();
+        final canBypass = await _doNotDisturbService.canBypassDoNotDisturb();
+        
+        results['dnd_enabled'] = dndEnabled;
+        results['can_bypass_dnd'] = canBypass;
+        
+        if (dndEnabled && !canBypass && context.mounted) {
+          await _doNotDisturbService.showDoNotDisturbDialog(context);
+          results['dnd_prompted'] = true;
+        }
+      }
+      
+      // فحص الإشعارات المعلقة
+      final pendingNotifications = await getPendingNotifications();
+      results['pending_notifications_count'] = pendingNotifications.length;
+      
+      return results;
+    } catch (e) {
+      _errorLoggingService.logError(
+        'PrayerNotificationService', 
+        'Error performing health check', 
+        e
+      );
+      return {
+        'error': e.toString(),
+        'success': false,
+      };
+    }
+  }
 }

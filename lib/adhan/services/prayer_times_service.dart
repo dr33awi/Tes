@@ -6,9 +6,16 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:test_athkar_app/adhan/models/prayer_time_model.dart';
 import 'package:test_athkar_app/adhan/widgets/location_permission_dialog.dart';
 import 'package:test_athkar_app/adhan/services/prayer_notification_service.dart';
+import 'package:test_athkar_app/services/retry_service.dart';
+import 'package:test_athkar_app/services/error_logging_service.dart';
+import 'package:test_athkar_app/services/di_container.dart';
+import 'package:test_athkar_app/services/notification/notification_manager.dart';
+import 'package:test_athkar_app/services/notification/notification_helpers.dart';
 
 /// Service for managing prayer times
 /// 
@@ -44,6 +51,11 @@ class PrayerTimesService {
   List<PrayerTimeModel>? _cachedPrayerTimes;
   DateTime? _lastCalculationTime;
   
+  // Dependencies
+  late final ErrorLoggingService _errorLoggingService;
+  late final RetryService _retryService;
+  late final NotificationManager _notificationManager;
+  
   // Initialization flag
   bool _isInitialized = false;
   
@@ -58,6 +70,14 @@ class PrayerTimesService {
     }
     
     try {
+      // Initialize timezone data
+      tz_data.initializeTimeZones();
+      
+      // Initialize dependencies
+      _errorLoggingService = serviceLocator<ErrorLoggingService>();
+      _retryService = serviceLocator<RetryService>();
+      _notificationManager = serviceLocator<NotificationManager>();
+      
       // Load saved settings
       await _loadSettings();
       
@@ -70,6 +90,14 @@ class PrayerTimesService {
     } catch (e, stackTrace) {
       debugPrint('Error initializing prayer times service: $e');
       debugPrint('Stack trace: $stackTrace');
+      
+      // Log error with centralized error logging service
+      await _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error during initialization',
+        e,
+        stackTrace: stackTrace
+      );
       
       // Use default settings in case of error
       _setDefaultSettings();
@@ -121,7 +149,11 @@ class PrayerTimesService {
       
       debugPrint('Settings loaded: Method = $calculationMethod, Madhab = $madhab');
     } catch (e) {
-      debugPrint('Error loading prayer time settings: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error loading prayer time settings',
+        e
+      );
       // Continue with defaults in case of error
     }
     
@@ -133,47 +165,63 @@ class PrayerTimesService {
   /// Save settings
   Future<bool> saveSettings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final result = await _retryService.executeWithRetry<bool>(
+        operation: () async {
+          final prefs = await SharedPreferences.getInstance();
+          
+          // Get current configuration
+          final currentMethod = getCalculationMethodName();
+          final currentMadhab = getMadhabName();
+          
+          debugPrint('Saving settings - Method: $currentMethod, Madhab: $currentMadhab');
+          
+          // Save calculation method
+          await prefs.setString('prayer_calculation_method', currentMethod);
+          
+          // Save madhab
+          await prefs.setString('prayer_madhab', currentMadhab);
+          
+          // Save time adjustments
+          final String adjustmentsJson = json.encode(_adjustments);
+          await prefs.setString('prayer_adjustments', adjustmentsJson);
+          
+          // Save location if available
+          if (_latitude != null && _longitude != null) {
+            await prefs.setDouble('prayer_location_latitude', _latitude!);
+            await prefs.setDouble('prayer_location_longitude', _longitude!);
+            
+            if (_locationName != null) {
+              await prefs.setString('prayer_location_name', _locationName!);
+            }
+          }
+          
+          // Verify saved settings
+          final savedMethod = prefs.getString('prayer_calculation_method');
+          final savedMadhab = prefs.getString('prayer_madhab');
+          
+          debugPrint('Settings saved and verified - Method: $savedMethod, Madhab: $savedMadhab');
+          
+          // Clear cached prayer times to force recalculation
+          _cachedPrayerTimes = null;
+          _lastCalculationTime = null;
+          
+          return true;
+        },
+        operationName: 'save_prayer_settings',
+        config: RetryConfig(
+          maxAttempts: 3,
+          initialDelay: const Duration(milliseconds: 300),
+          strategy: RetryStrategy.exponentialBackoff
+        )
+      );
       
-      // Get current configuration
-      final currentMethod = getCalculationMethodName();
-      final currentMadhab = getMadhabName();
-      
-      debugPrint('Saving settings - Method: $currentMethod, Madhab: $currentMadhab');
-      
-      // Save calculation method
-      await prefs.setString('prayer_calculation_method', currentMethod);
-      
-      // Save madhab
-      await prefs.setString('prayer_madhab', currentMadhab);
-      
-      // Save time adjustments
-      final String adjustmentsJson = json.encode(_adjustments);
-      await prefs.setString('prayer_adjustments', adjustmentsJson);
-      
-      // Save location if available
-      if (_latitude != null && _longitude != null) {
-        await prefs.setDouble('prayer_location_latitude', _latitude!);
-        await prefs.setDouble('prayer_location_longitude', _longitude!);
-        
-        if (_locationName != null) {
-          await prefs.setString('prayer_location_name', _locationName!);
-        }
-      }
-      
-      // Verify saved settings
-      final savedMethod = prefs.getString('prayer_calculation_method');
-      final savedMadhab = prefs.getString('prayer_madhab');
-      
-      debugPrint('Settings saved and verified - Method: $savedMethod, Madhab: $savedMadhab');
-      
-      // Clear cached prayer times to force recalculation
-      _cachedPrayerTimes = null;
-      _lastCalculationTime = null;
-      
-      return true;
+      return result.success;
     } catch (e) {
-      debugPrint('Error saving prayer time settings: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService', 
+        'Error saving prayer time settings', 
+        e
+      );
       return false;
     }
   }
@@ -196,7 +244,11 @@ class PrayerTimesService {
       
       return true;
     } catch (e) {
-      debugPrint('Error recalculating prayer times: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService', 
+        'Error recalculating prayer times', 
+        e
+      );
       
       try {
         // Try local calculation as fallback
@@ -208,7 +260,11 @@ class PrayerTimesService {
         
         return true;
       } catch (e2) {
-        debugPrint('Error with local calculation fallback: $e2');
+        _errorLoggingService.logError(
+          'PrayerTimesService', 
+          'Error with local calculation fallback', 
+          e2
+        );
         return false;
       }
     }
@@ -337,7 +393,11 @@ class PrayerTimesService {
         return isServiceEnabled;
       }
     } catch (e) {
-      debugPrint('Error checking location permission: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error checking location permission',
+        e
+      );
     }
     
     return false;
@@ -393,7 +453,11 @@ class PrayerTimesService {
         }
       }
     } catch (e) {
-      debugPrint('Error requesting location permission: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error requesting location permission',
+        e
+      );
     }
     
     return false;
@@ -438,14 +502,22 @@ class PrayerTimesService {
             await prefs.setString('prayer_location_name', _locationName!);
           }
         } catch (e) {
-          debugPrint('Error saving location: $e');
+          _errorLoggingService.logError(
+            'PrayerTimesService',
+            'Error saving location',
+            e
+          );
           // Continue despite error saving location
         }
         
         return position;
       }
     } catch (e) {
-      debugPrint('Error getting location: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error getting location',
+        e
+      );
     }
     
     // If we get here, try to use cached location
@@ -470,53 +542,70 @@ class PrayerTimesService {
   /// Get location name from coordinates
   Future<String?> _getLocationName(double latitude, double longitude) async {
     try {
-      // Use OpenStreetMap reverse geocoding API
-      final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?' +
-        'lat=$latitude&lon=$longitude&format=json&accept-language=ar'
-      );
-      
-      final response = await http.get(
-        url, 
-        headers: {'User-Agent': 'Islamic Prayer Times App'}
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('Timeout while getting location name')
-      );
-      
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        
-        // Try to extract place name in different ways
-        String? name;
-        
-        // City or town
-        if (data['address'] != null) {
-          final address = data['address'] as Map<String, dynamic>;
+      // Wrap this in a RetryService call to improve reliability
+      final result = await _retryService.executeWithRetry<String?>(
+        operation: () async {
+          // Use OpenStreetMap reverse geocoding API
+          final url = Uri.parse(
+            'https://nominatim.openstreetmap.org/reverse?' +
+            'lat=$latitude&lon=$longitude&format=json&accept-language=ar'
+          );
           
-          // Try different location levels
-          name = address['city'] ?? 
-                 address['town'] ?? 
-                 address['village'] ?? 
-                 address['state'] ?? 
-                 address['country'];
-        }
-        
-        // Use display name if nothing specific found
-        if (name == null && data['display_name'] != null) {
-          final parts = data['display_name'].toString().split(',');
-          if (parts.isNotEmpty) {
-            name = parts[0].trim();
+          final response = await http.get(
+            url, 
+            headers: {'User-Agent': 'Islamic Prayer Times App'}
+          ).timeout(
+            const Duration(seconds: 10)
+          );
+          
+          if (response.statusCode == 200) {
+            final Map<String, dynamic> data = json.decode(response.body);
+            
+            // Try to extract place name in different ways
+            String? name;
+            
+            // City or town
+            if (data['address'] != null) {
+              final address = data['address'] as Map<String, dynamic>;
+              
+              // Try different location levels
+              name = address['city'] ?? 
+                     address['town'] ?? 
+                     address['village'] ?? 
+                     address['state'] ?? 
+                     address['country'];
+            }
+            
+            // Use display name if nothing specific found
+            if (name == null && data['display_name'] != null) {
+              final parts = data['display_name'].toString().split(',');
+              if (parts.isNotEmpty) {
+                name = parts[0].trim();
+              }
+            }
+            
+            return name;
           }
-        }
-        
-        return name;
-      }
+          
+          return null;
+        },
+        operationName: 'get_location_name',
+        config: RetryConfig(
+          maxAttempts: 3,
+          initialDelay: const Duration(seconds: 1),
+          strategy: RetryStrategy.exponentialBackoffWithJitter
+        )
+      );
+      
+      return result.value;
     } catch (e) {
-      debugPrint('Error getting location name: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error getting location name',
+        e
+      );
+      return null;
     }
-    
-    return null;
   }
   
   /// Set context for showing dialogs
@@ -568,7 +657,11 @@ class PrayerTimesService {
         throw Exception('Could not get current location');
       }
     } catch (e) {
-      debugPrint('Error getting prayer times from API: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error getting prayer times from API',
+        e
+      );
       
       // In case of error, use default location if needed
       if (useDefaultLocationIfNeeded) {
@@ -645,7 +738,11 @@ class PrayerTimesService {
           }
         }
       } catch (e) {
-        debugPrint('Error applying adjustments: $e');
+        _errorLoggingService.logError(
+          'PrayerTimesService',
+          'Error applying adjustments',
+          e
+        );
         // Ignore adjustment errors and continue without them
       }
       
@@ -667,7 +764,11 @@ class PrayerTimesService {
         
         return prayerModels;
       } catch (e) {
-        debugPrint('Error calculating prayer times: $e');
+        _errorLoggingService.logError(
+          'PrayerTimesService',
+          'Error calculating prayer times',
+          e
+        );
         
         // Check if we have cached results
         if (_cachedPrayerTimes != null) {
@@ -678,7 +779,11 @@ class PrayerTimesService {
         throw e;
       }
     } catch (e) {
-      debugPrint('Error getting prayer times locally: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error getting prayer times locally',
+        e
+      );
       
       // If we have cached results, use them as last resort
       if (_cachedPrayerTimes != null) {
@@ -757,7 +862,7 @@ class PrayerTimesService {
     return defaultPrayers;
   }
   
-  /// Schedule prayer notifications
+  /// Schedule prayer notifications - Using the unified notification system
   Future<bool> schedulePrayerNotifications() async {
     try {
       // Get prayer times
@@ -766,7 +871,11 @@ class PrayerTimesService {
         // Try to get updated times
         prayerTimes = await getPrayerTimesFromAPI(useDefaultLocationIfNeeded: true);
       } catch (e) {
-        debugPrint('Error getting prayer times for notifications: $e');
+        _errorLoggingService.logError(
+          'PrayerTimesService',
+          'Error getting prayer times for notifications, using cached ones',
+          e
+        );
         
         // Use cache if available
         if (_cachedPrayerTimes != null) {
@@ -777,34 +886,206 @@ class PrayerTimesService {
         }
       }
       
-      // Prepare list of prayer times for scheduling notifications
-      final List<Map<String, dynamic>> notificationTimes = [];
-      
+      // Filter out past prayers and prepare batch items for scheduling
       final now = DateTime.now();
+      final List<Map<String, dynamic>> notificationData = [];
       
       for (final prayer in prayerTimes) {
-        // Ignore Sunrise since it's not a real prayer time
-        // and times that have already passed
-        if (prayer.name != 'الشروق' && prayer.time.isAfter(now)) {
-          notificationTimes.add({
+        // Include all prayers that occur in the future
+        if (prayer.time.isAfter(now)) {
+          // Create standardized notification payload
+          final payload = NotificationNavigation.createNavigationPayload(
+            navigationId: 'prayer',
+            targetId: prayer.name,
+            extraData: {
+              'prayerTime': prayer.time.millisecondsSinceEpoch,
+              'englishName': prayer.englishName,
+            },
+          );
+          
+          // Add notification data
+          notificationData.add({
             'name': prayer.name,
             'time': prayer.time,
+            'payload': payload,
+            'color': prayer.color,
+            'priority': _getPriorityForPrayer(prayer.name),
+            'title': _getNotificationTitle(prayer.name),
+            'body': _getNotificationBody(prayer.name),
           });
         }
       }
       
-      // Schedule notifications for all future prayer times today
-      if (notificationTimes.isNotEmpty) {
-        final scheduledCount = await _notificationService.scheduleAllPrayerNotifications(notificationTimes);
-        debugPrint('Scheduled $scheduledCount prayer notifications');
-        return scheduledCount > 0;
-      } else {
-        debugPrint('No future prayer times today to schedule notifications for');
-        return false;
+      // Schedule using notification manager for tomorrow's prayers if none left today
+      if (notificationData.isEmpty) {
+        // Schedule tomorrow's prayers
+        final tomorrow = DateTime.now().add(const Duration(days: 1));
+        final date = DateComponents(tomorrow.year, tomorrow.month, tomorrow.day);
+        
+        // Calculate tomorrow's prayers
+        try {
+          final coordinates = Coordinates(_latitude!, _longitude!);
+          final tomorrowPrayerTimes = PrayerTimes(coordinates, date, _calculationParameters);
+          final tomorrowModels = PrayerTimeModel.fromPrayerTimes(tomorrowPrayerTimes);
+          
+          for (final prayer in tomorrowModels) {
+            // Create notification payload
+            final payload = NotificationNavigation.createNavigationPayload(
+              navigationId: 'prayer',
+              targetId: prayer.name,
+              extraData: {
+                'prayerTime': prayer.time.millisecondsSinceEpoch,
+                'englishName': prayer.englishName,
+              },
+            );
+            
+            // Add to notification data
+            notificationData.add({
+              'name': prayer.name,
+              'time': prayer.time,
+              'payload': payload,
+              'color': prayer.color,
+              'priority': _getPriorityForPrayer(prayer.name),
+              'title': _getNotificationTitle(prayer.name),
+              'body': _getNotificationBody(prayer.name),
+            });
+          }
+        } catch (e) {
+          _errorLoggingService.logError(
+            'PrayerTimesService',
+            'Error calculating tomorrow prayers, using defaults',
+            e
+          );
+          
+          // Use default times shifted to tomorrow
+          final tomorrowDefaults = _createDefaultPrayerTimes().map((prayer) {
+            return prayer.copyWith(
+              time: DateTime(
+                tomorrow.year,
+                tomorrow.month,
+                tomorrow.day,
+                prayer.time.hour,
+                prayer.time.minute,
+              ),
+            );
+          }).toList();
+          
+          for (final prayer in tomorrowDefaults) {
+            // Create notification payload
+            final payload = NotificationNavigation.createNavigationPayload(
+              navigationId: 'prayer',
+              targetId: prayer.name,
+              extraData: {
+                'prayerTime': prayer.time.millisecondsSinceEpoch,
+                'englishName': prayer.englishName,
+              },
+            );
+            
+            // Add to notification data
+            notificationData.add({
+              'name': prayer.name,
+              'time': prayer.time,
+              'payload': payload,
+              'color': prayer.color,
+              'priority': _getPriorityForPrayer(prayer.name),
+              'title': _getNotificationTitle(prayer.name),
+              'body': _getNotificationBody(prayer.name),
+            });
+          }
+        }
       }
+      
+      // Schedule notifications using the modern notification service
+      int scheduledCount = 0;
+      
+      // Option 1: Using the legacy service for compatibility
+      scheduledCount = await _notificationService.scheduleAllPrayerNotifications(notificationData);
+      
+      // Option 2: Using the modern notification manager (better for the future)
+      if (scheduledCount == 0) {
+        // Try modern notification manager as fallback
+        for (final prayer in notificationData) {
+          final timeOfDay = TimeOfDay(
+            hour: prayer['time'].hour,
+            minute: prayer['time'].minute,
+          );
+          
+          final success = await _notificationManager.scheduleNotification(
+            notificationId: 'prayer_${prayer['name']}',
+            title: prayer['title'],
+            body: prayer['body'],
+            notificationTime: timeOfDay,
+            channelId: 'prayer_channel',
+            payload: prayer['payload'],
+            color: prayer['color'],
+            priority: prayer['priority'],
+          );
+          
+          if (success) scheduledCount++;
+        }
+      }
+      
+      debugPrint('Scheduled $scheduledCount prayer notifications');
+      return scheduledCount > 0;
     } catch (e) {
-      debugPrint('Error scheduling prayer notifications: $e');
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error scheduling prayer notifications',
+        e
+      );
       return false;
+    }
+  }
+  
+  /// Get the notification title for a specific prayer
+  String _getNotificationTitle(String prayerName) {
+    switch (prayerName) {
+      case 'الفجر':
+        return 'حان وقت صلاة الفجر';
+      case 'الشروق':
+        return 'الشمس تشرق الآن';
+      case 'الظهر':
+        return 'حان وقت صلاة الظهر';
+      case 'العصر':
+        return 'حان وقت صلاة العصر';
+      case 'المغرب':
+        return 'حان وقت صلاة المغرب';
+      case 'العشاء':
+        return 'حان وقت صلاة العشاء';
+      default:
+        return 'حان وقت الصلاة';
+    }
+  }
+  
+  /// Get the notification body for a specific prayer
+  String _getNotificationBody(String prayerName) {
+    switch (prayerName) {
+      case 'الفجر':
+        return 'حان الآن وقت صلاة الفجر. قم وصلِ قبل طلوع الشمس';
+      case 'الشروق':
+        return 'الشمس تشرق الآن. وَسَبِّحْ بِحَمْدِ رَبِّكَ قَبْلَ طُلُوعِ الشَّمْسِ';
+      case 'الظهر':
+        return 'حان الآن وقت صلاة الظهر. حي على الصلاة';
+      case 'العصر':
+        return 'حان الآن وقت صلاة العصر. حي على الفلاح';
+      case 'المغرب':
+        return 'حان الآن وقت صلاة المغرب. وَسَبِّحْ بِحَمْدِ رَبِّكَ قَبْلَ غُرُوبِ الشَّمْسِ';
+      case 'العشاء':
+        return 'حان الآن وقت صلاة العشاء. أقم الصلاة لدلوك الشمس إلى غسق الليل';
+      default:
+        return 'حان الآن وقت الصلاة';
+    }
+  }
+  
+  /// Get the priority level for a specific prayer
+  int _getPriorityForPrayer(String prayerName) {
+    switch (prayerName) {
+      case 'الفجر':
+        return 5; // Highest priority for Fajr
+      case 'المغرب':
+        return 4; // High priority for Maghrib
+      default:
+        return 3; // Normal priority for other prayers
     }
   }
   
@@ -887,7 +1168,69 @@ class PrayerTimesService {
       'calculationMethod': getCalculationMethodName(),
       'madhab': getMadhabName(),
       'adjustments': Map<String, int>.from(_adjustments),
+      'location': _locationName,
+      'latitude': _latitude,
+      'longitude': _longitude,
     };
+  }
+  
+  /// Get prayer times statistics
+  Future<Map<String, dynamic>> getPrayerTimesStatistics() async {
+    try {
+      // Get current prayer times
+      final prayerTimes = _cachedPrayerTimes ?? getPrayerTimesLocally();
+      final now = DateTime.now();
+      
+      // Find next prayer
+      PrayerTimeModel? nextPrayer;
+      for (final prayer in prayerTimes) {
+        if (prayer.time.isAfter(now)) {
+          if (nextPrayer == null || prayer.time.isBefore(nextPrayer.time)) {
+            nextPrayer = prayer;
+          }
+        }
+      }
+      
+      // Find current prayer period
+      String currentPeriod = "";
+      for (int i = 0; i < prayerTimes.length - 1; i++) {
+        if (now.isAfter(prayerTimes[i].time) && now.isBefore(prayerTimes[i + 1].time)) {
+          currentPeriod = "${prayerTimes[i].name} - ${prayerTimes[i + 1].name}";
+          break;
+        }
+      }
+      
+      // Get notification statistics
+      final notificationStats = await _notificationService.getNotificationStatistics();
+      
+      // Get remaining time until next prayer
+      String remainingTime = "";
+      if (nextPrayer != null) {
+        remainingTime = nextPrayer.remainingTime;
+      }
+      
+      return {
+        'current_time': now.toString(),
+        'next_prayer': nextPrayer?.name ?? 'None',
+        'next_prayer_time': nextPrayer?.formattedTime ?? 'N/A',
+        'remaining_time': remainingTime,
+        'current_period': currentPeriod,
+        'calculation_method': getCalculationMethodName(),
+        'madhab': getMadhabName(),
+        'location': _locationName ?? 'Unknown',
+        'notification_stats': notificationStats,
+        'adjustments': _adjustments,
+      };
+    } catch (e) {
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error getting prayer times statistics',
+        e
+      );
+      return {
+        'error': e.toString(),
+      };
+    }
   }
   
   /// Get location name
@@ -895,6 +1238,37 @@ class PrayerTimesService {
   
   /// Check if service is initialized
   bool get isInitialized => _isInitialized;
+  
+  /// Testing features
+  
+  /// Test prayer notifications
+  Future<bool> testPrayerNotifications() async {
+    try {
+      final now = DateTime.now();
+      final testPrayerTime = now.add(const Duration(seconds: 5));
+      
+      // Test with both services for better reliability
+      
+      // Test with legacy service
+      await _notificationService.testImmediateNotification();
+      
+      // Test with unified service
+      await _notificationManager.showSimpleNotification(
+        "اختبار إشعارات الصلاة",
+        "هذا اختبار لنظام إشعارات الصلاة باستخدام الخدمة الموحدة",
+        payload: "test_prayer_notification",
+      );
+      
+      return true;
+    } catch (e) {
+      _errorLoggingService.logError(
+        'PrayerTimesService',
+        'Error testing prayer notifications',
+        e
+      );
+      return false;
+    }
+  }
 }
 
 /// Custom timeout exception
