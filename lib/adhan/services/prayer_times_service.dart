@@ -16,6 +16,8 @@ import 'package:test_athkar_app/services/error_logging_service.dart';
 import 'package:test_athkar_app/services/di_container.dart';
 import 'package:test_athkar_app/services/notification/notification_manager.dart';
 import 'package:test_athkar_app/services/notification/notification_helpers.dart';
+// Add the missing import for NotificationNavigation
+import 'package:test_athkar_app/services/notification/notification_navigation.dart';
 
 /// Service for managing prayer times
 /// 
@@ -26,6 +28,8 @@ import 'package:test_athkar_app/services/notification/notification_helpers.dart'
 /// - Scheduling prayer time notifications
 /// - Loading and saving user preferences
 class PrayerTimesService {
+  // Rest of the code remains unchanged...
+  
   // Singleton implementation
   static final PrayerTimesService _instance = PrayerTimesService._internal();
   factory PrayerTimesService() => _instance;
