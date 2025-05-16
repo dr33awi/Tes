@@ -37,7 +37,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     {
       'id': 'morning',
       'title': 'أذكار الصباح',
-      'icon': Icons.wb_sunny,
+      'icon': Icons.wb_sunny_rounded,
       'color': const Color(0xFFFFD54F),
       'defaultTime': '06:00',
     },
@@ -51,28 +51,28 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     {
       'id': 'sleep',
       'title': 'أذكار النوم',
-      'icon': Icons.bedtime,
+      'icon': Icons.bedtime_rounded,
       'color': const Color(0xFF5C6BC0),
       'defaultTime': '22:00',
     },
     {
       'id': 'wake',
       'title': 'أذكار الاستيقاظ',
-      'icon': Icons.alarm,
+      'icon': Icons.alarm_rounded,
       'color': const Color(0xFFFFB74D),
       'defaultTime': '05:30',
     },
     {
       'id': 'prayer',
       'title': 'أذكار الصلاة',
-      'icon': Icons.mosque,
+      'icon': Icons.mosque_rounded,
       'color': const Color(0xFF4DB6AC),
       'defaultTime': '12:00',
     },
     {
       'id': 'home',
       'title': 'أذكار المنزل',
-      'icon': Icons.home,
+      'icon': Icons.home_rounded,
       'color': const Color(0xFF66BB6A),
       'defaultTime': '18:00',
     },
@@ -171,6 +171,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       _isGlobalMuteEnabled = value;
     });
     
+    // تأثير اهتزاز خفيف
+    HapticFeedback.lightImpact();
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -184,8 +187,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: value ? Colors.grey : kPrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: value ? Colors.grey.shade700 : kPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 2),
       ),
@@ -194,8 +197,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   @override
   Widget build(BuildContext context) {
+    final greenColor = const Color(0xFF2D6852);
+    
     return Scaffold(
       backgroundColor: kSurface,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -224,35 +230,37 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       body: _isLoading 
         ? _buildLoadingIndicator()
         : AnimationLimiter(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: AnimationConfiguration.toStaggeredList(
-                duration: const Duration(milliseconds: 500),
-                childAnimationBuilder: (widget) => SlideAnimation(
-                  verticalOffset: 50.0,
-                  child: FadeInAnimation(child: widget),
+            child: SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                children: AnimationConfiguration.toStaggeredList(
+                  duration: const Duration(milliseconds: 600),
+                  childAnimationBuilder: (widget) => SlideAnimation(
+                    verticalOffset: 50.0,
+                    child: FadeInAnimation(child: widget),
+                  ),
+                  children: [
+                    // بطاقة التحقق من الأذونات
+                    if (!_hasNotificationPermission) _buildPermissionCard(),
+                    
+                    // بطاقة الوضع الصامت
+                    _buildGlobalMuteCard(),
+                    const SizedBox(height: 16),
+                    
+                    // الإجراءات السريعة
+                    _buildQuickActions(),
+                    const SizedBox(height: 24),
+                    
+                    // عنوان الفئات
+                    _buildSectionTitle('إعدادات الفئات'),
+                    const SizedBox(height: 16),
+                    
+                    // قائمة الفئات
+                    ..._categories.map((category) => _buildCategoryCard(category)),
+                    
+                    const SizedBox(height: 30),
+                  ],
                 ),
-                children: [
-                  // بطاقة التحقق من الأذونات
-                  if (!_hasNotificationPermission) _buildPermissionCard(),
-                  
-                  // بطاقة الوضع الصامت
-                  _buildGlobalMuteCard(),
-                  const SizedBox(height: 12),
-                  
-                  // الإجراءات السريعة
-                  _buildQuickActions(),
-                  const SizedBox(height: 20),
-                  
-                  // عنوان الفئات
-                  _buildSectionTitle('إعدادات الفئات'),
-                  const SizedBox(height: 12),
-                  
-                  // قائمة الفئات
-                  ..._categories.map((category) => _buildCategoryCard(category)),
-                  
-                  const SizedBox(height: 30),
-                ],
               ),
             ),
           ),
@@ -287,47 +295,75 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   Widget _buildPermissionCard() {
     return Card(
       elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      margin: const EdgeInsets.only(bottom: 16),
+      shadowColor: Colors.orange.withOpacity(0.4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      margin: const EdgeInsets.only(bottom: 20),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           gradient: LinearGradient(
             colors: [Colors.orange.shade400, Colors.orange.shade600],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(16),
-          leading: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.warning, color: Colors.white),
-          ),
-          title: const Text(
-            'الأذونات مطلوبة',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          subtitle: const Text(
-            'يحتاج التطبيق إلى إذن الإشعارات لتنبيهك بالأذكار',
-            style: TextStyle(color: Colors.white70),
-          ),
-          trailing: ElevatedButton(
-            onPressed: () => openAppSettings(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.orange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('منح الإذن', style: TextStyle(fontWeight: FontWeight.bold)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.notifications_off_rounded, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'الأذونات مطلوبة',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'يحتاج التطبيق إلى إذن الإشعارات لتنبيهك بالأذكار',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => openAppSettings(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.orange,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text(
+                    'منح الإذن',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -336,50 +372,78 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   // بطاقة الوضع الصامت العام
   Widget _buildGlobalMuteCard() {
+    final greenColor = const Color(0xFF2D6852);
+    
     return Card(
       elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shadowColor: _isGlobalMuteEnabled ? Colors.grey.withOpacity(0.4) : greenColor.withOpacity(0.4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           gradient: LinearGradient(
             colors: _isGlobalMuteEnabled
-                ? [Colors.grey.shade400, Colors.grey.shade600]
-                : [kPrimary, const Color(0xFF2D6852)],
+                ? [Colors.grey.shade600, Colors.grey.shade800]
+                : [kPrimary, greenColor],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: SwitchListTile(
-          contentPadding: const EdgeInsets.all(16),
-          secondary: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _isGlobalMuteEnabled ? Icons.notifications_off : Icons.notifications_active,
-              color: Colors.white,
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isGlobalMuteEnabled ? Icons.notifications_off_rounded : Icons.notifications_active_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'الوضع الصامت',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _isGlobalMuteEnabled ? 'جميع الإشعارات مغلقة' : 'الإشعارات نشطة',
+                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Transform.scale(
+                    scale: 1.2,
+                    child: Switch(
+                      value: _isGlobalMuteEnabled,
+                      onChanged: _hasNotificationPermission ? _toggleGlobalMute : null,
+                      activeColor: Colors.white,
+                      inactiveThumbColor: Colors.white,
+                      inactiveTrackColor: Colors.white30,
+                      trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          title: const Text(
-            'الوضع الصامت',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          subtitle: Text(
-            _isGlobalMuteEnabled ? 'جميع الإشعارات مغلقة' : 'الإشعارات نشطة',
-            style: const TextStyle(color: Colors.white70),
-          ),
-          value: _isGlobalMuteEnabled,
-          onChanged: _hasNotificationPermission ? _toggleGlobalMute : null,
-          activeColor: Colors.white,
-          inactiveThumbColor: Colors.white,
-          inactiveTrackColor: Colors.white30,
         ),
       ),
     );
@@ -387,12 +451,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   // عنوان القسم
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-        color: kPrimary,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: kPrimary,
+        ),
       ),
     );
   }
@@ -400,23 +467,31 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   // الإجراءات السريعة
   Widget _buildQuickActions() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         Expanded(
           child: _buildQuickActionCard(
-            icon: Icons.notifications_active,
+            icon: Icons.notifications_active_rounded,
             title: 'جدولة الكل',
-            color: Colors.green,
+            color: Colors.green.shade600,
             onTap: _scheduleAllNotifications,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: _buildQuickActionCard(
-            icon: Icons.notifications_off,
+            icon: Icons.notifications_off_rounded,
             title: 'إلغاء الكل',
-            color: Colors.red,
+            color: Colors.red.shade600,
             onTap: _cancelAllNotifications,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildQuickActionCard(
+            icon: Icons.refresh_rounded,
+            title: 'إعادة ضبط',
+            color: Colors.blue.shade600,
+            onTap: _resetAllNotificationSettings,
           ),
         ),
       ],
@@ -431,17 +506,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     required VoidCallback onTap,
   }) {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 6,
+      shadowColor: color.withOpacity(0.3),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
-              colors: [color.withOpacity(0.8), color],
+              colors: [color.withOpacity(0.9), color],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -450,13 +529,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, color: Colors.white, size: 30),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 title,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -474,104 +553,173 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         final isEnabled = snapshot.data?['isEnabled'] ?? false;
         final customTime = snapshot.data?['customTime'];
         final currentTime = customTime ?? category['defaultTime'];
+        final Color categoryColor = category['color'] as Color;
         
         return Card(
-          elevation: 6,
+          elevation: 8,
+          shadowColor: categoryColor.withOpacity(0.3),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 16),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: LinearGradient(
                 colors: [
-                  (category['color'] as Color).withOpacity(0.8),
-                  category['color'] as Color,
+                  categoryColor.withOpacity(0.8),
+                  categoryColor,
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
             ),
-            child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  category['icon'] as IconData,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              title: Text(
-                category['title'] as String,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              subtitle: Text(
-                isEnabled ? 'مفعل - $currentTime' : 'غير مفعل',
-                style: const TextStyle(color: Colors.white70),
-              ),
-              trailing: Switch(
-                value: isEnabled && !_isGlobalMuteEnabled,
-                onChanged: _hasNotificationPermission && !_isGlobalMuteEnabled
-                    ? (value) => _toggleCategoryNotification(category['id'], value)
-                    : null,
-                activeColor: Colors.white,
-                activeTrackColor: Colors.white.withOpacity(0.5),
-                inactiveThumbColor: Colors.white60,
-                inactiveTrackColor: Colors.white30,
-              ),
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(20),
-                      bottomRight: Radius.circular(20),
-                    ),
-                  ),
-                  child: Column(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      // اختيار الوقت
-                      ListTile(
-                        leading: const Icon(Icons.access_time, color: Colors.white),
-                        title: const Text(
-                          'وقت الإشعار',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      // أيقونة الفئة
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        subtitle: Text(
-                          currentTime,
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.white),
-                          onPressed: () => _selectTime(category['id'], currentTime),
+                        child: Icon(
+                          category['icon'] as IconData,
+                          color: Colors.white,
+                          size: 24,
                         ),
                       ),
-                      
-                      // الإعدادات المتقدمة للفئة
-                      ListTile(
-                        leading: const Icon(Icons.tune, color: Colors.white),
-                        title: const Text(
-                          'إعدادات متقدمة',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      const SizedBox(width: 16),
+                      // تفاصيل الفئة
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category['title'] as String,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time_rounded,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        currentTime,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isEnabled && !_isGlobalMuteEnabled ? 'مفعل' : 'غير مفعل',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
-                          onPressed: () => _showCategoryAdvancedSettings(category),
+                      ),
+                      // مفتاح التبديل
+                      Transform.scale(
+                        scale: 1.1,
+                        child: Switch(
+                          value: isEnabled && !_isGlobalMuteEnabled,
+                          onChanged: _hasNotificationPermission && !_isGlobalMuteEnabled
+                              ? (value) => _toggleCategoryNotification(category, value)
+                              : null,
+                          activeColor: Colors.white,
+                          activeTrackColor: Colors.white.withOpacity(0.5),
+                          inactiveThumbColor: Colors.white60,
+                          inactiveTrackColor: Colors.white30,
+                          trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  
+                  // زر تغيير الوقت
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _isGlobalMuteEnabled 
+                              ? null 
+                              : () => _selectTime(category, currentTime),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            disabledBackgroundColor: Colors.white.withOpacity(0.1),
+                            disabledForegroundColor: Colors.white.withOpacity(0.4),
+                          ),
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: const Text(
+                            'تغيير الوقت',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(width: 8),
+                      
+                      // زر إعادة ضبط الوقت الافتراضي
+                      ElevatedButton(
+                        onPressed: _isGlobalMuteEnabled 
+                            ? null 
+                            : () => _resetCategoryDefaultTime(category),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          disabledBackgroundColor: Colors.white.withOpacity(0.1),
+                          disabledForegroundColor: Colors.white.withOpacity(0.4),
+                        ),
+                        child: const Icon(Icons.restore, size: 18),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -585,9 +733,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       final isEnabled = await _athkarService.getNotificationEnabled(categoryId);
       final customTime = await _athkarService.getCustomNotificationTime(categoryId);
       
+      // إذا كان الوقت المخصص غير موجود (null)، استخدم الوقت الافتراضي
+      final category = _categories.firstWhere(
+        (cat) => cat['id'] == categoryId,
+        orElse: () => {'defaultTime': '12:00'}, // قيمة افتراضية إذا لم يجد الفئة
+      );
+      
       return {
         'isEnabled': isEnabled,
-        'customTime': customTime,
+        'customTime': customTime ?? category['defaultTime'],
       };
     } catch (e) {
       await _errorLoggingService.logError(
@@ -595,18 +749,25 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         'Error getting category info: $categoryId',
         e,
       );
-      return {'isEnabled': false, 'customTime': null};
+      return {'isEnabled': false, 'customTime': '12:00'}; // قيمة افتراضية في حالة الخطأ
     }
   }
   
   // اختيار الوقت
-  Future<void> _selectTime(String categoryId, String currentTime) async {
+  Future<void> _selectTime(Map<String, dynamic> category, String currentTime) async {
+    final categoryId = category['id'];
+    // استخدام اللون الأخضر بدلاً من لون الفئة
+    final greenColor = const Color(0xFF2D6852);
+    
     try {
       final parts = currentTime.split(':');
       final initialTime = TimeOfDay(
         hour: int.tryParse(parts[0]) ?? 0,
         minute: int.tryParse(parts[1]) ?? 0,
       );
+      
+      // تأثير اهتزاز خفيف
+      HapticFeedback.lightImpact();
       
       final time = await showTimePicker(
         context: context,
@@ -615,9 +776,47 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           return Theme(
             data: Theme.of(context).copyWith(
               colorScheme: ColorScheme.light(
-                primary: kPrimary,
+                primary: greenColor,
                 onPrimary: Colors.white,
-                onSurface: kPrimary,
+                onSurface: greenColor,
+              ),
+              timePickerTheme: TimePickerThemeData(
+                backgroundColor: Colors.white,
+                hourMinuteShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                dayPeriodShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                dayPeriodColor: greenColor.withOpacity(0.1),
+                dayPeriodTextColor: greenColor,
+                hourMinuteColor: greenColor.withOpacity(0.1),
+                hourMinuteTextColor: greenColor,
+                dialHandColor: greenColor,
+                dialBackgroundColor: greenColor.withOpacity(0.1),
+                hourMinuteTextStyle: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
+                dayPeriodTextStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                helpTextStyle: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: greenColor,
+                ),
+                inputDecorationTheme: InputDecorationTheme(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: greenColor),
+                  ),
+                  contentPadding: const EdgeInsets.all(16),
+                ),
+                dialTextColor: MaterialStateColor.resolveWith((states) => 
+                  states.contains(MaterialState.selected) ? Colors.white : greenColor),
+                entryModeIconColor: greenColor,
               ),
             ),
             child: child!,
@@ -629,12 +828,17 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         final formattedTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
         await _athkarService.setCustomNotificationTime(categoryId, formattedTime);
         
-        if (await _athkarService.getNotificationEnabled(categoryId)) {
+        // إذا كانت الإشعارات مفعلة، فأعد جدولتها
+        if (await _athkarService.getNotificationEnabled(categoryId) && !_isGlobalMuteEnabled) {
           await _athkarService.scheduleCategoryNotifications(categoryId);
         }
         
         setState(() {});
         
+        // تأثير اهتزاز خفيف
+        HapticFeedback.mediumImpact();
+        
+        // إظهار رسالة نجاح
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -645,8 +849,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               ],
             ),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: kPrimary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: greenColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 2),
           ),
@@ -664,7 +868,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
   
   // تبديل حالة إشعار الفئة
-  Future<void> _toggleCategoryNotification(String categoryId, bool value) async {
+  Future<void> _toggleCategoryNotification(Map<String, dynamic> category, bool value) async {
+    final categoryId = category['id'];
+    final categoryColor = category['color'] as Color;
+    final categoryTitle = category['title'] as String;
+    
     // لا نستخدم setState لتحميل كامل الصفحة
     try {
       // إظهار مؤشر تحميل مؤقت
@@ -684,18 +892,20 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               Text('جاري ${value ? 'تفعيل' : 'إيقاف'} الإشعارات...'),
             ],
           ),
-          duration: const Duration(seconds: 1),
+          duration: const Duration(milliseconds: 800),
           behavior: SnackBarBehavior.floating,
           backgroundColor: kPrimary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           margin: const EdgeInsets.all(16),
         ),
       );
       
+      // تأثير اهتزاز خفيف
+      HapticFeedback.lightImpact();
+      
       if (value) {
         // تفعيل الإشعارات
-        // الحصول على معلومات الفئة
-        final category = _categories.firstWhere((cat) => cat['id'] == categoryId);
+        // الحصول على وقت الإشعار
         final customTime = await _athkarService.getCustomNotificationTime(categoryId);
         final defaultTime = category['defaultTime'] as String;
         final timeString = customTime ?? defaultTime;
@@ -710,9 +920,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         // جدولة الإشعارات
         final result = await _notificationManager.scheduleAthkarNotifications(
           categoryId: categoryId,
-          categoryTitle: category['title'] as String,
+          categoryTitle: categoryTitle,
           times: [time],
-          color: category['color'] as Color,
+          color: categoryColor,
         );
         
         if (result.success) {
@@ -723,14 +933,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.notifications_active, color: Colors.white),
+                  const Icon(Icons.notifications_active, color: Colors.white),
                   const SizedBox(width: 10),
-                  Text('تم تفعيل إشعارات ${category['title']}'),
+                  Text('تم تفعيل إشعارات $categoryTitle'),
                 ],
               ),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: kPrimary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: categoryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               margin: const EdgeInsets.all(16),
               duration: const Duration(seconds: 2),
             ),
@@ -745,21 +955,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         if (success) {
           await _athkarService.setNotificationEnabled(categoryId, false);
           
-          final category = _categories.firstWhere((cat) => cat['id'] == categoryId);
-          
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.notifications_off, color: Colors.white),
+                  const Icon(Icons.notifications_off, color: Colors.white),
                   const SizedBox(width: 10),
-                  Text('تم إيقاف إشعارات ${category['title']}'),
+                  Text('تم إيقاف إشعارات $categoryTitle'),
                 ],
               ),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.grey,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: Colors.grey.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               margin: const EdgeInsets.all(16),
               duration: const Duration(seconds: 2),
             ),
@@ -772,7 +980,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       // تحديث حالة البطاقة فقط بدون إعادة تحميل الصفحة كاملة
       if (mounted) {
         setState(() {
-          // سيتم تحديث فقط البطاقة المعنية
+          // سيتم تحديث البطاقة المعنية فقط عن طريق FutureBuilder
         });
       }
     } catch (e) {
@@ -800,6 +1008,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       // التأكد من تهيئة الإشعارات أولاً
       await _initializeNotifications();
       
+      // إلغاء الوضع الصامت إذا كان مفعلاً
+      if (_isGlobalMuteEnabled) {
+        await _toggleGlobalMute(false);
+      }
+      
       // جدولة الإشعارات الافتراضية
       await _notificationManager.scheduleDefaultAthkarNotifications();
       
@@ -808,24 +1021,23 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         await _athkarService.setNotificationEnabled(category['id'], true);
       }
       
-      if (_isGlobalMuteEnabled) {
-        await _toggleGlobalMute(false);
-      }
+      // تأثير اهتزاز
+      HapticFeedback.mediumImpact();
       
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 10),
-              Text('تم جدولة جميع الإشعارات بنجاح'),
+              const Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              const Text('تم جدولة جميع الإشعارات بنجاح'),
             ],
           ),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
+          backgroundColor: Colors.green.shade600,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
         ),
       );
       
@@ -848,33 +1060,38 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
           children: [
-            Icon(Icons.warning, color: Colors.orange),
-            const SizedBox(width: 10),
-            const Text('تأكيد الإلغاء'),
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Text('تأكيد الإلغاء'),
           ],
         ),
         content: const Text('هل أنت متأكد من إلغاء جميع الإشعارات؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
+            child: const Text('إلغاء', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
-            child: const Text('موافق'),
+            child: const Text('موافق', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
     
     if (confirm != true) return;
+    
+    // تأثير اهتزاز خفيف
+    HapticFeedback.lightImpact();
     
     setState(() => _isLoading = true);
     
@@ -889,19 +1106,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         }
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
+          SnackBar(
+            content: const Row(
               children: [
-                Icon(Icons.notifications_off, color: Colors.white),
+                Icon(Icons.notifications_off_rounded, color: Colors.white),
                 SizedBox(width: 10),
-                Text('تم إلغاء جميع الإشعارات'),
+                Text('تم إلغاء جميع الإشعارات بنجاح'),
               ],
             ),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.red,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-            margin: EdgeInsets.all(16),
-            duration: Duration(seconds: 2),
+            backgroundColor: Colors.red.shade600,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
           ),
         );
       } else {
@@ -929,6 +1146,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       return;
     }
     
+    // تأثير اهتزاز خفيف
+    HapticFeedback.lightImpact();
+    
     try {
       // استخدام ID آمن للإشعار التجريبي
       final testId = DateTime.now().millisecondsSinceEpoch ~/ 1000000; // تقسيم على مليون للحصول على رقم صغير
@@ -941,26 +1161,26 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         notificationTime: TimeOfDay.now(),
         channelId: 'test_channel',
         payload: 'test_notification',
-        color: Colors.blue,
+        color: Colors.blue.shade600,
         repeat: false,
         priority: 4,
       );
       
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
+          SnackBar(
+            content: const Row(
               children: [
-                Icon(Icons.notifications, color: Colors.white),
+                Icon(Icons.notifications_rounded, color: Colors.white),
                 SizedBox(width: 10),
                 Text('تم إرسال إشعار تجريبي'),
               ],
             ),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.blue,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-            margin: EdgeInsets.all(16),
-            duration: Duration(seconds: 2),
+            backgroundColor: Colors.blue.shade600,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
           ),
         );
       } else {
@@ -979,6 +1199,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   // عرض المساعدة
   void _showHelp() {
+    // تأثير اهتزاز خفيف
+    HapticFeedback.lightImpact();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -991,6 +1214,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             topLeft: Radius.circular(30),
             topRight: Radius.circular(30),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -1003,37 +1233,78 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'المساعدة والدعم',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: kPrimary,
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.help_outline_rounded,
+                    color: kPrimary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'المساعدة والدعم',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: kPrimary,
+                    ),
+                  ),
+                ],
               ),
             ),
+            const Divider(height: 1),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
                   _buildHelpCard(
                     'كيفية تفعيل الإشعارات',
-                    'اتبع الخطوات التالية لتفعيل الإشعارات:\n1. اضغط على زر الإذن\n2. قم بتفعيل إذن الإشعارات\n3. ارجع إلى التطبيق',
-                    Icons.notifications_active,
+                    'اتبع الخطوات التالية لتفعيل الإشعارات:\n\n1. اضغط على زر الإذن\n2. قم بتفعيل إذن الإشعارات\n3. ارجع إلى التطبيق وقم بتفعيل الإشعارات التي تريدها',
+                    Icons.notifications_active_rounded,
                   ),
                   _buildHelpCard(
                     'الوضع الصامت',
-                    'يمكنك تفعيل الوضع الصامت لإيقاف جميع الإشعارات مؤقتاً دون الحاجة لإلغاء الجدولة',
-                    Icons.notifications_off,
+                    'يمكنك تفعيل الوضع الصامت في أعلى الصفحة لإيقاف جميع الإشعارات مؤقتًا دون الحاجة لإلغاء الجدولة. عند تعطيل الوضع الصامت، ستعود الإشعارات للعمل تلقائيًا.',
+                    Icons.notifications_off_rounded,
                   ),
                   _buildHelpCard(
                     'تخصيص الأوقات',
-                    'يمكنك تخصيص وقت كل إشعار حسب احتياجاتك من خلال النقر على أيقونة التعديل بجانب الوقت',
-                    Icons.access_time,
+                    'يمكنك تخصيص وقت كل إشعار على حدة من خلال:\n\n1. اضغط على زر "تغيير الوقت" في بطاقة الذكر\n2. اختر الوقت المناسب\n3. اضغط "موافق" لحفظ الإعدادات',
+                    Icons.access_time_rounded,
+                  ),
+                  _buildHelpCard(
+                    'إدارة الإشعارات',
+                    'استخدم أزرار "جدولة الكل" أو "إلغاء الكل" في أعلى الصفحة لإدارة جميع الإشعارات دفعة واحدة.',
+                    Icons.settings_rounded,
+                  ),
+                  _buildHelpCard(
+                    'حل المشكلات',
+                    'إذا لم تظهر الإشعارات على جهازك، تأكد من إتباع الخطوات التالية:\n\n1. تأكد من منح الإذن للتطبيق في إعدادات جهازك\n2. تأكد من أن الوضع الصامت غير مفعل\n3. تأكد من تفعيل الإشعار المطلوب\n\nإذا استمرت المشكلة، جرب إعادة تشغيل التطبيق أو الجهاز.',
+                    Icons.bug_report_rounded,
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text(
+                    'حسناً، فهمت',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
               ),
             ),
           ],
@@ -1045,8 +1316,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   // بطاقة المساعدة
   Widget _buildHelpCard(String title, String content, IconData icon) {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      shadowColor: kPrimary.withOpacity(0.2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       margin: const EdgeInsets.only(bottom: 16),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.all(16),
@@ -1063,17 +1335,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
+            color: kPrimary,
           ),
         ),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              content,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                height: 1.6,
-              ),
+          const Divider(),
+          const SizedBox(height: 4),
+          Text(
+            content,
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              height: 1.6,
             ),
           ),
         ],
@@ -1081,171 +1355,23 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
   
-  // عرض إعدادات الفئة المتقدمة
-  void _showCategoryAdvancedSettings(Map<String, dynamic> category) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(30),
-            topRight: Radius.circular(30),
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 5,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: (category['color'] as Color).withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      category['icon'] as IconData,
-                      color: category['color'] as Color,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category['title'] as String,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Text(
-                          'إعدادات متقدمة',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _buildAdvancedOption(
-                    'نوع التنبيه',
-                    'اختر نوع التنبيه المناسب',
-                    Icons.notifications_active,
-                    onTap: () => _showNotificationTypeDialog(category['id']),
-                  ),
-                  _buildAdvancedOption(
-                    'الأيام النشطة',
-                    'حدد الأيام التي تريد تلقي الإشعارات فيها',
-                    Icons.calendar_today,
-                    onTap: () => _showDaysSelectionDialog(category['id']),
-                  ),
-                  _buildAdvancedOption(
-                    'نغمة الإشعار',
-                    'اختر نغمة مخصصة لهذه الفئة',
-                    Icons.music_note,
-                    onTap: () => _showSoundSelectionDialog(category['id']),
-                  ),
-                  _buildAdvancedOption(
-                    'الأوقات الإضافية',
-                    'أضف أوقات إضافية للتذكير',
-                    Icons.add_alarm,
-                    onTap: () => _showAdditionalTimesDialog(category['id']),
-                  ),
-                  _buildAdvancedOption(
-                    'رسالة مخصصة',
-                    'تخصيص نص الإشعار',
-                    Icons.message,
-                    onTap: () => _showCustomMessageDialog(category['id']),
-                  ),
-                  _buildAdvancedOption(
-                    'السجل',
-                    'عرض سجل الإشعارات لهذه الفئة',
-                    Icons.history,
-                    onTap: () => _showCategoryHistory(category['id']),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  // خيار متقدم
-  Widget _buildAdvancedOption(
-    String title,
-    String subtitle,
-    IconData icon, {
-    VoidCallback? onTap,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: kPrimary.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: kPrimary),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: onTap,
-      ),
-    );
-  }
-  
-  // حوارات مختلفة للإعدادات المتقدمة
   void _showPermissionDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
           children: [
-            Icon(Icons.security, color: Colors.orange),
-            const SizedBox(width: 10),
-            const Text('الإذن مطلوب'),
+            Icon(Icons.security_rounded, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Text('الإذن مطلوب'),
           ],
         ),
         content: const Text('يحتاج التطبيق إلى إذن الإشعارات لتنبيهك بأوقات الأذكار'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
+            child: const Text('إلغاء', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1254,24 +1380,166 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('فتح الإعدادات'),
+            child: const Text('فتح الإعدادات', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
   
+  // إعادة ضبط جميع إعدادات الإشعارات إلى الإعدادات الافتراضية
+  Future<void> _resetAllNotificationSettings() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.refresh_rounded, color: Colors.blue, size: 28),
+            SizedBox(width: 12),
+            Text('إعادة ضبط'),
+          ],
+        ),
+        content: const Text('هل أنت متأكد من إعادة ضبط جميع إعدادات الإشعارات إلى الحالة الافتراضية؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text('موافق', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm != true) return;
+    
+    // تأثير اهتزاز خفيف
+    HapticFeedback.lightImpact();
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      // إعادة ضبط الوضع الصامت
+      if (_isGlobalMuteEnabled) {
+        await _toggleGlobalMute(false);
+      }
+      
+      // إلغاء جميع الإشعارات أولاً
+      await _notificationManager.cancelAllNotifications();
+      
+      // إعادة ضبط جميع الأوقات إلى الأوقات الافتراضية لكل فئة
+      for (var category in _categories) {
+        final categoryId = category['id'];
+        final defaultTime = category['defaultTime'] as String;
+        // استخدام القيمة الافتراضية بدلاً من null
+        await _athkarService.setCustomNotificationTime(categoryId, defaultTime);
+        // إعادة ضبط حالة التفعيل
+        await _athkarService.setNotificationEnabled(categoryId, true);
+      }
+      
+      // إعادة جدولة الإشعارات الافتراضية
+      await _notificationManager.scheduleDefaultAthkarNotifications();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.settings_backup_restore_rounded, color: Colors.white),
+              SizedBox(width: 10),
+              Text('تم إعادة ضبط جميع الإعدادات بنجاح'),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.blue.shade600,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      setState(() {});
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationSettings',
+        'Error resetting notification settings',
+        e,
+      );
+      
+      _showErrorDialog('خطأ في إعادة الضبط', 'حدث خطأ أثناء إعادة ضبط الإعدادات.\n\nتفاصيل الخطأ:\n${e.toString()}');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+  
+  // إعادة ضبط وقت فئة محددة إلى الوقت الافتراضي
+  Future<void> _resetCategoryDefaultTime(Map<String, dynamic> category) async {
+    final categoryId = category['id'];
+    final defaultTime = category['defaultTime'] as String;
+    final greenColor = const Color(0xFF2D6852);
+    
+    // تأثير اهتزاز خفيف
+    HapticFeedback.lightImpact();
+    
+    try {
+      // استخدام الوقت الافتراضي بدلاً من null
+      await _athkarService.setCustomNotificationTime(categoryId, defaultTime);
+      
+      // إذا كانت الإشعارات مفعلة، فأعد جدولتها
+      if (await _athkarService.getNotificationEnabled(categoryId) && !_isGlobalMuteEnabled) {
+        await _athkarService.scheduleCategoryNotifications(categoryId);
+      }
+      
+      setState(() {});
+      
+      // إظهار رسالة نجاح
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.restore_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              Text('تم إعادة ضبط الوقت إلى $defaultTime'),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: greenColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      await _errorLoggingService.logError(
+        'NotificationSettings',
+        'Error resetting category default time',
+        e,
+      );
+      
+      _showErrorDialog('خطأ في إعادة الضبط', 'حدث خطأ أثناء إعادة ضبط الوقت الافتراضي. يرجى المحاولة مرة أخرى.');
+    }
+  }
+  
   void _showErrorDialog(String title, String content) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            const SizedBox(width: 10),
+            Icon(Icons.error_outline_rounded, color: Colors.red.shade600, size: 28),
+            const SizedBox(width: 12),
             Text(title),
           ],
         ),
@@ -1279,37 +1547,17 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           child: Text(content),
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('حسناً'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('حسناً', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
-  }
-  
-  // وظائف إضافية ستحتاج إلى تنفيذها لاحقاً
-  void _showNotificationTypeDialog(String categoryId) {
-    // TODO: Implement notification type selection
-  }
-  
-  void _showDaysSelectionDialog(String categoryId) {
-    // TODO: Implement days selection
-  }
-  
-  void _showSoundSelectionDialog(String categoryId) {
-    // TODO: Implement sound selection
-  }
-  
-  void _showAdditionalTimesDialog(String categoryId) {
-    // TODO: Implement additional times
-  }
-  
-  void _showCustomMessageDialog(String categoryId) {
-    // TODO: Implement custom message
-  }
-  
-  void _showCategoryHistory(String categoryId) {
-    // TODO: Implement category history
   }
 }
