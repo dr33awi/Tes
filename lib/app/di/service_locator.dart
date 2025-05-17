@@ -14,6 +14,8 @@ import '../../core/services/interfaces/battery_service.dart';
 import '../../core/services/implementations/battery_service_impl.dart';
 import '../../core/services/interfaces/do_not_disturb_service.dart';
 import '../../core/services/implementations/do_not_disturb_service_impl.dart';
+import '../../core/services/interfaces/timezone_service.dart';
+import '../../core/services/implementations/timezone_service_impl.dart';
 import '../../data/datasources/local/athkar_local_data_source.dart';
 import '../../data/datasources/local/settings_local_data_source.dart';
 import '../../data/repositories/athkar_repository_impl.dart';
@@ -28,6 +30,7 @@ import '../../domain/usecases/prayers/get_prayer_times.dart';
 import '../../domain/usecases/prayers/get_qibla_direction.dart';
 import '../../domain/usecases/settings/get_settings.dart';
 import '../../domain/usecases/settings/update_settings.dart';
+import '../../core/services/utils/notification_scheduler.dart';
 
 final getIt = GetIt.instance;
 
@@ -63,6 +66,10 @@ class ServiceLocator {
       DoNotDisturbServiceImpl(),
     );
     
+    getIt.registerSingleton<TimezoneService>(
+      TimezoneServiceImpl(),
+    );
+    
     // تسجيل خدمة الإشعارات مع الخدمات الجديدة
     getIt.registerSingleton<NotificationService>(
       NotificationServiceImpl(
@@ -78,6 +85,11 @@ class ServiceLocator {
     
     getIt.registerSingleton<QiblaService>(
       QiblaServiceImpl(),
+    );
+    
+    // تسجيل مساعد جدولة الإشعارات
+    getIt.registerSingleton<NotificationScheduler>(
+      NotificationScheduler(),
     );
 
     // Data Sources
@@ -112,13 +124,45 @@ class ServiceLocator {
 
     // تهيئة خدمة الإشعارات
     await getIt<NotificationService>().initialize();
+    
+    // تهيئة خدمة المناطق الزمنية
+    await getIt<TimezoneService>().initializeTimeZones();
 
     _isInitialized = true;
   }
   
+  /// تنظيف الموارد عند إغلاق التطبيق
+  Future<void> dispose() async {
+    if (!_isInitialized) return;
+    
+    try {
+      // تنظيف خدمة الإشعارات
+      if (getIt.isRegistered<NotificationService>()) {
+        await getIt<NotificationService>().dispose();
+      }
+      
+      // تنظيف خدمة البوصلة
+      if (getIt.isRegistered<QiblaService>()) {
+        getIt<QiblaService>().dispose();
+      }
+      
+      // تنظيف خدمة عدم الإزعاج
+      if (getIt.isRegistered<DoNotDisturbService>()) {
+        await getIt<DoNotDisturbService>().unregisterDoNotDisturbListener();
+      }
+      
+      // إعادة تعيين حالة التسجيل
+      await getIt.reset();
+      _isInitialized = false;
+      
+      debugPrint('All services disposed successfully');
+    } catch (e) {
+      debugPrint('Error while disposing services: $e');
+    }
+  }
+  
   // لاستخدامه عند اختبار التطبيق
   Future<void> reset() async {
-    await getIt.reset();
-    _isInitialized = false;
+    await dispose();
   }
 }

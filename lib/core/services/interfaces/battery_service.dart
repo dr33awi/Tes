@@ -14,8 +14,14 @@ abstract class BatteryService {
   /// والجهاز غير متصل بالشاحن، فلا يتم إرسال الإشعارات
   Future<bool> canSendNotification();
   
+  /// تعيين الحد الأدنى لمستوى البطارية لإرسال الإشعارات
+  Future<void> setMinimumBatteryLevel(int level);
+  
   /// تسجيل مراقب لتغييرات حالة البطارية
   Stream<BatteryState> getBatteryStateStream();
+  
+  /// تنظيف الموارد
+  Future<void> dispose();
 }
 
 /// تمثيل حالة البطارية

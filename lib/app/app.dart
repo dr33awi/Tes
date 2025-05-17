@@ -1,4 +1,4 @@
-// lib/app/app.dart
+// lib/app/app.dart - Corregir las rutas y constantes
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -62,8 +62,8 @@ class AthkarApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            initialRoute: AppRouter.initialRoute,
-            onGenerateRoute: AppRouter.onGenerateRoute,
+            initialRoute: '/', // Utiliza un valor directo en lugar de AppConstants.initialRoute
+            onGenerateRoute: AppRouter.onGenerateRoute, // Asegúrate de que AppRouter existe y esté correctamente importado
           );
         },
       ),

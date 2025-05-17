@@ -16,11 +16,14 @@ class SettingsModel {
   final bool enableHighPriorityForPrayers;
   final bool enableSilentMode;
   final int lowBatteryThreshold;
+  final bool useCustomSounds;
+  final Map<String, String> notificationSounds;
   
   // إعدادات الأذكار
   final bool showAthkarReminders;
   final List<int> morningAthkarTime; // [hour, minute]
   final List<int> eveningAthkarTime; // [hour, minute]
+  final bool enableActionButtons;
 
   SettingsModel({
     required this.enableNotifications,
@@ -38,6 +41,9 @@ class SettingsModel {
     required this.showAthkarReminders,
     required this.morningAthkarTime,
     required this.eveningAthkarTime,
+    required this.useCustomSounds,
+    required this.notificationSounds,
+    required this.enableActionButtons,
   });
 
   // إعدادات افتراضية
@@ -58,6 +64,14 @@ class SettingsModel {
       showAthkarReminders: true,
       morningAthkarTime: [5, 0], // 5:00 صباحًا
       eveningAthkarTime: [17, 0], // 5:00 مساءً
+      useCustomSounds: false,
+      notificationSounds: {
+        'prayer': 'adhan_sound',
+        'athkar_morning': 'morning_athkar_sound',
+        'athkar_evening': 'evening_athkar_sound',
+        'reminder': 'reminder_sound',
+      },
+      enableActionButtons: true,
     );
   }
 
@@ -83,6 +97,16 @@ class SettingsModel {
       eveningAthkarTime: json['eveningAthkarTime'] != null
           ? List<int>.from(json['eveningAthkarTime'])
           : [17, 0],
+      useCustomSounds: json['useCustomSounds'] ?? false,
+      notificationSounds: json['notificationSounds'] != null
+          ? Map<String, String>.from(json['notificationSounds'])
+          : {
+              'prayer': 'adhan_sound',
+              'athkar_morning': 'morning_athkar_sound',
+              'athkar_evening': 'evening_athkar_sound',
+              'reminder': 'reminder_sound',
+            },
+      enableActionButtons: json['enableActionButtons'] ?? true,
     );
   }
 
@@ -104,6 +128,9 @@ class SettingsModel {
       'showAthkarReminders': showAthkarReminders,
       'morningAthkarTime': morningAthkarTime,
       'eveningAthkarTime': eveningAthkarTime,
+      'useCustomSounds': useCustomSounds,
+      'notificationSounds': notificationSounds,
+      'enableActionButtons': enableActionButtons,
     };
   }
 
@@ -125,6 +152,9 @@ class SettingsModel {
       showAthkarReminders: showAthkarReminders,
       morningAthkarTime: morningAthkarTime,
       eveningAthkarTime: eveningAthkarTime,
+      useCustomSounds: useCustomSounds,
+      notificationSounds: notificationSounds,
+      enableActionButtons: enableActionButtons,
     );
   }
 
@@ -146,6 +176,9 @@ class SettingsModel {
       showAthkarReminders: settings.showAthkarReminders,
       morningAthkarTime: settings.morningAthkarTime,
       eveningAthkarTime: settings.eveningAthkarTime,
+      useCustomSounds: settings.useCustomSounds,
+      notificationSounds: settings.notificationSounds,
+      enableActionButtons: settings.enableActionButtons,
     );
   }
 }

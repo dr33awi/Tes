@@ -4,12 +4,16 @@ import '../../../domain/entities/settings.dart';
 import '../../../domain/usecases/settings/get_settings.dart';
 import '../../../domain/usecases/settings/update_settings.dart';
 import '../../../core/services/interfaces/notification_service.dart';
+import '../../../core/services/interfaces/battery_service.dart';
+import '../../../core/services/utils/notification_scheduler.dart';
 import '../../../app/di/service_locator.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final GetSettings _getSettings;
   final UpdateSettings _updateSettings;
   final NotificationService _notificationService = getIt<NotificationService>();
+  final BatteryService _batteryService = getIt<BatteryService>();
+  final NotificationScheduler _notificationScheduler = getIt<NotificationScheduler>();
   
   Settings? _settings;
   bool _isLoading = false;
@@ -39,6 +43,9 @@ class SettingsProvider extends ChangeNotifier {
       // تحديث إعدادات خدمة الإشعارات
       await _updateNotificationServiceSettings();
       
+      // تحديث إعدادات خدمة البطارية
+      await _updateBatteryServiceSettings();
+      
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -57,10 +64,20 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final success = await _updateSettings(newSettings);
       if (success) {
+        // حفظ الإعدادات القديمة لمعرفة ما إذا تم تغيير إعدادات الإشعارات
+        final oldSettings = _settings;
         _settings = newSettings;
         
         // تحديث إعدادات خدمة الإشعارات
         await _updateNotificationServiceSettings();
+        
+        // تحديث إعدادات خدمة البطارية
+        await _updateBatteryServiceSettings();
+        
+        // إعادة جدولة الإشعارات إذا تم تغيير إعدادات الإشعارات
+        if (_shouldRescheduleNotifications(oldSettings, newSettings)) {
+          await _notificationScheduler.scheduleAllNotifications(newSettings);
+        }
       }
       
       _isLoading = false;
@@ -74,6 +91,28 @@ class SettingsProvider extends ChangeNotifier {
       
       return false;
     }
+  }
+  
+  // التحقق مما إذا كان يجب إعادة جدولة الإشعارات
+  bool _shouldRescheduleNotifications(Settings? oldSettings, Settings newSettings) {
+    if (oldSettings == null) return true;
+    
+    // التحقق من التغيرات في إعدادات الإشعارات
+    return oldSettings.enableNotifications != newSettings.enableNotifications ||
+           oldSettings.enablePrayerTimesNotifications != newSettings.enablePrayerTimesNotifications ||
+           oldSettings.enableAthkarNotifications != newSettings.enableAthkarNotifications ||
+           oldSettings.morningAthkarTime != newSettings.morningAthkarTime ||
+           oldSettings.eveningAthkarTime != newSettings.eveningAthkarTime ||
+           oldSettings.showAthkarReminders != newSettings.showAthkarReminders ||
+           oldSettings.respectBatteryOptimizations != newSettings.respectBatteryOptimizations ||
+           oldSettings.respectDoNotDisturb != newSettings.respectDoNotDisturb ||
+           oldSettings.enableHighPriorityForPrayers != newSettings.enableHighPriorityForPrayers ||
+           oldSettings.enableSilentMode != newSettings.enableSilentMode ||
+           oldSettings.useCustomSounds != newSettings.useCustomSounds ||
+           oldSettings.notificationSounds != newSettings.notificationSounds ||
+           oldSettings.enableActionButtons != newSettings.enableActionButtons ||
+           oldSettings.calculationMethod != newSettings.calculationMethod ||
+           oldSettings.asrMethod != newSettings.asrMethod;
   }
   
   // تحديث إعداد محدد
@@ -85,57 +124,26 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final success = await _updateSettings.updateSetting(key: key, value: value);
       if (success && _settings != null) {
+        // حفظ الإعدادات القديمة
+        final oldSettings = _settings!;
+        
         // تحديث الإعدادات المحلية
-        switch (key) {
-          case 'enableNotifications':
-            _settings = _settings!.copyWith(enableNotifications: value as bool);
-            break;
-          case 'enablePrayerTimesNotifications':
-            _settings = _settings!.copyWith(enablePrayerTimesNotifications: value as bool);
-            break;
-          case 'enableAthkarNotifications':
-            _settings = _settings!.copyWith(enableAthkarNotifications: value as bool);
-            break;
-          case 'enableDarkMode':
-            _settings = _settings!.copyWith(enableDarkMode: value as bool);
-            break;
-          case 'language':
-            _settings = _settings!.copyWith(language: value as String);
-            break;
-          case 'calculationMethod':
-            _settings = _settings!.copyWith(calculationMethod: value as int);
-            break;
-          case 'asrMethod':
-            _settings = _settings!.copyWith(asrMethod: value as int);
-            break;
-          case 'respectBatteryOptimizations':
-            _settings = _settings!.copyWith(respectBatteryOptimizations: value as bool);
-            break;
-          case 'respectDoNotDisturb':
-            _settings = _settings!.copyWith(respectDoNotDisturb: value as bool);
-            break;
-          case 'enableHighPriorityForPrayers':
-            _settings = _settings!.copyWith(enableHighPriorityForPrayers: value as bool);
-            break;
-          case 'enableSilentMode':
-            _settings = _settings!.copyWith(enableSilentMode: value as bool);
-            break;
-          case 'lowBatteryThreshold':
-            _settings = _settings!.copyWith(lowBatteryThreshold: value as int);
-            break;
-          case 'showAthkarReminders':
-            _settings = _settings!.copyWith(showAthkarReminders: value as bool);
-            break;
-          case 'morningAthkarTime':
-            _settings = _settings!.copyWith(morningAthkarTime: value as List<int>);
-            break;
-          case 'eveningAthkarTime':
-            _settings = _settings!.copyWith(eveningAthkarTime: value as List<int>);
-            break;
+        final newSettings = _updateLocalSettings(key, value);
+        
+        // تحديث إعدادات خدمة الإشعارات إذا لزم الأمر
+        if (_isNotificationRelatedSetting(key)) {
+          await _updateNotificationServiceSettings();
         }
         
-        // تحديث إعدادات خدمة الإشعارات
-        await _updateNotificationServiceSettings();
+        // تحديث إعدادات خدمة البطارية إذا لزم الأمر
+        if (key == 'lowBatteryThreshold') {
+          await _updateBatteryServiceSettings();
+        }
+        
+        // إعادة جدولة الإشعارات إذا لزم الأمر
+        if (_shouldRescheduleNotificationForKey(key)) {
+          await _notificationScheduler.scheduleAllNotifications(newSettings);
+        }
       }
       
       _isLoading = false;
@@ -151,6 +159,97 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
   
+  // تحديث الإعدادات المحلية
+  Settings _updateLocalSettings(String key, dynamic value) {
+    switch (key) {
+      case 'enableNotifications':
+        _settings = _settings!.copyWith(enableNotifications: value as bool);
+        break;
+      case 'enablePrayerTimesNotifications':
+        _settings = _settings!.copyWith(enablePrayerTimesNotifications: value as bool);
+        break;
+      case 'enableAthkarNotifications':
+        _settings = _settings!.copyWith(enableAthkarNotifications: value as bool);
+        break;
+      case 'enableDarkMode':
+        _settings = _settings!.copyWith(enableDarkMode: value as bool);
+        break;
+      case 'language':
+        _settings = _settings!.copyWith(language: value as String);
+        break;
+      case 'calculationMethod':
+        _settings = _settings!.copyWith(calculationMethod: value as int);
+        break;
+      case 'asrMethod':
+        _settings = _settings!.copyWith(asrMethod: value as int);
+        break;
+      case 'respectBatteryOptimizations':
+        _settings = _settings!.copyWith(respectBatteryOptimizations: value as bool);
+        break;
+      case 'respectDoNotDisturb':
+        _settings = _settings!.copyWith(respectDoNotDisturb: value as bool);
+        break;
+      case 'enableHighPriorityForPrayers':
+        _settings = _settings!.copyWith(enableHighPriorityForPrayers: value as bool);
+        break;
+      case 'enableSilentMode':
+        _settings = _settings!.copyWith(enableSilentMode: value as bool);
+        break;
+      case 'lowBatteryThreshold':
+        _settings = _settings!.copyWith(lowBatteryThreshold: value as int);
+        break;
+      case 'showAthkarReminders':
+        _settings = _settings!.copyWith(showAthkarReminders: value as bool);
+        break;
+      case 'morningAthkarTime':
+        _settings = _settings!.copyWith(morningAthkarTime: value as List<int>);
+        break;
+      case 'eveningAthkarTime':
+        _settings = _settings!.copyWith(eveningAthkarTime: value as List<int>);
+        break;
+      case 'useCustomSounds':
+        _settings = _settings!.copyWith(useCustomSounds: value as bool);
+        break;
+      case 'notificationSounds':
+        _settings = _settings!.copyWith(notificationSounds: value as Map<String, String>);
+        break;
+      case 'enableActionButtons':
+        _settings = _settings!.copyWith(enableActionButtons: value as bool);
+        break;
+    }
+    return _settings!;
+  }
+  
+  // التحقق مما إذا كان الإعداد متعلق بالإشعارات
+  bool _isNotificationRelatedSetting(String key) {
+    return [
+      'enableNotifications',
+      'enablePrayerTimesNotifications',
+      'enableAthkarNotifications',
+      'respectBatteryOptimizations',
+      'respectDoNotDisturb',
+      'enableHighPriorityForPrayers',
+      'enableSilentMode',
+    ].contains(key);
+  }
+  
+  // التحقق مما إذا كان يجب إعادة جدولة الإشعارات لهذا الإعداد
+  bool _shouldRescheduleNotificationForKey(String key) {
+    return [
+      'enableNotifications',
+      'enablePrayerTimesNotifications',
+      'enableAthkarNotifications',
+      'morningAthkarTime',
+      'eveningAthkarTime',
+      'showAthkarReminders',
+      'useCustomSounds',
+      'notificationSounds',
+      'enableActionButtons',
+      'calculationMethod',
+      'asrMethod',
+    ].contains(key);
+  }
+  
   // تحديث إعدادات خدمة الإشعارات
   Future<void> _updateNotificationServiceSettings() async {
     if (_settings == null) return;
@@ -158,5 +257,25 @@ class SettingsProvider extends ChangeNotifier {
     // تحديث إعدادات احترام البطارية ووضع عدم الإزعاج
     await _notificationService.setRespectBatteryOptimizations(_settings!.respectBatteryOptimizations);
     await _notificationService.setRespectDoNotDisturb(_settings!.respectDoNotDisturb);
+  }
+  
+  // تحديث إعدادات خدمة البطارية
+  Future<void> _updateBatteryServiceSettings() async {
+    if (_settings == null) return;
+    
+    // تحديث الحد الأدنى لمستوى البطارية
+    await _batteryService.setMinimumBatteryLevel(_settings!.lowBatteryThreshold);
+  }
+  
+  // إعادة جدولة جميع الإشعارات
+  Future<void> rescheduleAllNotifications() async {
+    if (_settings == null) return;
+    
+    await _notificationScheduler.rescheduleAllNotifications(_settings!);
+  }
+  
+  // الحصول على حالة الإشعارات
+  Future<Map<String, dynamic>> getNotificationStatus() async {
+    return await _notificationScheduler.getNotificationStatus();
   }
 }

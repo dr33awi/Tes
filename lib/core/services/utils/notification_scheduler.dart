@@ -1,11 +1,12 @@
-// lib/core/utils/notification_scheduler.dart
-import 'package:athkar_app/app/di/service_locator.dart';
-import 'package:athkar_app/core/services/interfaces/battery_service.dart';
-import 'package:athkar_app/core/services/interfaces/do_not_disturb_service.dart';
-import 'package:athkar_app/core/services/interfaces/notification_service.dart';
-import 'package:athkar_app/core/services/interfaces/prayer_times_service.dart';
-import 'package:athkar_app/domain/entities/settings.dart';
+// lib/core/services/utils/notification_scheduler.dart
 import 'package:flutter/material.dart';
+import '../../../app/di/service_locator.dart';
+import '../../../core/services/interfaces/battery_service.dart';
+import '../../../core/services/interfaces/do_not_disturb_service.dart';
+import '../../../core/services/interfaces/notification_service.dart';
+import '../../../core/services/interfaces/prayer_times_service.dart';
+import '../../../domain/entities/settings.dart';
+
 /// مساعد لجدولة الإشعارات المختلفة في التطبيق
 class NotificationScheduler {
   final NotificationService _notificationService = getIt<NotificationService>();
@@ -13,27 +14,41 @@ class NotificationScheduler {
   final DoNotDisturbService _doNotDisturbService = getIt<DoNotDisturbService>();
   final PrayerTimesService _prayerTimesService = getIt<PrayerTimesService>();
   
+  // تخزين معرفات الإشعارات التي تم جدولتها
+  final Set<int> _scheduledNotificationIds = {};
+  
   /// جدولة جميع الإشعارات بناءً على الإعدادات
   Future<void> scheduleAllNotifications(Settings settings) async {
-    if (!settings.enableNotifications) return;
-    
-    // إلغاء جميع الإشعارات السابقة
-    await _notificationService.cancelAllNotifications();
+    if (!settings.enableNotifications) {
+      // إلغاء جميع الإشعارات السابقة
+      await _notificationService.cancelAllNotifications();
+      _scheduledNotificationIds.clear();
+      return;
+    }
     
     // جدولة إشعارات الأذكار
     if (settings.enableAthkarNotifications) {
       await _scheduleAthkarNotifications(settings);
+    } else {
+      // إلغاء إشعارات الأذكار فقط
+      await _cancelNotificationsByType('athkar');
     }
     
     // جدولة إشعارات مواقيت الصلاة
     if (settings.enablePrayerTimesNotifications) {
       await _schedulePrayerNotifications(settings);
+    } else {
+      // إلغاء إشعارات مواقيت الصلاة فقط
+      await _cancelNotificationsByType('prayer');
     }
   }
   
   /// جدولة إشعارات الأذكار
   Future<void> _scheduleAthkarNotifications(Settings settings) async {
-    if (!settings.showAthkarReminders) return;
+    if (!settings.showAthkarReminders) {
+      await _cancelNotificationsByType('athkar');
+      return;
+    }
     
     // إشعار أذكار الصباح
     final DateTime now = DateTime.now();
@@ -53,6 +68,29 @@ class NotificationScheduler {
       morningTime = morningTime.add(const Duration(days: 1));
     }
     
+    // إعداد إجراءات الإشعار
+    final List<NotificationAction> morningActions = [
+      NotificationAction(
+        id: 'read_now',
+        title: 'قراءة الآن',
+      ),
+      NotificationAction(
+        id: 'remind_later',
+        title: 'تذكير لاحقًا',
+      ),
+    ];
+    
+    // payload يحتوي على معلومات عن الإشعار والشاشة المراد فتحها
+    final Map<String, dynamic> morningPayload = {
+      'type': 'athkar',
+      'category': 'morning',
+      'route': '/athkar-details',
+      'arguments': {
+        'categoryId': 'morning',
+        'categoryName': 'أذكار الصباح',
+      }
+    };
+    
     final NotificationData morningNotification = NotificationData(
       id: 1001,
       title: 'أذكار الصباح',
@@ -60,12 +98,25 @@ class NotificationScheduler {
       scheduledDate: morningTime,
       repeatInterval: NotificationRepeatInterval.daily,
       notificationTime: NotificationTime.morning,
-      priority: NotificationPriority.normal,
+      priority: settings.enableHighPriorityForPrayers 
+          ? NotificationPriority.high 
+          : NotificationPriority.normal,
       respectBatteryOptimizations: settings.respectBatteryOptimizations,
       respectDoNotDisturb: settings.respectDoNotDisturb,
+      channelId: 'athkar_channel',
+      soundName: settings.enableSilentMode ? null : 'athkar_sound',
+      payload: morningPayload,
     );
     
-    await _notificationService.scheduleRepeatingNotification(morningNotification);
+    // محاولة جدولة الإشعار مع الإجراءات
+    final scheduled = await _notificationService.scheduleNotificationWithActions(
+      morningNotification,
+      morningActions,
+    );
+    
+    if (scheduled) {
+      _scheduledNotificationIds.add(1001);
+    }
     
     // إشعار أذكار المساء
     final int eveningHour = settings.eveningAthkarTime[0];
@@ -84,6 +135,29 @@ class NotificationScheduler {
       eveningTime = eveningTime.add(const Duration(days: 1));
     }
     
+    // إعداد إجراءات الإشعار
+    final List<NotificationAction> eveningActions = [
+      NotificationAction(
+        id: 'read_now',
+        title: 'قراءة الآن',
+      ),
+      NotificationAction(
+        id: 'remind_later',
+        title: 'تذكير لاحقًا',
+      ),
+    ];
+    
+    // payload يحتوي على معلومات عن الإشعار والشاشة المراد فتحها
+    final Map<String, dynamic> eveningPayload = {
+      'type': 'athkar',
+      'category': 'evening',
+      'route': '/athkar-details',
+      'arguments': {
+        'categoryId': 'evening',
+        'categoryName': 'أذكار المساء',
+      }
+    };
+    
     final NotificationData eveningNotification = NotificationData(
       id: 1002,
       title: 'أذكار المساء',
@@ -91,12 +165,24 @@ class NotificationScheduler {
       scheduledDate: eveningTime,
       repeatInterval: NotificationRepeatInterval.daily,
       notificationTime: NotificationTime.evening,
-      priority: NotificationPriority.normal,
+      priority: settings.enableHighPriorityForPrayers 
+          ? NotificationPriority.high 
+          : NotificationPriority.normal,
       respectBatteryOptimizations: settings.respectBatteryOptimizations,
       respectDoNotDisturb: settings.respectDoNotDisturb,
+      channelId: 'athkar_channel',
+      soundName: settings.enableSilentMode ? null : 'athkar_sound',
+      payload: eveningPayload,
     );
     
-    await _notificationService.scheduleRepeatingNotification(eveningNotification);
+    final scheduledEvening = await _notificationService.scheduleNotificationWithActions(
+      eveningNotification,
+      eveningActions,
+    );
+    
+    if (scheduledEvening) {
+      _scheduledNotificationIds.add(1002);
+    }
   }
   
   /// جدولة إشعارات مواقيت الصلاة
@@ -123,51 +209,57 @@ class NotificationScheduler {
         params: params,
       );
       
+      // قائمة بالصلوات لجدولة إشعاراتها
+      final prayerInfo = [
+        {
+          'prayer': 'الفجر', 
+          'time': prayerTimes.fajr, 
+          'id': 2001, 
+          'reminder_id': 2101,
+          'notification_time': NotificationTime.fajr,
+        },
+        {
+          'prayer': 'الظهر', 
+          'time': prayerTimes.dhuhr, 
+          'id': 2002, 
+          'reminder_id': 2102,
+          'notification_time': NotificationTime.dhuhr,
+        },
+        {
+          'prayer': 'العصر', 
+          'time': prayerTimes.asr, 
+          'id': 2003, 
+          'reminder_id': 2103,
+          'notification_time': NotificationTime.asr,
+        },
+        {
+          'prayer': 'المغرب', 
+          'time': prayerTimes.maghrib, 
+          'id': 2004, 
+          'reminder_id': 2104,
+          'notification_time': NotificationTime.maghrib,
+        },
+        {
+          'prayer': 'العشاء', 
+          'time': prayerTimes.isha, 
+          'id': 2005, 
+          'reminder_id': 2105,
+          'notification_time': NotificationTime.isha,
+        },
+      ];
+      
       // جدولة إشعارات لكل صلاة
-      await _schedulePrayerNotification(
-        prayerTimes.fajr,
-        'الفجر',
-        'حان وقت صلاة الفجر',
-        2001,
-        NotificationTime.fajr,
-        settings,
-      );
-      
-      await _schedulePrayerNotification(
-        prayerTimes.dhuhr,
-        'الظهر',
-        'حان وقت صلاة الظهر',
-        2002,
-        NotificationTime.dhuhr,
-        settings,
-      );
-      
-      await _schedulePrayerNotification(
-        prayerTimes.asr,
-        'العصر',
-        'حان وقت صلاة العصر',
-        2003,
-        NotificationTime.asr,
-        settings,
-      );
-      
-      await _schedulePrayerNotification(
-        prayerTimes.maghrib,
-        'المغرب',
-        'حان وقت صلاة المغرب',
-        2004,
-        NotificationTime.maghrib,
-        settings,
-      );
-      
-      await _schedulePrayerNotification(
-        prayerTimes.isha,
-        'العشاء',
-        'حان وقت صلاة العشاء',
-        2005,
-        NotificationTime.isha,
-        settings,
-      );
+      for (final prayer in prayerInfo) {
+        await _schedulePrayerNotification(
+          prayer['time'] as DateTime,
+          prayer['prayer'] as String,
+          'حان وقت صلاة ${prayer['prayer']}',
+          prayer['id'] as int,
+          prayer['notification_time'] as NotificationTime,
+          prayer['reminder_id'] as int,
+          settings,
+        );
+      }
     } catch (e) {
       debugPrint('حدث خطأ أثناء جدولة إشعارات الصلاة: $e');
     }
@@ -180,6 +272,7 @@ class NotificationScheduler {
     String body,
     int id,
     NotificationTime notificationTime,
+    int reminderId,
     Settings settings,
   ) async {
     // التحقق مما إذا كان وقت الصلاة قد فات
@@ -200,10 +293,30 @@ class NotificationScheduler {
     // تعيين تذكير قبل وقت الصلاة بـ 15 دقيقة
     final DateTime reminderTime = scheduledTime.subtract(const Duration(minutes: 15));
     
+    // إعداد إجراءات الإشعار
+    final List<NotificationAction> prayerActions = [
+      NotificationAction(
+        id: 'view_prayer_times',
+        title: 'عرض المواقيت',
+      ),
+      NotificationAction(
+        id: 'dismiss',
+        title: 'إغلاق',
+        cancelNotification: true,
+      ),
+    ];
+    
+    // payload يحتوي على معلومات عن الإشعار والشاشة المراد فتحها
+    final Map<String, dynamic> prayerPayload = {
+      'type': 'prayer',
+      'prayer_name': prayerName,
+      'route': '/prayer-times',
+    };
+    
     // جدولة تذكير قبل الصلاة
     if (reminderTime.isAfter(now)) {
       final NotificationData reminderNotification = NotificationData(
-        id: id + 100, // معرف مختلف للتذكير
+        id: reminderId,
         title: 'تذكير: صلاة $prayerName',
         body: 'سيحين وقت صلاة $prayerName بعد 15 دقيقة',
         scheduledDate: reminderTime,
@@ -213,9 +326,15 @@ class NotificationScheduler {
             : NotificationPriority.normal,
         respectBatteryOptimizations: settings.respectBatteryOptimizations,
         respectDoNotDisturb: false, // دائماً إظهار تذكير الصلاة حتى في وضع عدم الإزعاج
+        channelId: 'prayer_channel',
+        soundName: settings.enableSilentMode ? null : 'prayer_reminder_sound',
+        payload: prayerPayload,
       );
       
-      await _notificationService.scheduleNotification(reminderNotification);
+      final scheduledReminder = await _notificationService.scheduleNotification(reminderNotification);
+      if (scheduledReminder) {
+        _scheduledNotificationIds.add(reminderId);
+      }
     }
     
     // جدولة إشعار وقت الصلاة
@@ -231,9 +350,24 @@ class NotificationScheduler {
           : NotificationPriority.normal,
       respectBatteryOptimizations: settings.respectBatteryOptimizations,
       respectDoNotDisturb: false, // دائماً إظهار إشعار الصلاة حتى في وضع عدم الإزعاج
+      channelId: 'prayer_channel',
+      soundName: settings.enableSilentMode ? null : 'prayer_sound',
+      payload: prayerPayload,
     );
     
-    await _notificationService.scheduleRepeatingNotification(prayerNotification);
+    final scheduledPrayer = await _notificationService.scheduleNotificationWithActions(
+      prayerNotification,
+      prayerActions,
+    );
+    
+    if (scheduledPrayer) {
+      _scheduledNotificationIds.add(id);
+    }
+  }
+  
+  /// إلغاء الإشعارات حسب النوع
+  Future<void> _cancelNotificationsByType(String type) async {
+    await _notificationService.cancelNotificationsByTag(type);
   }
   
   /// تحويل رقم طريقة الحساب إلى اسم الطريقة المناسب
@@ -264,5 +398,28 @@ class NotificationScheduler {
       default:
         return 'muslim_world_league';
     }
+  }
+  
+  /// التحقق من حالة الإشعارات
+  Future<Map<String, dynamic>> getNotificationStatus() async {
+    final bool canSendNow = await _notificationService.canSendNotificationsNow();
+    final bool hasPermission = await _notificationService.requestPermission();
+    final bool batteryOptimizationEnabled = await _batteryService.isPowerSaveMode();
+    final bool dndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
+    
+    return {
+      'can_send_now': canSendNow,
+      'has_permission': hasPermission,
+      'battery_optimization_enabled': batteryOptimizationEnabled,
+      'dnd_enabled': dndEnabled,
+      'scheduled_notifications_count': _scheduledNotificationIds.length,
+    };
+  }
+  
+  /// إعادة جدولة جميع الإشعارات
+  Future<void> rescheduleAllNotifications(Settings settings) async {
+    await _notificationService.cancelAllNotifications();
+    _scheduledNotificationIds.clear();
+    await scheduleAllNotifications(settings);
   }
 }

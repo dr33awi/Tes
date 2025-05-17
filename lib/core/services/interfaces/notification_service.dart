@@ -24,7 +24,15 @@ enum NotificationTime {
 enum NotificationPriority {
   low,
   normal,
-  high
+  high,
+  critical
+}
+
+/// ظهور الإشعار في شاشة القفل (استخدام اسم مختلف لتجنب التعارض)
+enum NotificationVisibility {
+  public,   // ظاهر تمامًا
+  secret,   // مخفي تمامًا
+  private,  // يظهر عنوان الإشعار فقط
 }
 
 /// بيانات الإشعار
@@ -39,6 +47,12 @@ class NotificationData {
   final bool respectBatteryOptimizations;
   final bool respectDoNotDisturb;
   
+  // إضافة خيارات جديدة
+  final String? soundName;
+  final String channelId;
+  final Map<String, dynamic>? payload;
+  final NotificationVisibility visibility;
+
   NotificationData({
     required this.id,
     required this.title,
@@ -49,6 +63,25 @@ class NotificationData {
     this.priority = NotificationPriority.normal,
     this.respectBatteryOptimizations = true,
     this.respectDoNotDisturb = true,
+    this.soundName,
+    this.channelId = 'default_channel',
+    this.payload,
+    this.visibility = NotificationVisibility.public,
+  });
+}
+
+/// كلاس لتمثيل إجراء الإشعار
+class NotificationAction {
+  final String id;
+  final String title;
+  final bool showsUserInterface;
+  final bool cancelNotification;
+
+  NotificationAction({
+    required this.id,
+    required this.title,
+    this.showsUserInterface = true,
+    this.cancelNotification = false,
   });
 }
 
@@ -60,32 +93,44 @@ abstract class NotificationService {
   Future<bool> requestPermission();
   
   /// جدولة إشعار في وقت محدد
-  /// 
-  /// يمكن تحديد تكرار الإشعار من خلال [repeatInterval]
-  /// ويمكن تحديد أولوية الإشعار من خلال [priority]
-  /// ويمكن تحديد ما إذا كان الإشعار يحترم إعدادات البطارية من خلال [respectBatteryOptimizations]
-  /// ويمكن تحديد ما إذا كان الإشعار يحترم وضع عدم الإزعاج من خلال [respectDoNotDisturb]
   Future<bool> scheduleNotification(NotificationData notification);
   
   /// جدولة إشعار متكرر في وقت محدد
   Future<bool> scheduleRepeatingNotification(NotificationData notification);
   
+  /// جدولة إشعار مع مراعاة المنطقة الزمنية
+  Future<bool> scheduleNotificationInTimeZone(
+    NotificationData notification, 
+    String timeZone
+  );
+  
+  /// جدولة إشعار مع إجراءات تفاعلية
+  Future<bool> scheduleNotificationWithActions(
+    NotificationData notification,
+    List<NotificationAction> actions,
+  );
+  
   /// إلغاء إشعار محدد
   Future<void> cancelNotification(int id);
+  
+  /// إلغاء مجموعة من الإشعارات بواسطة معرفاتها
+  Future<void> cancelNotificationsByIds(List<int> ids);
+  
+  /// إلغاء إشعارات بواسطة علامة
+  Future<void> cancelNotificationsByTag(String tag);
   
   /// إلغاء جميع الإشعارات
   Future<void> cancelAllNotifications();
   
   /// تعيين استراتيجية إرسال الإشعارات حسب حالة البطارية
-  /// 
-  /// إذا كانت [enabled] تساوي true، فسيتم التحقق من حالة البطارية قبل إرسال الإشعارات
   Future<void> setRespectBatteryOptimizations(bool enabled);
   
   /// تعيين استراتيجية إرسال الإشعارات حسب وضع عدم الإزعاج
-  /// 
-  /// إذا كانت [enabled] تساوي true، فلن يتم إرسال الإشعارات عندما يكون وضع عدم الإزعاج مفعلاً
   Future<void> setRespectDoNotDisturb(bool enabled);
   
   /// التحقق مما إذا كان يمكن إرسال الإشعارات حاليًا
   Future<bool> canSendNotificationsNow();
+  
+  /// تنظيف الموارد عند الانتهاء
+  Future<void> dispose();
 }

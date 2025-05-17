@@ -35,6 +35,9 @@ Future<void> main() async {
     // جدولة الإشعارات بناءً على الإعدادات المحفوظة
     await _scheduleNotifications();
     
+    // تسجيل Observer لمراقبة دورة حياة التطبيق
+    WidgetsBinding.instance.addObserver(AppLifecycleObserver());
+    
     runApp(const AthkarApp());
   } catch (e) {
     runApp(
@@ -79,7 +82,7 @@ Future<void> _scheduleNotifications() async {
     
     // جدولة الإشعارات
     if (settings.enableNotifications) {
-      final notificationScheduler = NotificationScheduler();
+      final notificationScheduler = getIt<NotificationScheduler>();
       await notificationScheduler.scheduleAllNotifications(settings);
     }
   } catch (e) {
@@ -90,4 +93,47 @@ Future<void> _scheduleNotifications() async {
 // خدمة التنقل للوصول إلى السياق العام للتطبيق
 class NavigationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+}
+
+/// مراقب دورة حياة التطبيق لتنظيف الموارد عند إغلاق التطبيق
+class AppLifecycleObserver extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      // عندما يتم إغلاق التطبيق نهائيًا
+      _disposeResources();
+    }
+  }
+  
+  /// تنظيف الموارد عند إغلاق التطبيق
+  Future<void> _disposeResources() async {
+    try {
+      debugPrint('Disposing resources...');
+      
+      // تنظيف موارد خدمة الإشعارات
+      final notificationService = getIt<NotificationService>();
+      await notificationService.dispose();
+      
+      // تنظيف موارد جميع الخدمات
+      await ServiceLocator().dispose();
+      
+      debugPrint('Resources disposed successfully');
+    } catch (e) {
+      debugPrint('Error disposing resources: $e');
+    }
+  }
+}
+
+/// تسجيل الخروج من التطبيق
+class AppShutdownManager {
+  static Future<bool> shutdownApp() async {
+    try {
+      // تنظيف الموارد
+      await ServiceLocator().dispose();
+      return true;
+    } catch (e) {
+      debugPrint('Error during app shutdown: $e');
+      return false;
+    }
+  }
 }

@@ -9,7 +9,8 @@ class BatteryServiceImpl implements app_battery.BatteryService {
       StreamController<app_battery.BatteryState>.broadcast();
   
   // الحد الأدنى لمستوى البطارية لإرسال الإشعارات
-  final int _minimumBatteryLevel = 15;
+  int _minimumBatteryLevel = 15;
+  StreamSubscription? _batterySubscription;
   
   BatteryServiceImpl() {
     // تسجيل المراقبة لتغييرات البطارية
@@ -18,7 +19,7 @@ class BatteryServiceImpl implements app_battery.BatteryService {
   
   void _initBatteryStateListener() {
     // مراقبة مستوى البطارية
-    _battery.onBatteryStateChanged.listen((BatteryState state) async {
+    _batterySubscription = _battery.onBatteryStateChanged.listen((BatteryState state) async {
       final int level = await getBatteryLevel();
       final bool charging = await isCharging();
       final bool powerSaveMode = await isPowerSaveMode();
@@ -88,12 +89,20 @@ class BatteryServiceImpl implements app_battery.BatteryService {
   }
   
   @override
+  Future<void> setMinimumBatteryLevel(int level) async {
+    if (level >= 5 && level <= 30) {
+      _minimumBatteryLevel = level;
+    }
+  }
+  
+  @override
   Stream<app_battery.BatteryState> getBatteryStateStream() {
     return _batteryStateController.stream;
   }
   
   /// إغلاق الموارد عند الانتهاء
   Future<void> dispose() async {
+    await _batterySubscription?.cancel();
     await _batteryStateController.close();
   }
 }

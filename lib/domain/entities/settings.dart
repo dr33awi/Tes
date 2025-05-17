@@ -17,11 +17,14 @@ class Settings {
   final bool enableHighPriorityForPrayers;
   final bool enableSilentMode;
   final int lowBatteryThreshold;
+  final bool useCustomSounds;
+  final Map<String, String> notificationSounds;
   
   // إعدادات الأذكار
   final bool showAthkarReminders;
   final List<int> morningAthkarTime; // [hour, minute]
   final List<int> eveningAthkarTime; // [hour, minute]
+  final bool enableActionButtons;
 
   Settings({
     this.enableNotifications = true,
@@ -39,6 +42,14 @@ class Settings {
     this.showAthkarReminders = true,
     this.morningAthkarTime = const [5, 0], // 5:00 صباحًا
     this.eveningAthkarTime = const [17, 0], // 5:00 مساءً
+    this.useCustomSounds = false,
+    this.notificationSounds = const {
+      'prayer': 'adhan_sound',
+      'athkar_morning': 'morning_athkar_sound',
+      'athkar_evening': 'evening_athkar_sound',
+      'reminder': 'reminder_sound',
+    },
+    this.enableActionButtons = true,
   });
 
   Settings copyWith({
@@ -57,6 +68,9 @@ class Settings {
     bool? showAthkarReminders,
     List<int>? morningAthkarTime,
     List<int>? eveningAthkarTime,
+    bool? useCustomSounds,
+    Map<String, String>? notificationSounds,
+    bool? enableActionButtons,
   }) {
     return Settings(
       enableNotifications: enableNotifications ?? this.enableNotifications,
@@ -74,6 +88,9 @@ class Settings {
       showAthkarReminders: showAthkarReminders ?? this.showAthkarReminders,
       morningAthkarTime: morningAthkarTime ?? this.morningAthkarTime,
       eveningAthkarTime: eveningAthkarTime ?? this.eveningAthkarTime,
+      useCustomSounds: useCustomSounds ?? this.useCustomSounds,
+      notificationSounds: notificationSounds ?? this.notificationSounds,
+      enableActionButtons: enableActionButtons ?? this.enableActionButtons,
     );
   }
 }
