@@ -1,4 +1,5 @@
 // lib/app/di/service_locator.dart
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/interfaces/notification_service.dart';
@@ -9,6 +10,10 @@ import '../../core/services/interfaces/prayer_times_service.dart';
 import '../../core/services/implementations/prayer_times_service_impl.dart';
 import '../../core/services/interfaces/qibla_service.dart';
 import '../../core/services/implementations/qibla_service_impl.dart';
+import '../../core/services/interfaces/battery_service.dart';
+import '../../core/services/implementations/battery_service_impl.dart';
+import '../../core/services/interfaces/do_not_disturb_service.dart';
+import '../../core/services/implementations/do_not_disturb_service_impl.dart';
 import '../../data/datasources/local/athkar_local_data_source.dart';
 import '../../data/datasources/local/settings_local_data_source.dart';
 import '../../data/repositories/athkar_repository_impl.dart';
@@ -40,14 +45,31 @@ class ServiceLocator {
     // External Services
     final sharedPreferences = await SharedPreferences.getInstance();
     getIt.registerSingleton<SharedPreferences>(sharedPreferences);
+    
+    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    getIt.registerSingleton<FlutterLocalNotificationsPlugin>(flutterLocalNotificationsPlugin);
 
     // Core Services
     getIt.registerSingleton<StorageService>(
       StorageServiceImpl(sharedPreferences),
     );
     
+    // تسجيل الخدمات الجديدة
+    getIt.registerSingleton<BatteryService>(
+      BatteryServiceImpl(),
+    );
+    
+    getIt.registerSingleton<DoNotDisturbService>(
+      DoNotDisturbServiceImpl(),
+    );
+    
+    // تسجيل خدمة الإشعارات مع الخدمات الجديدة
     getIt.registerSingleton<NotificationService>(
-      NotificationServiceImpl(),
+      NotificationServiceImpl(
+        flutterLocalNotificationsPlugin,
+        getIt<BatteryService>(),
+        getIt<DoNotDisturbService>(),
+      ),
     );
     
     getIt.registerSingleton<PrayerTimesService>(
@@ -87,6 +109,9 @@ class ServiceLocator {
     getIt.registerLazySingleton(() => GetQiblaDirection(getIt<PrayerTimesRepository>()));
     getIt.registerLazySingleton(() => GetSettings(getIt<SettingsRepository>()));
     getIt.registerLazySingleton(() => UpdateSettings(getIt<SettingsRepository>()));
+
+    // تهيئة خدمة الإشعارات
+    await getIt<NotificationService>().initialize();
 
     _isInitialized = true;
   }

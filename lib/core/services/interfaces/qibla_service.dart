@@ -1,3 +1,4 @@
+
 // lib/core/services/interfaces/qibla_service.dart
 import 'dart:async';
 
@@ -17,6 +18,12 @@ abstract class QiblaService {
     required double longitude,
   });
   
+  /// تحديث موقع المستخدم
+  Future<void> updateUserLocation(double latitude, double longitude);
+  
   /// التحقق من توفر البوصلة على الجهاز
   Future<bool> isCompassAvailable();
+  
+  /// إلغاء الاشتراكات وتنظيف الموارد
+  void dispose();
 }

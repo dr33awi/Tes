@@ -1,3 +1,4 @@
+// lib/domain/repositories/athkar_repository.dart
 import '../entities/athkar.dart';
 
 abstract class AthkarRepository {

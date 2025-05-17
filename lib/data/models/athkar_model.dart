@@ -1,4 +1,5 @@
-import '../../../domain/entities/athkar.dart';
+// lib/data/models/athkar_model.dart
+import '../../domain/entities/athkar.dart';
 
 class AthkarModel {
   final String id;
@@ -8,6 +9,7 @@ class AthkarModel {
   final String categoryId;
   final String? source;
   final String? notes;
+  final String? fadl;  // أضفنا حقل فضل الذكر
   
   AthkarModel({
     required this.id,
@@ -17,6 +19,7 @@ class AthkarModel {
     required this.categoryId,
     this.source,
     this.notes,
+    this.fadl,
   });
   
   factory AthkarModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +31,7 @@ class AthkarModel {
       categoryId: json['categoryId'],
       source: json['source'],
       notes: json['notes'],
+      fadl: json['fadl'],
     );
   }
   
@@ -40,6 +44,7 @@ class AthkarModel {
       'categoryId': categoryId,
       'source': source,
       'notes': notes,
+      'fadl': fadl,
     };
   }
   
@@ -52,6 +57,7 @@ class AthkarModel {
       categoryId: categoryId,
       source: source,
       notes: notes,
+      fadl: fadl,
     );
   }
 }
@@ -73,8 +79,8 @@ class AthkarCategoryModel {
     return AthkarCategoryModel(
       id: json['id'],
       name: json['name'],
-      description: json['description'],
-      icon: json['icon'],
+      description: json['description'] ?? '',
+      icon: json['icon'] ?? 'auto_awesome',
     );
   }
   

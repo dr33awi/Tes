@@ -49,6 +49,12 @@
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>نحتاج إلى إذن الإشعارات لإعلامك بمواقيت الصلاة والأذكار</string>
 	
+	<!-- أذونات الإشعارات المحلية الجديدة -->
+	<key>NSUserNotificationCenterUsageDescription</key>
+	<string>نحتاج إلى إذن الإشعارات لإعلامك بمواقيت الصلاة والأذكار</string>
+	<key>UNUserNotificationCenterUsageDescription</key>
+	<string>نحتاج إلى إذن الإشعارات لإعلامك بمواقيت الصلاة والأذكار</string>
+	
 	<!-- إذن إشعارات جديد لـ iOS 10 وما بعده -->
 	<key>FIRMessagingAutoInitEnabled</key>
 	<false/>

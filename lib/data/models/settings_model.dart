@@ -1,4 +1,4 @@
-// lib/data/models/settings_model.dart (تكملة)
+// lib/data/models/settings_model.dart
 import '../../domain/entities/settings.dart';
 
 class SettingsModel {
@@ -9,6 +9,18 @@ class SettingsModel {
   final String language;
   final int calculationMethod;
   final int asrMethod;
+  
+  // إعدادات جديدة للإشعارات
+  final bool respectBatteryOptimizations;
+  final bool respectDoNotDisturb;
+  final bool enableHighPriorityForPrayers;
+  final bool enableSilentMode;
+  final int lowBatteryThreshold;
+  
+  // إعدادات الأذكار
+  final bool showAthkarReminders;
+  final List<int> morningAthkarTime; // [hour, minute]
+  final List<int> eveningAthkarTime; // [hour, minute]
 
   SettingsModel({
     required this.enableNotifications,
@@ -18,6 +30,14 @@ class SettingsModel {
     required this.language,
     required this.calculationMethod,
     required this.asrMethod,
+    required this.respectBatteryOptimizations,
+    required this.respectDoNotDisturb,
+    required this.enableHighPriorityForPrayers,
+    required this.enableSilentMode,
+    required this.lowBatteryThreshold,
+    required this.showAthkarReminders,
+    required this.morningAthkarTime,
+    required this.eveningAthkarTime,
   });
 
   // إعدادات افتراضية
@@ -30,6 +50,14 @@ class SettingsModel {
       language: 'ar',
       calculationMethod: 4, // طريقة أم القرى
       asrMethod: 0, // طريقة الشافعي
+      respectBatteryOptimizations: true,
+      respectDoNotDisturb: true,
+      enableHighPriorityForPrayers: true,
+      enableSilentMode: false,
+      lowBatteryThreshold: 15,
+      showAthkarReminders: true,
+      morningAthkarTime: [5, 0], // 5:00 صباحًا
+      eveningAthkarTime: [17, 0], // 5:00 مساءً
     );
   }
 
@@ -43,6 +71,18 @@ class SettingsModel {
       language: json['language'] ?? 'ar',
       calculationMethod: json['calculationMethod'] ?? 4,
       asrMethod: json['asrMethod'] ?? 0,
+      respectBatteryOptimizations: json['respectBatteryOptimizations'] ?? true,
+      respectDoNotDisturb: json['respectDoNotDisturb'] ?? true,
+      enableHighPriorityForPrayers: json['enableHighPriorityForPrayers'] ?? true,
+      enableSilentMode: json['enableSilentMode'] ?? false,
+      lowBatteryThreshold: json['lowBatteryThreshold'] ?? 15,
+      showAthkarReminders: json['showAthkarReminders'] ?? true,
+      morningAthkarTime: json['morningAthkarTime'] != null
+          ? List<int>.from(json['morningAthkarTime'])
+          : [5, 0],
+      eveningAthkarTime: json['eveningAthkarTime'] != null
+          ? List<int>.from(json['eveningAthkarTime'])
+          : [17, 0],
     );
   }
 
@@ -56,6 +96,14 @@ class SettingsModel {
       'language': language,
       'calculationMethod': calculationMethod,
       'asrMethod': asrMethod,
+      'respectBatteryOptimizations': respectBatteryOptimizations,
+      'respectDoNotDisturb': respectDoNotDisturb,
+      'enableHighPriorityForPrayers': enableHighPriorityForPrayers,
+      'enableSilentMode': enableSilentMode,
+      'lowBatteryThreshold': lowBatteryThreshold,
+      'showAthkarReminders': showAthkarReminders,
+      'morningAthkarTime': morningAthkarTime,
+      'eveningAthkarTime': eveningAthkarTime,
     };
   }
 
@@ -69,6 +117,14 @@ class SettingsModel {
       language: language,
       calculationMethod: calculationMethod,
       asrMethod: asrMethod,
+      respectBatteryOptimizations: respectBatteryOptimizations,
+      respectDoNotDisturb: respectDoNotDisturb,
+      enableHighPriorityForPrayers: enableHighPriorityForPrayers,
+      enableSilentMode: enableSilentMode,
+      lowBatteryThreshold: lowBatteryThreshold,
+      showAthkarReminders: showAthkarReminders,
+      morningAthkarTime: morningAthkarTime,
+      eveningAthkarTime: eveningAthkarTime,
     );
   }
 
@@ -82,6 +138,14 @@ class SettingsModel {
       language: settings.language,
       calculationMethod: settings.calculationMethod,
       asrMethod: settings.asrMethod,
+      respectBatteryOptimizations: settings.respectBatteryOptimizations,
+      respectDoNotDisturb: settings.respectDoNotDisturb,
+      enableHighPriorityForPrayers: settings.enableHighPriorityForPrayers,
+      enableSilentMode: settings.enableSilentMode,
+      lowBatteryThreshold: settings.lowBatteryThreshold,
+      showAthkarReminders: settings.showAthkarReminders,
+      morningAthkarTime: settings.morningAthkarTime,
+      eveningAthkarTime: settings.eveningAthkarTime,
     );
   }
 }

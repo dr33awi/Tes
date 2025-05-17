@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../domain/entities/settings.dart';
 import '../../../domain/usecases/settings/get_settings.dart';
 import '../../../domain/usecases/settings/update_settings.dart';
+import '../../../core/services/interfaces/notification_service.dart';
+import '../../../app/di/service_locator.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final GetSettings _getSettings;
   final UpdateSettings _updateSettings;
+  final NotificationService _notificationService = getIt<NotificationService>();
   
   Settings? _settings;
   bool _isLoading = false;
@@ -32,6 +35,10 @@ class SettingsProvider extends ChangeNotifier {
     
     try {
       _settings = await _getSettings();
+      
+      // تحديث إعدادات خدمة الإشعارات
+      await _updateNotificationServiceSettings();
+      
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -51,6 +58,9 @@ class SettingsProvider extends ChangeNotifier {
       final success = await _updateSettings(newSettings);
       if (success) {
         _settings = newSettings;
+        
+        // تحديث إعدادات خدمة الإشعارات
+        await _updateNotificationServiceSettings();
       }
       
       _isLoading = false;
@@ -98,7 +108,34 @@ class SettingsProvider extends ChangeNotifier {
           case 'asrMethod':
             _settings = _settings!.copyWith(asrMethod: value as int);
             break;
+          case 'respectBatteryOptimizations':
+            _settings = _settings!.copyWith(respectBatteryOptimizations: value as bool);
+            break;
+          case 'respectDoNotDisturb':
+            _settings = _settings!.copyWith(respectDoNotDisturb: value as bool);
+            break;
+          case 'enableHighPriorityForPrayers':
+            _settings = _settings!.copyWith(enableHighPriorityForPrayers: value as bool);
+            break;
+          case 'enableSilentMode':
+            _settings = _settings!.copyWith(enableSilentMode: value as bool);
+            break;
+          case 'lowBatteryThreshold':
+            _settings = _settings!.copyWith(lowBatteryThreshold: value as int);
+            break;
+          case 'showAthkarReminders':
+            _settings = _settings!.copyWith(showAthkarReminders: value as bool);
+            break;
+          case 'morningAthkarTime':
+            _settings = _settings!.copyWith(morningAthkarTime: value as List<int>);
+            break;
+          case 'eveningAthkarTime':
+            _settings = _settings!.copyWith(eveningAthkarTime: value as List<int>);
+            break;
         }
+        
+        // تحديث إعدادات خدمة الإشعارات
+        await _updateNotificationServiceSettings();
       }
       
       _isLoading = false;
@@ -112,5 +149,14 @@ class SettingsProvider extends ChangeNotifier {
       
       return false;
     }
+  }
+  
+  // تحديث إعدادات خدمة الإشعارات
+  Future<void> _updateNotificationServiceSettings() async {
+    if (_settings == null) return;
+    
+    // تحديث إعدادات احترام البطارية ووضع عدم الإزعاج
+    await _notificationService.setRespectBatteryOptimizations(_settings!.respectBatteryOptimizations);
+    await _notificationService.setRespectDoNotDisturb(_settings!.respectDoNotDisturb);
   }
 }

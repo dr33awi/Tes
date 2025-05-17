@@ -1,6 +1,6 @@
 // lib/data/repositories/prayer_times_repository_impl.dart
 import '../../core/services/interfaces/prayer_times_service.dart';
-import '../../core/services/interfaces/qibla_service.dart';
+import '../../domain/entities/prayer_times.dart';
 import '../../domain/repositories/prayer_times_repository.dart';
 
 class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
@@ -12,10 +12,14 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
   Future<PrayerTimes> getPrayerTimes({
     required DateTime date,
     required PrayerTimesCalculationParams params,
+    required double latitude,
+    required double longitude,
   }) async {
     return await _prayerTimesService.getPrayerTimes(
       date: date,
       params: params,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 
@@ -24,11 +28,15 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
     required DateTime startDate,
     required DateTime endDate,
     required PrayerTimesCalculationParams params,
+    required double latitude,
+    required double longitude,
   }) async {
     return await _prayerTimesService.getPrayerTimesForRange(
       startDate: startDate,
       endDate: endDate,
       params: params,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 

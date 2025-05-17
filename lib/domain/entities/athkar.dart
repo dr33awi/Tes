@@ -1,3 +1,4 @@
+// lib/domain/entities/athkar.dart
 class Athkar {
   final String id;
   final String title;
@@ -6,6 +7,7 @@ class Athkar {
   final String categoryId;
   final String? source;
   final String? notes;
+  final String? fadl;  // أضفنا حقل فضل الذكر
   
   Athkar({
     required this.id,
@@ -15,6 +17,7 @@ class Athkar {
     required this.categoryId,
     this.source,
     this.notes,
+    this.fadl,
   });
 }
 

@@ -1,7 +1,10 @@
 // lib/presentation/screens/settings/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../app/di/service_locator.dart';
 import '../../../core/services/interfaces/notification_service.dart';
+import '../../../core/services/interfaces/battery_service.dart';
+import '../../../core/services/interfaces/do_not_disturb_service.dart';
 import '../../blocs/prayers/prayer_times_provider.dart';
 import '../../blocs/settings/settings_provider.dart';
 import '../../widgets/common/custom_app_bar.dart';
@@ -14,18 +17,89 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  final NotificationService? _notificationService = null; // في التطبيق الحقيقي يجب استخدام getIt
+class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final NotificationService _notificationService = getIt<NotificationService>();
+  final BatteryService _batteryService = getIt<BatteryService>();
+  final DoNotDisturbService _doNotDisturbService = getIt<DoNotDisturbService>();
+  
+  int _batteryLevel = 100;
+  bool _isCharging = false;
+  bool _isPowerSaveMode = false;
+  bool _isDoNotDisturbEnabled = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadBatteryInfo();
+    _loadDoNotDisturbStatus();
+  }
+  
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+  
+  Future<void> _loadBatteryInfo() async {
+    final batteryLevel = await _batteryService.getBatteryLevel();
+    final isCharging = await _batteryService.isCharging();
+    final isPowerSaveMode = await _batteryService.isPowerSaveMode();
+    
+    if (mounted) {
+      setState(() {
+        _batteryLevel = batteryLevel;
+        _isCharging = isCharging;
+        _isPowerSaveMode = isPowerSaveMode;
+      });
+    }
+    
+    // الاستماع لتغييرات البطارية
+    _batteryService.getBatteryStateStream().listen((state) {
+      if (mounted) {
+        setState(() {
+          _batteryLevel = state.level;
+          _isCharging = state.isCharging;
+          _isPowerSaveMode = state.isPowerSaveMode;
+        });
+      }
+    });
+  }
+  
+  Future<void> _loadDoNotDisturbStatus() async {
+    final isDndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
+    
+    if (mounted) {
+      setState(() {
+        _isDoNotDisturbEnabled = isDndEnabled;
+      });
+    }
+    
+    // تسجيل مراقب لتغييرات وضع عدم الإزعاج
+    await _doNotDisturbService.registerDoNotDisturbListener((enabled) {
+      if (mounted) {
+        setState(() {
+          _isDoNotDisturbEnabled = enabled;
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: 'الإعدادات'),
+      appBar: AppBar(
+        title: const Text('الإعدادات'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'عام', icon: Icon(Icons.settings)),
+            Tab(text: 'الإشعارات', icon: Icon(Icons.notifications)),
+            Tab(text: 'مواقيت الصلاة', icon: Icon(Icons.access_time)),
+          ],
+        ),
+      ),
       body: Consumer<SettingsProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
@@ -48,26 +122,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
             );
           }
           
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionTitle(context, 'إعدادات التطبيق'),
-                _buildThemeSettings(context, provider),
-                _buildLanguageSettings(context, provider),
-                
-                const SizedBox(height: 24),
-                _buildSectionTitle(context, 'إعدادات الإشعارات'),
-                _buildNotificationSettings(context, provider),
-                
-                const SizedBox(height: 24),
-                _buildSectionTitle(context, 'إعدادات مواقيت الصلاة'),
-                _buildPrayerSettings(context, provider),
-              ],
-            ),
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildGeneralSettingsTab(provider),
+              _buildNotificationSettingsTab(provider),
+              _buildPrayerSettingsTab(provider),
+            ],
           );
         },
+      ),
+    );
+  }
+  
+  // علامة تبويب الإعدادات العامة
+  Widget _buildGeneralSettingsTab(SettingsProvider provider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(context, 'إعدادات التطبيق'),
+          _buildThemeSettings(provider),
+          _buildLanguageSettings(provider),
+          
+          const SizedBox(height: 16),
+          
+          // معلومات حول النظام
+          _buildSystemInfoCard(),
+        ],
+      ),
+    );
+  }
+  
+  // علامة تبويب إعدادات الإشعارات
+  Widget _buildNotificationSettingsTab(SettingsProvider provider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(context, 'إعدادات الإشعارات'),
+          _buildBasicNotificationSettings(provider),
+          
+          const SizedBox(height: 16),
+          
+          _buildSectionTitle(context, 'إعدادات البطارية وعدم الإزعاج'),
+          _buildBatteryAndDndSettingsCard(provider),
+          
+          const SizedBox(height: 16),
+          
+          _buildSectionTitle(context, 'توقيت الأذكار'),
+          _buildAthkarTimingCard(provider),
+        ],
+      ),
+    );
+  }
+  
+  // علامة تبويب إعدادات مواقيت الصلاة
+  Widget _buildPrayerSettingsTab(SettingsProvider provider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(context, 'إعدادات مواقيت الصلاة'),
+          _buildPrayerSettings(provider),
+        ],
       ),
     );
   }
@@ -82,7 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
   
-  Widget _buildThemeSettings(BuildContext context, SettingsProvider provider) {
+  Widget _buildThemeSettings(SettingsProvider provider) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -104,7 +225,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
   
-  Widget _buildLanguageSettings(BuildContext context, SettingsProvider provider) {
+  Widget _buildLanguageSettings(SettingsProvider provider) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -116,14 +237,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
           leading: const Icon(Icons.language),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
           onTap: () {
-            _showLanguageDialog(context, provider);
+            _showLanguageDialog(provider);
           },
         ),
       ),
     );
   }
   
-  Widget _buildNotificationSettings(BuildContext context, SettingsProvider provider) {
+  Widget _buildSystemInfoCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'معلومات النظام',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Divider(),
+            _buildSystemInfoRow(
+              'البطارية',
+              '$_batteryLevel% ${_isCharging ? "(قيد الشحن)" : ""}',
+              icon: _getBatteryIcon(),
+            ),
+            _buildSystemInfoRow(
+              'وضع توفير الطاقة',
+              _isPowerSaveMode ? 'مفعل' : 'معطل',
+              icon: Icons.battery_saver,
+            ),
+            _buildSystemInfoRow(
+              'وضع عدم الإزعاج',
+              _isDoNotDisturbEnabled ? 'مفعل' : 'معطل',
+              icon: Icons.do_not_disturb_on,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  IconData _getBatteryIcon() {
+    if (_isCharging) {
+      return Icons.battery_charging_full;
+    }
+    
+    if (_batteryLevel >= 90) {
+      return Icons.battery_full;
+    } else if (_batteryLevel >= 60) {
+      return Icons.battery_6_bar;
+    } else if (_batteryLevel >= 30) {
+      return Icons.battery_3_bar;
+    } else {
+      return Icons.battery_alert;
+    }
+  }
+  
+  Widget _buildSystemInfoRow(String title, String value, {IconData? icon}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 22),
+            const SizedBox(width: 12),
+          ],
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 16))),
+          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildBasicNotificationSettings(SettingsProvider provider) {
     return Card(
       child: Column(
         children: [
@@ -138,13 +324,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) async {
               if (value) {
                 // طلب إذن الإشعارات
-                final hasPermission = await _requestNotificationPermission();
+                final hasPermission = await _notificationService.requestPermission();
                 if (hasPermission) {
                   provider.updateSetting(key: 'enableNotifications', value: value);
                 } else {
                   // إظهار رسالة تنبيه بأنه لا يمكن تفعيل الإشعارات
                   if (mounted) {
-                    _showPermissionDeniedDialog(context);
+                    _showPermissionDeniedDialog();
                   }
                 }
               } else {
@@ -189,7 +375,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
   
-  Widget _buildPrayerSettings(BuildContext context, SettingsProvider provider) {
+  Widget _buildBatteryAndDndSettingsCard(SettingsProvider provider) {
+    return Card(
+      child: Column(
+        children: [
+          SwitchListTile(
+            title: const Text('احترام تحسينات البطارية'),
+            subtitle: const Text('لا يتم إرسال الإشعارات عندما تكون البطارية منخفضة ووضع توفير الطاقة مفعل'),
+            value: provider.settings!.respectBatteryOptimizations,
+            secondary: const Icon(Icons.battery_saver),
+            onChanged: (value) {
+              provider.updateSetting(key: 'respectBatteryOptimizations', value: value);
+              _notificationService.setRespectBatteryOptimizations(value);
+            },
+          ),
+          
+          if (provider.settings!.respectBatteryOptimizations) ...[
+            ListTile(
+              title: const Text('حد البطارية المنخفضة'),
+              subtitle: Text('${provider.settings!.lowBatteryThreshold}%'),
+              leading: const Icon(Icons.battery_alert),
+              trailing: const Icon(Icons.edit, size: 20),
+              onTap: () {
+                _showLowBatteryThresholdDialog(provider);
+              },
+            ),
+          ],
+          
+          const Divider(),
+          
+          SwitchListTile(
+            title: const Text('احترام وضع عدم الإزعاج'),
+            subtitle: const Text('لا يتم إرسال الإشعارات عندما يكون وضع عدم الإزعاج مفعلاً'),
+            value: provider.settings!.respectDoNotDisturb,
+            secondary: const Icon(Icons.do_not_disturb_on),
+            onChanged: (value) {
+              provider.updateSetting(key: 'respectDoNotDisturb', value: value);
+              _notificationService.setRespectDoNotDisturb(value);
+            },
+          ),
+          
+          const Divider(),
+          
+          SwitchListTile(
+            title: const Text('أولوية عالية لإشعارات الصلاة'),
+            subtitle: const Text('تظهر إشعارات الصلاة حتى في وضع عدم الإزعاج'),
+            value: provider.settings!.enableHighPriorityForPrayers,
+            secondary: const Icon(Icons.priority_high),
+            onChanged: (value) {
+              provider.updateSetting(key: 'enableHighPriorityForPrayers', value: value);
+            },
+          ),
+          
+          const Divider(),
+          
+          SwitchListTile(
+            title: const Text('الوضع الصامت'),
+            subtitle: const Text('لا يصدر التطبيق أي صوت للإشعارات'),
+            value: provider.settings!.enableSilentMode,
+            secondary: const Icon(Icons.volume_off),
+            onChanged: (value) {
+              provider.updateSetting(key: 'enableSilentMode', value: value);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildAthkarTimingCard(SettingsProvider provider) {
+    final morningHour = provider.settings!.morningAthkarTime[0];
+    final morningMinute = provider.settings!.morningAthkarTime[1];
+    final eveningHour = provider.settings!.eveningAthkarTime[0];
+    final eveningMinute = provider.settings!.eveningAthkarTime[1];
+    
+    final morningTime = TimeOfDay(hour: morningHour, minute: morningMinute);
+    final eveningTime = TimeOfDay(hour: eveningHour, minute: eveningMinute);
+    
+    return Card(
+      child: Column(
+        children: [
+          SwitchListTile(
+            title: const Text('تذكير بالأذكار'),
+            subtitle: const Text('إظهار تذكير بالأذكار في الأوقات المحددة'),
+            value: provider.settings!.showAthkarReminders,
+            secondary: const Icon(Icons.notification_important),
+            onChanged: (value) {
+              provider.updateSetting(key: 'showAthkarReminders', value: value);
+            },
+          ),
+          
+          if (provider.settings!.showAthkarReminders) ...[
+            const Divider(),
+            ListTile(
+              title: const Text('وقت أذكار الصباح'),
+              subtitle: Text(_formatTimeOfDay(morningTime)),
+              leading: const Icon(Icons.wb_sunny),
+              trailing: const Icon(Icons.access_time, size: 20),
+              onTap: () {
+                _selectTime(
+                  context,
+                  initialTime: morningTime,
+                  onTimeSelected: (time) {
+                    provider.updateSetting(
+                      key: 'morningAthkarTime',
+                      value: [time.hour, time.minute],
+                    );
+                  },
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              title: const Text('وقت أذكار المساء'),
+              subtitle: Text(_formatTimeOfDay(eveningTime)),
+              leading: const Icon(Icons.nights_stay),
+              trailing: const Icon(Icons.access_time, size: 20),
+              onTap: () {
+                _selectTime(
+                  context,
+                  initialTime: eveningTime,
+                  onTimeSelected: (time) {
+                    provider.updateSetting(
+                      key: 'eveningAthkarTime',
+                      value: [time.hour, time.minute],
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildPrayerSettings(SettingsProvider provider) {
     return Card(
       child: Column(
         children: [
@@ -199,7 +520,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.calculate),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              _showCalculationMethodDialog(context, provider);
+              _showCalculationMethodDialog(provider);
             },
           ),
           const Divider(),
@@ -213,7 +534,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.sunny),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              _showAsrMethodDialog(context, provider);
+              _showAsrMethodDialog(provider);
             },
           ),
           const Divider(),
@@ -251,17 +572,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
   
-  Future<bool> _requestNotificationPermission() async {
-    // في التطبيق الحقيقي، استخدم خدمة الإشعارات لطلب الإذن
-    if (_notificationService != null) {
-      return await _notificationService!.requestPermissions();
-    }
+  Future<void> _selectTime(
+    BuildContext context, {
+    required TimeOfDay initialTime,
+    required Function(TimeOfDay) onTimeSelected,
+  }) async {
+    final TimeOfDay? selectedTime = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            alwaysUse24HourFormat: false,
+          ),
+          child: child!,
+        );
+      },
+    );
     
-    // للتجربة، نعتبر أن الإذن تم الحصول عليه
-    return true;
+    if (selectedTime != null) {
+      onTimeSelected(selectedTime);
+    }
   }
   
-  void _showPermissionDeniedDialog(BuildContext context) {
+  void _showPermissionDeniedDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -272,14 +606,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('حسنًا'),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _doNotDisturbService.openDoNotDisturbSettings();
+            },
+            child: const Text('فتح الإعدادات'),
           ),
         ],
       ),
     );
   }
   
-  void _showLanguageDialog(BuildContext context, SettingsProvider provider) {
+  void _showLanguageDialog(SettingsProvider provider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -321,7 +662,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
   
-  void _showCalculationMethodDialog(BuildContext context, SettingsProvider provider) {
+  void _showLowBatteryThresholdDialog(SettingsProvider provider) {
+    int tempThreshold = provider.settings!.lowBatteryThreshold;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تحديد حد البطارية المنخفضة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('لن يتم إرسال الإشعارات عندما تكون نسبة البطارية أقل من هذا الحد ووضع توفير الطاقة مفعل'),
+            const SizedBox(height: 16),
+            Slider(
+              value: tempThreshold.toDouble(),
+              min: 5,
+              max: 30,
+              divisions: 5,
+              label: '$tempThreshold%',
+              onChanged: (value) {
+                setState(() {
+                  tempThreshold = value.round();
+                });
+              },
+            ),
+            Text(
+              '$tempThreshold%',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              provider.updateSetting(key: 'lowBatteryThreshold', value: tempThreshold);
+            },
+            child: const Text('تأكيد'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showCalculationMethodDialog(SettingsProvider provider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -354,7 +742,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
   
-  void _showAsrMethodDialog(BuildContext context, SettingsProvider provider) {
+  void _showAsrMethodDialog(SettingsProvider provider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -396,6 +784,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+  
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${time.period == DayPeriod.am ? 'ص' : 'م'}';
   }
   
   String _getCalculationMethodName(int methodIndex) {

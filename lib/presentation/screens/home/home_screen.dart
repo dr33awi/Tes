@@ -50,7 +50,8 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              Navigator.pushNamed(context, AppRouter.settings);
+              // استخدام معرف settingsRoute بدلاً من settings
+              Navigator.pushNamed(context, AppRouter.settingsRoute);
             },
           ),
         ],

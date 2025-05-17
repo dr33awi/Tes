@@ -1,3 +1,6 @@
+// lib/data/datasources/local/athkar_local_data_source.dart
+import '../../../domain/entities/athkar.dart';
+
 abstract class AthkarLocalDataSource {
   Future<List<Map<String, dynamic>>> getCategories();
   Future<List<Map<String, dynamic>>> getAthkarByCategory(String categoryId);
@@ -5,6 +8,7 @@ abstract class AthkarLocalDataSource {
   Future<void> saveAthkarFavorite(String id, bool isFavorite);
   Future<List<Map<String, dynamic>>> getFavoriteAthkar();
   Future<List<Map<String, dynamic>>> searchAthkar(String query);
+  Future<List<Map<String, dynamic>>> loadAllAthkar(); // أضفنا هذه الطريقة
 }
 
 class AthkarLocalDataSourceImpl implements AthkarLocalDataSource {
@@ -35,7 +39,8 @@ class AthkarLocalDataSourceImpl implements AthkarLocalDataSource {
       'count': 1,
       'categoryId': 'morning',
       'source': 'القرآن الكريم',
-      'notes': null
+      'notes': null,
+      'fadl': 'للاستعاذة فضل كبير وهي من أسباب حفظ العبد من الشيطان',
     },
     // إضافة المزيد من الأذكار
   ];
@@ -76,5 +81,20 @@ class AthkarLocalDataSourceImpl implements AthkarLocalDataSource {
       athkar['title'].toLowerCase().contains(lowercaseQuery) || 
       athkar['content'].toLowerCase().contains(lowercaseQuery)
     ).toList());
+  }
+  
+  @override
+  Future<List<Map<String, dynamic>>> loadAllAthkar() async {
+    return Future.value(_athkar);
+  }
+  
+  // طريقة إضافية لتحميل الأذكار حسب الفئة (نستخدمها في الملف المعدل)
+  Future<List<Map<String, dynamic>>> loadAthkarByCategory(String categoryId) async {
+    return getAthkarByCategory(categoryId);
+  }
+  
+  // طريقة إضافية لتحميل فئات الأذكار (نستخدمها في الملف المعدل)
+  Future<List<Map<String, dynamic>>> loadCategories() async {
+    return getCategories();
   }
 }

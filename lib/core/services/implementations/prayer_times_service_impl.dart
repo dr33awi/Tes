@@ -1,4 +1,6 @@
+// lib/core/services/implementations/prayer_times_service_impl.dart
 import 'package:adhan/adhan.dart' as adhan;
+import '../../../domain/entities/prayer_times.dart';
 import '../interfaces/prayer_times_service.dart';
 
 class PrayerTimesServiceImpl implements PrayerTimesService {
@@ -10,24 +12,17 @@ class PrayerTimesServiceImpl implements PrayerTimesService {
     required PrayerTimesCalculationParams params,
   }) async {
     final adhan.Coordinates coordinates = adhan.Coordinates(latitude, longitude);
-    final adhan.CalculationParameters calculationParameters = _getCalculationMethod(params.calculationMethod);
+    final adhan.CalculationParameters calculationParameters = params.toAdhanParams();
     
-    if (params.adjustmentMinutes != 0) {
-      calculationParameters.adjustments.fajr = params.adjustmentMinutes;
-      calculationParameters.adjustments.sunrise = params.adjustmentMinutes;
-      calculationParameters.adjustments.dhuhr = params.adjustmentMinutes;
-      calculationParameters.adjustments.asr = params.adjustmentMinutes;
-      calculationParameters.adjustments.maghrib = params.adjustmentMinutes;
-      calculationParameters.adjustments.isha = params.adjustmentMinutes;
-    }
+    final adhan.DateComponents dateComponents = adhan.DateComponents(date.year, date.month, date.day);
     
     final adhan.PrayerTimes prayerTimes = adhan.PrayerTimes(
       coordinates,
-      DateComponents.from(date),
+      dateComponents,
       calculationParameters,
     );
     
-    return prayerTimes as PrayerData;
+    return PrayerTimes.fromAdhan(prayerTimes);
   }
   
   @override
@@ -76,28 +71,32 @@ class PrayerTimesServiceImpl implements PrayerTimesService {
     final adhan.Coordinates coordinates = adhan.Coordinates(0, 0); // استبدل بإحداثيات المستخدم الفعلية
     final adhan.CalculationParameters params = adhan.CalculationMethod.muslim_world_league.getParameters();
     
+    final adhan.DateComponents dateComponents = adhan.DateComponents(now.year, now.month, now.day);
+    
     final adhan.PrayerTimes prayerTimes = adhan.PrayerTimes(
       coordinates,
-      DateComponents.from(now),
+      dateComponents,
       params,
     );
     
     final adhan.Prayer nextPrayer = prayerTimes.nextPrayer();
-    final DateTime nextPrayerTime = prayerTimes.timeForPrayer(nextPrayer)!;
+    final DateTime? nextPrayerTime = prayerTimes.timeForPrayer(nextPrayer);
     
-    if (nextPrayer == adhan.Prayer.fajr && nextPrayerTime.isBefore(now)) {
+    if (nextPrayer == adhan.Prayer.fajr && (nextPrayerTime?.isBefore(now) ?? false)) {
       // إذا كانت صلاة الفجر في اليوم التالي
       final DateTime tomorrow = now.add(const Duration(days: 1));
+      final adhan.DateComponents tomorrowComponents = adhan.DateComponents(tomorrow.year, tomorrow.month, tomorrow.day);
+      
       final adhan.PrayerTimes tomorrowPrayerTimes = adhan.PrayerTimes(
         coordinates,
-        DateComponents.from(tomorrow),
+        tomorrowComponents,
         params,
       );
       
-      return tomorrowPrayerTimes.fajr!;
+      return tomorrowPrayerTimes.fajr ?? now;
     }
     
-    return nextPrayerTime;
+    return nextPrayerTime ?? now;
   }
   
   @override
@@ -106,43 +105,24 @@ class PrayerTimesServiceImpl implements PrayerTimesService {
     final adhan.Coordinates coordinates = adhan.Coordinates(0, 0); // استبدل بإحداثيات المستخدم الفعلية
     final adhan.CalculationParameters params = adhan.CalculationMethod.muslim_world_league.getParameters();
     
+    final adhan.DateComponents dateComponents = adhan.DateComponents(now.year, now.month, now.day);
+    
     final adhan.PrayerTimes prayerTimes = adhan.PrayerTimes(
       coordinates,
-      DateComponents.from(now),
+      dateComponents,
       params,
     );
     
-    return prayerTimes.nextPrayer() as PrayerName;
+    return prayerTimes.nextPrayer();
   }
   
-  adhan.CalculationParameters _getCalculationMethod(String method) {
-    switch (method) {
-      case 'north_america':
-        return adhan.CalculationMethod.north_america.getParameters();
-      case 'muslim_world_league':
-        return adhan.CalculationMethod.muslim_world_league.getParameters();
-      case 'egyptian':
-        return adhan.CalculationMethod.egyptian.getParameters();
-      case 'karachi':
-        return adhan.CalculationMethod.karachi.getParameters();
-      case 'umm_al_qura':
-        return adhan.CalculationMethod.umm_al_qura.getParameters();
-      case 'dubai':
-        return adhan.CalculationMethod.dubai.getParameters();
-      case 'qatar':
-        return adhan.CalculationMethod.qatar.getParameters();
-      case 'kuwait':
-        return adhan.CalculationMethod.kuwait.getParameters();
-      case 'moonsighting_committee':
-        return adhan.CalculationMethod.moon_sighting_committee.getParameters();
-      case 'singapore':
-        return adhan.CalculationMethod.singapore.getParameters();
-      case 'turkey':
-        return adhan.CalculationMethod.turkey.getParameters();
-      case 'tehran':
-        return adhan.CalculationMethod.tehran.getParameters();
-      default:
-        return adhan.CalculationMethod.muslim_world_league.getParameters();
-    }
+  @override
+  Future<double> getQiblaDirection({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final adhan.Coordinates coordinates = adhan.Coordinates(latitude, longitude);
+    // استخدام طريقة الحساب الصحيحة في الإصدار الجديد من المكتبة
+    return adhan.Qibla(coordinates).direction;
   }
 }

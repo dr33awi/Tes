@@ -46,6 +46,9 @@ dependencies:
 
   # 🌐 المشاركة
   share_plus: ^7.2.1                       # مشاركة النصوص مع تطبيقات أخرى
+  battery_plus: ^6.2.1
+  device_info_plus: ^11.4.0
+  app_settings: ^6.1.1
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +79,5 @@ flutter:
           weight: 300
     - family: Amiri
       fonts:
-        - asset: assets/fonts/Amiri-Regular.ttf
         - asset: assets/fonts/Amiri-Bold.ttf
           weight: 700

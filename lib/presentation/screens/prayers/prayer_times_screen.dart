@@ -1,9 +1,16 @@
+// lib/presentation/screens/prayers/prayer_times_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:adhan/adhan.dart' as adhan;
 import '../../../domain/usecases/prayers/get_prayer_times.dart';
 import '../../../core/services/interfaces/prayer_times_service.dart';
+import '../../../domain/entities/settings.dart';
+import '../../../domain/entities/prayer_times.dart';
+import '../../blocs/prayers/prayer_times_provider.dart';
+import '../../blocs/settings/settings_provider.dart';
 import '../../widgets/common/loading_widget.dart';
+import '../../widgets/common/custom_app_bar.dart';
 
 class PrayerTimesScreen extends StatefulWidget {
   const PrayerTimesScreen({Key? key}) : super(key: key);
@@ -13,9 +20,6 @@ class PrayerTimesScreen extends StatefulWidget {
 }
 
 class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
-  late Future<PrayerData> _prayerTimesFuture;
-  final GetPrayerTimes _getPrayerTimes = GetPrayerTimes(); // يمكن استخدام حقن التبعية Get_it بدلاً من هذا
-  
   @override
   void initState() {
     super.initState();
@@ -23,44 +27,57 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   }
   
   void _loadPrayerTimes() {
-    // استخدم مواقع افتراضية أو احصل عليها من خدمة الموقع
-    const double latitude = 24.7136; // مثال: الرياض
-    const double longitude = 46.6753;
+    // تأكد من تحميل مواقيت الصلاة إذا لم تكن قد حُملت بعد
+    final prayerProvider = Provider.of<PrayerTimesProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     
-    _prayerTimesFuture = _getPrayerTimes.getTodayPrayerTimes(
-      PrayerTimesCalculationParams(
-        calculationMethod: 'muslim_world_league',
-      ),
-      latitude: latitude,
-      longitude: longitude,
-    );
+    if (!prayerProvider.hasLocation) {
+      // تعيين موقع افتراضي مؤقت (مكة المكرمة)
+      prayerProvider.setLocation(
+        latitude: 21.422510,
+        longitude: 39.826168,
+      );
+    }
+    
+    if (prayerProvider.todayPrayerTimes == null && settingsProvider.settings != null) {
+      prayerProvider.loadTodayPrayerTimes(settingsProvider.settings!);
+    }
   }
   
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('أوقات الصلاة'),
-        centerTitle: true,
-      ),
-      body: FutureBuilder<PrayerData>(
-        future: _prayerTimesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      appBar: const CustomAppBar(title: 'أوقات الصلاة'),
+      body: Consumer2<PrayerTimesProvider, SettingsProvider>(
+        builder: (context, prayerProvider, settingsProvider, _) {
+          if (prayerProvider.isLoading) {
             return const LoadingWidget();
-          } else if (snapshot.hasError) {
+          } else if (prayerProvider.hasError) {
             return Center(
               child: Text(
-                'حدث خطأ: ${snapshot.error}',
+                'حدث خطأ: ${prayerProvider.error}',
                 style: const TextStyle(color: Colors.red),
               ),
             );
-          } else if (snapshot.hasData) {
-            final prayerTimes = snapshot.data!;
-            return _buildPrayerTimesList(prayerTimes);
+          } else if (prayerProvider.todayPrayerTimes != null) {
+            return _buildPrayerTimesList(context, prayerProvider.todayPrayerTimes!);
           } else {
-            return const Center(
-              child: Text('لا توجد بيانات متاحة'),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('لا توجد بيانات متاحة'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (settingsProvider.settings != null) {
+                        prayerProvider.loadTodayPrayerTimes(settingsProvider.settings!);
+                      }
+                    },
+                    child: const Text('تحميل مواقيت الصلاة'),
+                  ),
+                ],
+              ),
             );
           }
         },
@@ -68,19 +85,19 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     );
   }
   
-  Widget _buildPrayerTimesList(PrayerData prayerTimes) {
+  Widget _buildPrayerTimesList(BuildContext context, PrayerTimes prayerTimes) {
     final timeFormat = DateFormat.jm();
     final now = DateTime.now();
     
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        _buildPrayerTimeCard('الفجر', prayerTimes.fajr!, timeFormat, now),
-        _buildPrayerTimeCard('الشروق', prayerTimes.sunrise!, timeFormat, now),
-        _buildPrayerTimeCard('الظهر', prayerTimes.dhuhr!, timeFormat, now),
-        _buildPrayerTimeCard('العصر', prayerTimes.asr!, timeFormat, now),
-        _buildPrayerTimeCard('المغرب', prayerTimes.maghrib!, timeFormat, now),
-        _buildPrayerTimeCard('العشاء', prayerTimes.isha!, timeFormat, now),
+        _buildPrayerTimeCard('الفجر', prayerTimes.fajr, timeFormat, now),
+        _buildPrayerTimeCard('الشروق', prayerTimes.sunrise, timeFormat, now),
+        _buildPrayerTimeCard('الظهر', prayerTimes.dhuhr, timeFormat, now),
+        _buildPrayerTimeCard('العصر', prayerTimes.asr, timeFormat, now),
+        _buildPrayerTimeCard('المغرب', prayerTimes.maghrib, timeFormat, now),
+        _buildPrayerTimeCard('العشاء', prayerTimes.isha, timeFormat, now),
       ],
     );
   }

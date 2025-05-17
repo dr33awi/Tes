@@ -7,7 +7,7 @@ class AppTheme {
       primarySwatch: Colors.blue,
       primaryColor: Colors.blue,
       // تعديل CardTheme لتتوافق مع الإصدار الجديد
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(8.0)),
@@ -23,7 +23,7 @@ class AppTheme {
       primarySwatch: Colors.blue,
       primaryColor: Colors.blue[700],
       // تعديل CardTheme لتتوافق مع الإصدار الجديد
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(8.0)),

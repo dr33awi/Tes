@@ -1,6 +1,8 @@
 // lib/presentation/blocs/prayers/prayer_times_provider.dart
 import 'package:flutter/material.dart';
+import 'package:adhan/adhan.dart' as adhan;
 import '../../../core/services/interfaces/prayer_times_service.dart';
+import '../../../domain/entities/prayer_times.dart';
 import '../../../domain/entities/settings.dart';
 import '../../../domain/usecases/prayers/get_prayer_times.dart';
 import '../../../domain/usecases/prayers/get_qibla_direction.dart';
@@ -57,14 +59,17 @@ class PrayerTimesProvider extends ChangeNotifier {
     try {
       // إنشاء معلمات حساب مواقيت الصلاة
       final params = PrayerTimesCalculationParams(
-        latitude: _latitude!,
-        longitude: _longitude!,
-        methodIndex: settings.calculationMethod,
+        calculationMethod: _getCalculationMethodName(settings.calculationMethod),
+        adjustmentMinutes: 0,
         asrMethodIndex: settings.asrMethod,
       );
       
       // تحميل مواقيت اليوم
-      _todayPrayerTimes = await _getPrayerTimes.getTodayPrayerTimes(params);
+      _todayPrayerTimes = await _getPrayerTimes.getTodayPrayerTimes(
+        params,
+        latitude: _latitude!,
+        longitude: _longitude!,
+      );
       
       _isLoading = false;
       notifyListeners();
@@ -90,9 +95,8 @@ class PrayerTimesProvider extends ChangeNotifier {
     try {
       // إنشاء معلمات حساب مواقيت الصلاة
       final params = PrayerTimesCalculationParams(
-        latitude: _latitude!,
-        longitude: _longitude!,
-        methodIndex: settings.calculationMethod,
+        calculationMethod: _getCalculationMethodName(settings.calculationMethod),
+        adjustmentMinutes: 0,
         asrMethodIndex: settings.asrMethod,
       );
       
@@ -106,6 +110,8 @@ class PrayerTimesProvider extends ChangeNotifier {
         params: params,
         startDate: startDate,
         endDate: endDate,
+        latitude: _latitude!,
+        longitude: _longitude!,
       );
       
       _isLoading = false;
@@ -149,5 +155,35 @@ class PrayerTimesProvider extends ChangeNotifier {
     await loadTodayPrayerTimes(settings);
     await loadWeekPrayerTimes(settings);
     await loadQiblaDirection();
+  }
+  
+  // تحويل رقم طريقة الحساب إلى اسم الطريقة
+  String _getCalculationMethodName(int methodIndex) {
+    switch (methodIndex) {
+      case 0:
+        return 'karachi';
+      case 1:
+        return 'north_america';
+      case 2:
+        return 'muslim_world_league';
+      case 3:
+        return 'egyptian';
+      case 4:
+        return 'umm_al_qura';
+      case 5:
+        return 'dubai';
+      case 6:
+        return 'qatar';
+      case 7:
+        return 'kuwait';
+      case 8:
+        return 'singapore';
+      case 9:
+        return 'turkey';
+      case 10:
+        return 'tehran';
+      default:
+        return 'muslim_world_league';
+    }
   }
 }

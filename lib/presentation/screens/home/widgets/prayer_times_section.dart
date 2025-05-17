@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:adhan/adhan.dart' as adhan; // استيراد مكتبة أذان مع تحديد مساحة الاسم
 import '../../../../app/routes/app_router.dart';
 import '../../../../core/services/interfaces/prayer_times_service.dart';
 import '../../../blocs/prayers/prayer_times_provider.dart';
@@ -147,8 +148,9 @@ class PrayerTimesSection extends StatelessWidget {
 
   Widget _buildPrayerTimes(BuildContext context, PrayerTimesProvider provider) {
     final prayerTimes = provider.todayPrayerTimes!;
-    final currentPrayer = prayerTimes.getCurrentPrayer();
-    final nextPrayer = prayerTimes.getNextPrayer();
+    // استخدام مكتبة أذان للصلاة الحالية والتالية
+    final adhan.Prayer currentPrayer = prayerTimes.getCurrentPrayer();
+    final adhan.Prayer nextPrayer = prayerTimes.getNextPrayer();
     
     return Column(
       children: [
@@ -193,19 +195,19 @@ class PrayerTimesSection extends StatelessWidget {
               context, 
               'الفجر', 
               prayerTimes.fajr, 
-              currentPrayer == Prayer.fajr
+              currentPrayer == adhan.Prayer.fajr
             ),
             _buildPrayerTimeItem(
               context, 
               'الظهر', 
               prayerTimes.dhuhr, 
-              currentPrayer == Prayer.dhuhr
+              currentPrayer == adhan.Prayer.dhuhr
             ),
             _buildPrayerTimeItem(
               context, 
               'العصر', 
               prayerTimes.asr, 
-              currentPrayer == Prayer.asr
+              currentPrayer == adhan.Prayer.asr
             ),
           ],
         ),
@@ -216,13 +218,13 @@ class PrayerTimesSection extends StatelessWidget {
               context, 
               'المغرب', 
               prayerTimes.maghrib, 
-              currentPrayer == Prayer.maghrib
+              currentPrayer == adhan.Prayer.maghrib
             ),
             _buildPrayerTimeItem(
               context, 
               'العشاء', 
               prayerTimes.isha, 
-              currentPrayer == Prayer.isha
+              currentPrayer == adhan.Prayer.isha
             ),
             _buildPrayerTimeItem(
               context, 
@@ -308,20 +310,23 @@ class PrayerTimesSection extends StatelessWidget {
     return DateFormat.jm().format(time);
   }
   
-  String _getPrayerName(Prayer prayer) {
+  // تحويل نوع الصلاة إلى اسم مقروء
+  String _getPrayerName(adhan.Prayer prayer) {
     switch (prayer) {
-      case Prayer.fajr:
+      case adhan.Prayer.fajr:
         return 'الفجر';
-      case Prayer.sunrise:
+      case adhan.Prayer.sunrise:
         return 'الشروق';
-      case Prayer.dhuhr:
+      case adhan.Prayer.dhuhr:
         return 'الظهر';
-      case Prayer.asr:
+      case adhan.Prayer.asr:
         return 'العصر';
-      case Prayer.maghrib:
+      case adhan.Prayer.maghrib:
         return 'المغرب';
-      case Prayer.isha:
+      case adhan.Prayer.isha:
         return 'العشاء';
+      default:
+        return '';
     }
   }
 }
