@@ -1,68 +1,57 @@
-// lib/data/models/athkar_model.dart
-import '../../domain/entities/athkar.dart';
+import '../../../domain/entities/athkar.dart';
 
 class AthkarModel {
   final String id;
-  final String category;
   final String title;
   final String content;
   final int count;
+  final String categoryId;
   final String? source;
-  final String? fadl;
-  final List<String>? tags;
-
+  final String? notes;
+  
   AthkarModel({
     required this.id,
-    required this.category,
     required this.title,
     required this.content,
     required this.count,
+    required this.categoryId,
     this.source,
-    this.fadl,
-    this.tags,
+    this.notes,
   });
-
-  // تحويل من JSON إلى نموذج
+  
   factory AthkarModel.fromJson(Map<String, dynamic> json) {
     return AthkarModel(
       id: json['id'],
-      category: json['category'],
       title: json['title'],
       content: json['content'],
-      count: json['count'] ?? 1,
+      count: json['count'],
+      categoryId: json['categoryId'],
       source: json['source'],
-      fadl: json['fadl'],
-      tags: json['tags'] != null 
-          ? List<String>.from(json['tags']) 
-          : null,
+      notes: json['notes'],
     );
   }
-
-  // تحويل من نموذج إلى JSON
+  
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'category': category,
       'title': title,
       'content': content,
       'count': count,
+      'categoryId': categoryId,
       'source': source,
-      'fadl': fadl,
-      'tags': tags,
+      'notes': notes,
     };
   }
-
-  // تحويل من نموذج إلى كيان
+  
   Athkar toEntity() {
     return Athkar(
       id: id,
-      category: category,
       title: title,
       content: content,
       count: count,
+      categoryId: categoryId,
       source: source,
-      fadl: fadl,
-      tags: tags,
+      notes: notes,
     );
   }
 }
@@ -70,17 +59,16 @@ class AthkarModel {
 class AthkarCategoryModel {
   final String id;
   final String name;
-  final String? description;
-  final String? icon;
-
+  final String description;
+  final String icon;
+  
   AthkarCategoryModel({
     required this.id,
     required this.name,
-    this.description,
-    this.icon,
+    required this.description,
+    required this.icon,
   });
-
-  // تحويل من JSON إلى نموذج
+  
   factory AthkarCategoryModel.fromJson(Map<String, dynamic> json) {
     return AthkarCategoryModel(
       id: json['id'],
@@ -89,8 +77,7 @@ class AthkarCategoryModel {
       icon: json['icon'],
     );
   }
-
-  // تحويل من نموذج إلى JSON
+  
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -99,8 +86,7 @@ class AthkarCategoryModel {
       'icon': icon,
     };
   }
-
-  // تحويل من نموذج إلى كيان
+  
   AthkarCategory toEntity() {
     return AthkarCategory(
       id: id,

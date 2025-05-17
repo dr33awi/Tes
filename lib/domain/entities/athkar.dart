@@ -1,36 +1,33 @@
-// lib/domain/entities/athkar.dart
 class Athkar {
   final String id;
-  final String category;
   final String title;
   final String content;
   final int count;
+  final String categoryId;
   final String? source;
-  final String? fadl; // فضل الذكر
-  final List<String>? tags;
-
+  final String? notes;
+  
   Athkar({
     required this.id,
-    required this.category,
     required this.title,
     required this.content,
     required this.count,
+    required this.categoryId,
     this.source,
-    this.fadl,
-    this.tags,
+    this.notes,
   });
 }
 
 class AthkarCategory {
   final String id;
   final String name;
-  final String? description;
-  final String? icon;
-
+  final String description;
+  final String icon;
+  
   AthkarCategory({
     required this.id,
     required this.name,
-    this.description,
-    this.icon,
+    required this.description,
+    required this.icon,
   });
 }

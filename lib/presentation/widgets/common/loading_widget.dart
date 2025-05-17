@@ -1,24 +1,21 @@
-// lib/presentation/widgets/common/loading_widget.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 class LoadingWidget extends StatelessWidget {
+  final Color color;
   final double size;
-  final Color? color;
-
+  
   const LoadingWidget({
-    super.key,
-    this.size = 40.0,
-    this.color,
-  });
-
+    Key? key,
+    this.color = Colors.blue,
+    this.size = 50.0,
+  }) : super(key: key);
+  
   @override
   Widget build(BuildContext context) {
-    final themeColor = color ?? Theme.of(context).primaryColor;
-    
     return Center(
       child: SpinKitDoubleBounce(
-        color: themeColor,
+        color: color,
         size: size,
       ),
     );

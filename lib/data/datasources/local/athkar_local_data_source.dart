@@ -1,75 +1,80 @@
-// lib/data/datasources/local/athkar_local_data_source.dart
-import 'dart:convert';
-import 'package:flutter/services.dart';
-import '../../../domain/entities/athkar.dart';
-
 abstract class AthkarLocalDataSource {
-  /// تحميل جميع فئات الأذكار
-  Future<List<Map<String, dynamic>>> loadCategories();
-  
-  /// تحميل الأذكار حسب الفئة
-  Future<List<Map<String, dynamic>>> loadAthkarByCategory(String categoryId);
-  
-  /// تحميل جميع الأذكار
-  Future<List<Map<String, dynamic>>> loadAllAthkar();
+  Future<List<Map<String, dynamic>>> getCategories();
+  Future<List<Map<String, dynamic>>> getAthkarByCategory(String categoryId);
+  Future<Map<String, dynamic>?> getAthkarById(String id);
+  Future<void> saveAthkarFavorite(String id, bool isFavorite);
+  Future<List<Map<String, dynamic>>> getFavoriteAthkar();
+  Future<List<Map<String, dynamic>>> searchAthkar(String query);
 }
 
 class AthkarLocalDataSourceImpl implements AthkarLocalDataSource {
-  // تخزين مؤقت للبيانات لتحسين الأداء
-  Map<String, dynamic>? _cachedData;
-
+  // هنا يمكنك استخدام sqflite أو hive أو غيرها من قواعد البيانات المحلية
+  // للتبسيط، سنستخدم بيانات ثابتة
+  
+  final List<Map<String, dynamic>> _categories = [
+    {
+      'id': 'morning',
+      'name': 'أذكار الصباح',
+      'description': 'الأذكار التي تقال في الصباح',
+      'icon': 'sunrise'
+    },
+    {
+      'id': 'evening',
+      'name': 'أذكار المساء',
+      'description': 'الأذكار التي تقال في المساء',
+      'icon': 'sunset'
+    },
+    // إضافة المزيد من الفئات
+  ];
+  
+  final List<Map<String, dynamic>> _athkar = [
+    {
+      'id': '1',
+      'title': 'الاستعاذة',
+      'content': 'أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ',
+      'count': 1,
+      'categoryId': 'morning',
+      'source': 'القرآن الكريم',
+      'notes': null
+    },
+    // إضافة المزيد من الأذكار
+  ];
+  
+  final Map<String, bool> _favorites = {};
+  
   @override
-  Future<List<Map<String, dynamic>>> loadCategories() async {
-    // تحميل البيانات من ملف JSON
-    final Map<String, dynamic> data = await _loadJsonData();
-    
-    // الحصول على فئات الأذكار
-    final List<dynamic> categories = data['categories'] ?? [];
-    
-    // تحويل البيانات إلى قائمة من الخرائط
-    return categories.cast<Map<String, dynamic>>();
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    return Future.value(_categories);
   }
-
+  
   @override
-  Future<List<Map<String, dynamic>>> loadAthkarByCategory(String categoryId) async {
-    // تحميل البيانات من ملف JSON
-    final Map<String, dynamic> data = await _loadJsonData();
-    
-    // الحصول على الأذكار
-    final List<dynamic> athkar = data['athkar'] ?? [];
-    
-    // تصفية الأذكار حسب الفئة
-    final filteredAthkar = athkar.where((item) => item['category'] == categoryId).toList();
-    
-    // تحويل البيانات إلى قائمة من الخرائط
-    return filteredAthkar.cast<Map<String, dynamic>>();
+  Future<List<Map<String, dynamic>>> getAthkarByCategory(String categoryId) async {
+    return Future.value(_athkar.where((athkar) => athkar['categoryId'] == categoryId).toList());
   }
-
+  
   @override
-  Future<List<Map<String, dynamic>>> loadAllAthkar() async {
-    // تحميل البيانات من ملف JSON
-    final Map<String, dynamic> data = await _loadJsonData();
-    
-    // الحصول على الأذكار
-    final List<dynamic> athkar = data['athkar'] ?? [];
-    
-    // تحويل البيانات إلى قائمة من الخرائط
-    return athkar.cast<Map<String, dynamic>>();
+  Future<Map<String, dynamic>?> getAthkarById(String id) async {
+    final result = _athkar.where((athkar) => athkar['id'] == id).toList();
+    return Future.value(result.isNotEmpty ? result.first : null);
   }
-
-  // تحميل البيانات من ملف JSON
-  Future<Map<String, dynamic>> _loadJsonData() async {
-    // إذا كانت البيانات مخزنة مؤقتًا، استخدمها
-    if (_cachedData != null) {
-      return _cachedData!;
-    }
-    
-    // تحميل الملف من الأصول
-    final String jsonString = await rootBundle.loadString('assets/data/athkar.json');
-    
-    // تحليل البيانات
-    _cachedData = jsonDecode(jsonString) as Map<String, dynamic>;
-    
-    return _cachedData!;
+  
+  @override
+  Future<void> saveAthkarFavorite(String id, bool isFavorite) async {
+    _favorites[id] = isFavorite;
+    return Future.value();
+  }
+  
+  @override
+  Future<List<Map<String, dynamic>>> getFavoriteAthkar() async {
+    return Future.value(_athkar.where((athkar) => _favorites[athkar['id']] == true).toList());
+  }
+  
+  @override
+  Future<List<Map<String, dynamic>>> searchAthkar(String query) async {
+    final lowercaseQuery = query.toLowerCase();
+    return Future.value(_athkar.where((athkar) => 
+      athkar['title'].toLowerCase().contains(lowercaseQuery) || 
+      athkar['content'].toLowerCase().contains(lowercaseQuery)
+    ).toList());
   }
 }
