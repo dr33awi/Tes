@@ -1,4 +1,5 @@
 // lib/app/di/service_locator.dart
+import 'package:flutter/material.dart';  // Añade esta importación para debugPrint
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,7 +42,7 @@ class ServiceLocator {
 
   bool _isInitialized = false;
 
-  /// تهيئة خدمات التطبيق
+  /// Inicialización de servicios de la aplicación
   Future<void> init() async {
     if (_isInitialized) return;
 
@@ -57,7 +58,7 @@ class ServiceLocator {
       StorageServiceImpl(sharedPreferences),
     );
     
-    // تسجيل الخدمات الجديدة
+    // Registro de nuevos servicios
     getIt.registerSingleton<BatteryService>(
       BatteryServiceImpl(),
     );
@@ -70,7 +71,7 @@ class ServiceLocator {
       TimezoneServiceImpl(),
     );
     
-    // تسجيل خدمة الإشعارات مع الخدمات الجديدة
+    // Registro del servicio de notificaciones con los nuevos servicios
     getIt.registerSingleton<NotificationService>(
       NotificationServiceImpl(
         flutterLocalNotificationsPlugin,
@@ -87,7 +88,7 @@ class ServiceLocator {
       QiblaServiceImpl(),
     );
     
-    // تسجيل مساعد جدولة الإشعارات
+    // Registro del programador de notificaciones
     getIt.registerSingleton<NotificationScheduler>(
       NotificationScheduler(),
     );
@@ -122,46 +123,46 @@ class ServiceLocator {
     getIt.registerLazySingleton(() => GetSettings(getIt<SettingsRepository>()));
     getIt.registerLazySingleton(() => UpdateSettings(getIt<SettingsRepository>()));
 
-    // تهيئة خدمة الإشعارات
+    // Inicialización del servicio de notificaciones
     await getIt<NotificationService>().initialize();
     
-    // تهيئة خدمة المناطق الزمنية
+    // Inicialización del servicio de zonas horarias
     await getIt<TimezoneService>().initializeTimeZones();
 
     _isInitialized = true;
   }
   
-  /// تنظيف الموارد عند إغلاق التطبيق
+  /// Limpieza de recursos al cerrar la aplicación
   Future<void> dispose() async {
     if (!_isInitialized) return;
     
     try {
-      // تنظيف خدمة الإشعارات
+      // Limpieza del servicio de notificaciones
       if (getIt.isRegistered<NotificationService>()) {
         await getIt<NotificationService>().dispose();
       }
       
-      // تنظيف خدمة البوصلة
+      // Limpieza del servicio de brújula
       if (getIt.isRegistered<QiblaService>()) {
         getIt<QiblaService>().dispose();
       }
       
-      // تنظيف خدمة عدم الإزعاج
+      // Limpieza del servicio No molestar
       if (getIt.isRegistered<DoNotDisturbService>()) {
         await getIt<DoNotDisturbService>().unregisterDoNotDisturbListener();
       }
       
-      // إعادة تعيين حالة التسجيل
+      // Restablecer el estado de registro
       await getIt.reset();
       _isInitialized = false;
       
-      debugPrint('All services disposed successfully');
+      debugPrint('Todos los servicios se han eliminado correctamente');
     } catch (e) {
-      debugPrint('Error while disposing services: $e');
+      debugPrint('Error al eliminar servicios: $e');
     }
   }
   
-  // لاستخدامه عند اختبار التطبيق
+  // Para uso durante las pruebas de la aplicación
   Future<void> reset() async {
     await dispose();
   }

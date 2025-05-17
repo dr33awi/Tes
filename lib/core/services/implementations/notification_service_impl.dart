@@ -5,13 +5,13 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
-// Para evitar conflictos, renombra la importación de NotificationVisibility
-import '../interfaces/notification_service.dart' hide NotificationVisibility;
+// Renombrar la importación para evitar conflictos
+import '../interfaces/notification_service.dart' as app_notification;
 import '../interfaces/battery_service.dart';
 import '../interfaces/do_not_disturb_service.dart';
 import '../../../main.dart';
 
-class NotificationServiceImpl implements NotificationService {
+class NotificationServiceImpl implements app_notification.NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
   final BatteryService _batteryService;
   final DoNotDisturbService _doNotDisturbService;
@@ -49,41 +49,36 @@ class NotificationServiceImpl implements NotificationService {
       onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
     );
     
-    // إعداد قنوات الإشعارات
     await _setupNotificationChannels();
   }
 
   Future<void> _setupNotificationChannels() async {
     if (Platform.isAndroid) {
-      // قناة إشعارات الأذكار
       const AndroidNotificationChannel athkarChannel = AndroidNotificationChannel(
         'athkar_channel',
-        'إشعارات الأذكار',
-        description: 'يتم استخدامها لإرسال تذكيرات وإشعارات الأذكار',
+        'Notificaciones de Athkar',
+        description: 'Para enviar recordatorios y notificaciones de Athkar',
         importance: Importance.high,
       );
       
-      // قناة إشعارات الصلاة
       const AndroidNotificationChannel prayerChannel = AndroidNotificationChannel(
         'prayer_channel',
-        'إشعارات الصلاة',
-        description: 'يتم استخدامها لإرسال تذكيرات وإشعارات أوقات الصلاة',
+        'Notificaciones de oración',
+        description: 'Para enviar recordatorios y notificaciones de tiempo de oración',
         importance: Importance.high,
       );
       
-      // قناة الإشعارات العادية
       const AndroidNotificationChannel defaultChannel = AndroidNotificationChannel(
         'default_channel',
-        'الإشعارات العامة',
-        description: 'يتم استخدامها لإرسال الإشعارات العامة للتطبيق',
+        'Notificaciones generales',
+        description: 'Para enviar notificaciones generales de la aplicación',
         importance: Importance.defaultImportance,
       );
-      
-      // بعض الإصدارات القديمة قد لا تدعم createNotificationChannels
+
       final AndroidFlutterLocalNotificationsPlugin? androidPlugin = 
-          _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation
+          _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
-              
+
       if (androidPlugin != null) {
         await androidPlugin.createNotificationChannel(athkarChannel);
         await androidPlugin.createNotificationChannel(prayerChannel);
@@ -95,7 +90,6 @@ class NotificationServiceImpl implements NotificationService {
   void _onDidReceiveNotificationResponse(NotificationResponse response) {
     final String? payload = response.payload;
     if (payload != null && payload.isNotEmpty) {
-      // محاولة تحليل الـ payload كـ JSON
       try {
         final Map<String, dynamic> data = json.decode(payload);
         final String? type = data['type'];
@@ -103,7 +97,6 @@ class NotificationServiceImpl implements NotificationService {
         final Map<String, dynamic>? arguments = data['arguments'];
         
         if (type != null && route != null) {
-          // استخدام NavigationService للانتقال إلى الشاشة المناسبة
           final navigatorKey = NavigationService.navigatorKey;
           if (navigatorKey.currentState != null) {
             if (arguments != null) {
@@ -114,7 +107,7 @@ class NotificationServiceImpl implements NotificationService {
           }
         }
       } catch (e) {
-        debugPrint('Error parsing notification payload: $e');
+        debugPrint('Error al analizar payload de notificación: $e');
       }
     }
   }
@@ -122,75 +115,81 @@ class NotificationServiceImpl implements NotificationService {
   @override
   Future<bool> requestPermission() async {
     try {
-      // طلب إذن للأندرويد
       if (Platform.isAndroid) {
-        // في بعض الإصدارات لا يحتاج أي أذونات خاصة
+        final AndroidFlutterLocalNotificationsPlugin? androidPlugin = 
+            _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+        
+        if (androidPlugin != null) {
+          final bool? areEnabled = await androidPlugin.areNotificationsEnabled();
+          if (areEnabled == false) {
+            final bool? granted = await androidPlugin.requestNotificationsPermission();
+            return granted ?? false;
+          }
+          return areEnabled ?? false;
+        }
         return true;
       }
       
-      // طلب إذن لنظام iOS
       if (Platform.isIOS) {
-        // استخدم الطريقة المباشرة للإذن
-        return await _flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation
-                IOSFlutterLocalNotificationsPlugin>()
-            ?.requestPermissions(
-              alert: true,
-              badge: true,
-              sound: true,
-            ) ?? true;
+        final IOSFlutterLocalNotificationsPlugin? iosPlugin = 
+            _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>();
+        
+        if (iosPlugin != null) {
+          return await iosPlugin.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          ) ?? false;
+        }
+        return false;
       }
 
       return true;
     } catch (e) {
-      debugPrint('Error requesting permission: $e');
+      debugPrint('Error solicitando permiso: $e');
       return false;
     }
   }
 
   @override
-  Future<bool> scheduleNotification(NotificationData notification) async {
-    if (!await _canSendNotificationBasedOnSettings(notification)) {
-      return false;
-    }
+  Future<bool> scheduleNotification(app_notification.NotificationData notification) async {
+    if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
       final String payloadJson = notification.payload != null 
           ? json.encode(notification.payload)
           : '';
 
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        notification.id,
-        notification.title,
-        notification.body,
-        tz.TZDateTime.from(notification.scheduledDate, tz.local),
-        _getNotificationDetails(notification),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      );
+await _flutterLocalNotificationsPlugin.zonedSchedule(
+  notification.id,
+  notification.title,
+  notification.body,
+  tz.TZDateTime.from(notification.scheduledDate, tz.local),
+  _getNotificationDetails(notification),
+  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
+);
       return true;
     } catch (e) {
-      debugPrint('Error scheduling notification: $e');
+      debugPrint('Error al programar notificación: $e');
       return false;
     }
   }
 
   @override
-  Future<bool> scheduleRepeatingNotification(NotificationData notification) async {
-    if (notification.repeatInterval == null) {
-      return false;
-    }
-
-    if (!await _canSendNotificationBasedOnSettings(notification)) {
-      return false;
-    }
+  Future<bool> scheduleRepeatingNotification(app_notification.NotificationData notification) async {
+    if (notification.repeatInterval == null) return false;
+    if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
       final String payloadJson = notification.payload != null 
           ? json.encode(notification.payload)
           : '';
 
-      if (notification.repeatInterval == NotificationRepeatInterval.daily ||
-          notification.repeatInterval == NotificationRepeatInterval.weekly) {
+      if (notification.repeatInterval == app_notification.NotificationRepeatInterval.daily ||
+          notification.repeatInterval == app_notification.NotificationRepeatInterval.weekly) {
         final RepeatInterval flutterRepeatInterval =
             _mapToFlutterRepeatInterval(notification.repeatInterval!);
 
@@ -205,39 +204,36 @@ class NotificationServiceImpl implements NotificationService {
         );
         return true;
       } else {
-        // جدولة شهرية - تحتاج إلى استخدام zonedSchedule مع matchDateTimeComponents
         final tz.TZDateTime scheduledDate = tz.TZDateTime.from(
           notification.scheduledDate,
           tz.local,
         );
         
-        await _flutterLocalNotificationsPlugin.zonedSchedule(
-          notification.id,
-          notification.title,
-          notification.body,
-          scheduledDate,
-          _getNotificationDetails(notification),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        );
+await _flutterLocalNotificationsPlugin.zonedSchedule(
+  notification.id,
+  notification.title,
+  notification.body,
+  tz.TZDateTime.from(notification.scheduledDate, tz.local),
+  _getNotificationDetails(notification),
+  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
+);
         return true;
       }
     } catch (e) {
-      debugPrint('Error scheduling repeating notification: $e');
+      debugPrint('Error al programar notificación repetitiva: $e');
       return false;
     }
   }
 
   @override
   Future<bool> scheduleNotificationInTimeZone(
-    NotificationData notification, 
+    app_notification.NotificationData notification, 
     String timeZone
   ) async {
-    if (!await _canSendNotificationBasedOnSettings(notification)) {
-      return false;
-    }
+    if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
-      // تعيين المنطقة الزمنية المحددة
       final location = tz.getLocation(timeZone);
       final scheduledDate = tz.TZDateTime.from(notification.scheduledDate, location);
       
@@ -245,75 +241,66 @@ class NotificationServiceImpl implements NotificationService {
           ? json.encode(notification.payload)
           : '';
       
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        notification.id,
-        notification.title,
-        notification.body,
-        scheduledDate,
-        _getNotificationDetails(notification),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: 
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: payloadJson,
-      );
+await _flutterLocalNotificationsPlugin.zonedSchedule(
+  notification.id,
+  notification.title,
+  notification.body,
+  tz.TZDateTime.from(notification.scheduledDate, tz.local),
+  _getNotificationDetails(notification),
+  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
+);
       return true;
     } catch (e) {
-      debugPrint('Error scheduling notification in timezone: $e');
+      debugPrint('Error al programar notificación en zona horaria: $e');
       return false;
     }
   }
 
   @override
   Future<bool> scheduleNotificationWithActions(
-    NotificationData notification,
-    List<NotificationAction> actions,
+    app_notification.NotificationData notification,
+    List<app_notification.NotificationAction> actions,
   ) async {
-    if (!await _canSendNotificationBasedOnSettings(notification)) {
-      return false;
-    }
+    if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
-      // في الإصدار الحالي، لا يمكننا استخدام الإجراءات مباشرة
-      // نستخدم الإشعارات العادية بدون إجراءات
       final String payloadJson = notification.payload != null 
           ? json.encode(notification.payload)
           : '';
 
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        notification.id,
-        notification.title,
-        notification.body,
-        tz.TZDateTime.from(notification.scheduledDate, tz.local),
-        _getNotificationDetails(notification),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: 
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: payloadJson,
-      );
+await _flutterLocalNotificationsPlugin.zonedSchedule(
+  notification.id,
+  notification.title,
+  notification.body,
+  tz.TZDateTime.from(notification.scheduledDate, tz.local),
+  _getNotificationDetails(notification),
+  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
+);
 
       return true;
     } catch (e) {
-      debugPrint('Error scheduling notification with actions: $e');
+      debugPrint('Error al programar notificación con acciones: $e');
       return false;
     }
   }
 
-  RepeatInterval _mapToFlutterRepeatInterval(NotificationRepeatInterval interval) {
+  RepeatInterval _mapToFlutterRepeatInterval(app_notification.NotificationRepeatInterval interval) {
     switch (interval) {
-      case NotificationRepeatInterval.daily:
+      case app_notification.NotificationRepeatInterval.daily:
         return RepeatInterval.daily;
-      case NotificationRepeatInterval.weekly:
+      case app_notification.NotificationRepeatInterval.weekly:
         return RepeatInterval.weekly;
-      case NotificationRepeatInterval.monthly:
-        return RepeatInterval.weekly; // استخدام أسبوعي والتحقق من اليوم في الشهر بشكل منفصل
+      case app_notification.NotificationRepeatInterval.monthly:
+        return RepeatInterval.weekly;
     }
   }
 
-  NotificationDetails _getNotificationDetails(NotificationData notification) {
+  NotificationDetails _getNotificationDetails(app_notification.NotificationData notification) {
     final Importance importance = _mapToAndroidImportance(notification.priority);
     final Priority priority = _mapToAndroidPriority(notification.priority);
 
-    // تعيين تفاصيل الأندرويد مع مراعاة قناة الإشعارات
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       notification.channelId,
       'Athkar ${notification.notificationTime.name.toUpperCase()} Notifications',
@@ -328,7 +315,6 @@ class NotificationServiceImpl implements NotificationService {
       visibility: _getAndroidVisibility(notification.visibility),
     );
 
-    // تعيين تفاصيل iOS مع مراعاة إعدادات الصوت
     final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
@@ -342,28 +328,28 @@ class NotificationServiceImpl implements NotificationService {
     );
   }
 
-  Importance _mapToAndroidImportance(NotificationPriority priority) {
+  Importance _mapToAndroidImportance(app_notification.NotificationPriority priority) {
     switch (priority) {
-      case NotificationPriority.low:
+      case app_notification.NotificationPriority.low:
         return Importance.low;
-      case NotificationPriority.normal:
+      case app_notification.NotificationPriority.normal:
         return Importance.defaultImportance;
-      case NotificationPriority.high:
+      case app_notification.NotificationPriority.high:
         return Importance.high;
-      case NotificationPriority.critical:
+      case app_notification.NotificationPriority.critical:
         return Importance.max;
     }
   }
 
-  Priority _mapToAndroidPriority(NotificationPriority priority) {
+  Priority _mapToAndroidPriority(app_notification.NotificationPriority priority) {
     switch (priority) {
-      case NotificationPriority.low:
+      case app_notification.NotificationPriority.low:
         return Priority.low;
-      case NotificationPriority.normal:
+      case app_notification.NotificationPriority.normal:
         return Priority.defaultPriority;
-      case NotificationPriority.high:
+      case app_notification.NotificationPriority.high:
         return Priority.high;
-      case NotificationPriority.critical:
+      case app_notification.NotificationPriority.critical:
         return Priority.max;
     }
   }
@@ -399,20 +385,17 @@ class NotificationServiceImpl implements NotificationService {
   @override
   Future<void> cancelNotificationsByTag(String tag) async {
     if (Platform.isAndroid) {
-      // في الإصدار الحالي لا يمكن إلغاء الإشعارات حسب العلامة مباشرة
-      // نستخدم قائمة المعرفات المرتبطة بالعلامة
       final List<int> idsToCancel = _getNotificationIdsByTag(tag);
       await cancelNotificationsByIds(idsToCancel);
     }
   }
 
-  // طريقة وهمية للحصول على معرفات الإشعارات بناءً على العلامة - يجب استبدالها بتنفيذ فعلي
   List<int> _getNotificationIdsByTag(String tag) {
     switch (tag) {
       case 'athkar':
-        return [1001, 1002]; // معرفات إشعارات الأذكار
+        return [1001, 1002];
       case 'prayer':
-        return [2001, 2002, 2003, 2004, 2005, 2101, 2102, 2103, 2104, 2105]; // معرفات إشعارات وتذكيرات الصلاة
+        return [2001, 2002, 2003, 2004, 2005, 2101, 2102, 2103, 2104, 2105];
       default:
         return [];
     }
@@ -428,15 +411,14 @@ class NotificationServiceImpl implements NotificationService {
     _respectDoNotDisturb = enabled;
   }
 
-  Future<bool> _canSendNotificationBasedOnSettings(NotificationData notification) async {
-    // التحقق من إذون الإشعارات
+  Future<bool> _canSendNotificationBasedOnSettings(app_notification.NotificationData notification) async {
     final bool hasPermission = await requestPermission();
     if (!hasPermission) return false;
 
     if (notification.respectBatteryOptimizations && _respectBatteryOptimizations) {
       final bool canSendBasedOnBattery = await _batteryService.canSendNotification();
       if (!canSendBasedOnBattery) {
-        debugPrint('Cannot send notification due to battery optimizations');
+        debugPrint('No se puede enviar notificación debido a optimizaciones de batería');
         return false;
       }
     }
@@ -444,10 +426,9 @@ class NotificationServiceImpl implements NotificationService {
     if (notification.respectDoNotDisturb && _respectDoNotDisturb) {
       final bool isDndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
       if (isDndEnabled) {
-        debugPrint('DND is enabled');
-        // إذا كانت الأولوية عالية أو حرجة، يمكن إرسال الإشعار حتى في وضع عدم الإزعاج
-        return notification.priority == NotificationPriority.high || 
-               notification.priority == NotificationPriority.critical;
+        debugPrint('DND está habilitado');
+        return notification.priority == app_notification.NotificationPriority.high || 
+               notification.priority == app_notification.NotificationPriority.critical;
       }
     }
 
@@ -474,9 +455,6 @@ class NotificationServiceImpl implements NotificationService {
 
   @override
   Future<void> dispose() async {
-    // تنظيف أي موارد أخرى
     debugPrint('NotificationService disposed');
   }
 }
-
-// إضافة مساحة اسم لتجنب التعارض

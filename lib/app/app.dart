@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+
+// Importaciones con alias para evitar conflictos
+import 'di/service_locator.dart' as di;
 import 'routes/app_router.dart';
 import 'themes/app_theme.dart';
 import '../core/constants/app_constants.dart';
@@ -14,7 +17,6 @@ import '../domain/usecases/prayers/get_prayer_times.dart';
 import '../domain/usecases/prayers/get_qibla_direction.dart';
 import '../domain/usecases/settings/get_settings.dart';
 import '../domain/usecases/settings/update_settings.dart';
-import 'di/service_locator.dart';
 
 class AthkarApp extends StatelessWidget {
   const AthkarApp({super.key});
@@ -25,20 +27,20 @@ class AthkarApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (_) => SettingsProvider(
-            getSettings: getIt<GetSettings>(),
-            updateSettings: getIt<UpdateSettings>(),
+            getSettings: di.getIt<GetSettings>(),
+            updateSettings: di.getIt<UpdateSettings>(),
           )..loadSettings(),
         ),
         ChangeNotifierProvider(
           create: (_) => AthkarProvider(
-            getAthkarCategories: getIt<GetAthkarCategories>(),
-            getAthkarByCategory: getIt<GetAthkarByCategory>(),
+            getAthkarCategories: di.getIt<GetAthkarCategories>(),
+            getAthkarByCategory: di.getIt<GetAthkarByCategory>(),
           )..loadCategories(),
         ),
         ChangeNotifierProvider(
           create: (_) => PrayerTimesProvider(
-            getPrayerTimes: getIt<GetPrayerTimes>(),
-            getQiblaDirection: getIt<GetQiblaDirection>(),
+            getPrayerTimes: di.getIt<GetPrayerTimes>(),
+            getQiblaDirection: di.getIt<GetQiblaDirection>(),
           ),
         ),
       ],
@@ -62,8 +64,8 @@ class AthkarApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            initialRoute: '/', // Utiliza un valor directo en lugar de AppConstants.initialRoute
-            onGenerateRoute: AppRouter.onGenerateRoute, // Asegúrate de que AppRouter existe y esté correctamente importado
+            initialRoute: '/', // Usar un valor directo en lugar de AppConstants.initialRoute
+            onGenerateRoute: AppRouter.onGenerateRoute, // Asegurarse de que AppRouter existe y está importado correctamente
           );
         },
       ),
