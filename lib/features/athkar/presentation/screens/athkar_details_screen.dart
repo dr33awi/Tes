@@ -1,10 +1,11 @@
 // lib/features/athkar/presentation/screens/athkar_details_screen.dart
+import 'package:athkar_app/features/widgets/common/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../../../../app/di/service_locator.dart';
+
 import '../../data/models/athkar_model.dart';
 import '../../data/datasources/athkar_service.dart';
 
@@ -786,10 +787,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              LoadingAnimationWidget.staggeredDotsWave(
-                color: colorScheme.primary,
-                size: 50,
-              ),
+              const LoadingWidget(),
               const SizedBox(height: 20),
               Text(
                 'جاري تحميل الأذكار...',

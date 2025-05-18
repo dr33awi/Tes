@@ -1,5 +1,6 @@
 // lib/data/datasources/local/athkar_service.dart
 import 'dart:convert';
+import 'package:athkar_app/features/athkar/presentation/screens/athkar_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,16 +29,16 @@ class AthkarService {
   }
 
   // ذاكرة التخزين المؤقت للأذكار لتجنب القراءة المتكررة من الملفات
-  Map<String, AthkarCategory> _athkarCache = {};
+  Map<String, AthkarScreen> _athkarCache = {};
 
   // تحميل الأذكار من ملف JSON
-  Future<List<AthkarCategory>> loadAllAthkarCategories() async {
+  Future<List<AthkarScreen>> loadAllAthkarCategories() async {
     try {
       // قراءة ملف JSON من الأصول
       final String jsonString = await rootBundle.loadString('assets/data/athkar.json');
       final Map<String, dynamic> jsonData = json.decode(jsonString);
       
-      List<AthkarCategory> categories = [];
+      List<AthkarScreen> categories = [];
       
       // تحليل الفئات
       for (var categoryData in jsonData['categories']) {
@@ -56,7 +57,7 @@ class AthkarService {
   }
 
   // الحصول على فئة محددة حسب المعرف مع تحسين التخزين المؤقت
-  Future<AthkarCategory?> getAthkarCategory(String categoryId) async {
+  Future<AthkarScreen?> getAthkarCategory(String categoryId) async {
     // التحقق مما إذا كانت الفئة موجودة بالفعل في ذاكرة التخزين المؤقت
     if (_athkarCache.containsKey(categoryId)) {
       return _athkarCache[categoryId];
@@ -78,7 +79,7 @@ class AthkarService {
   }
 
   // تحليل فئة واحدة من JSON مع تحسين معالجة الأيقونة واللون
-  AthkarCategory _parseAthkarCategory(Map<String, dynamic> data) {
+  AthkarScreen _parseAthkarCategory(Map<String, dynamic> data) {
     // تحليل نص الأيقونة إلى IconData
     final iconString = data['icon'] as String;
     final IconData iconData = _getIconFromString(iconString);
@@ -105,7 +106,7 @@ class AthkarService {
     }
     
     // إنشاء وإرجاع الفئة
-    return AthkarCategory(
+    return AthkarScreen(
       id: data['id'],
       name: data['title'],
       description: data['description'] ?? '',
@@ -845,7 +846,7 @@ class AthkarNotificationSettings {
 
 // فئة لتمثيل ذكر مفضل مع فئته
 class FavoriteThikr {
-  final AthkarCategory category;
+  final AthkarScreen category;
   final Athkar thikr;
   final int thikrIndex;
   final DateTime dateAdded;

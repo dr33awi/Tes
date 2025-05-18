@@ -1,10 +1,12 @@
 // lib/features/athkar/presentation/screens/athkar_screen.dart
+import 'package:athkar_app/features/athkar/data/datasources/di_container.dart';
+import 'package:athkar_app/features/widgets/common/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:provider/provider.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../../../../app/di/service_locator.dart';
+
 import '../../../../core/services/utils/notification_scheduler.dart';
 import '../../data/models/athkar_model.dart';
 import '../../domain/entities/athkar.dart';
@@ -546,10 +548,7 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          LoadingAnimationWidget.staggeredDotsWave(
-            color: colorScheme.primary,
-            size: 50,
-          ),
+          const LoadingWidget(),
           const SizedBox(height: 20),
           Text(
             'جاري تحميل الأذكار...',
