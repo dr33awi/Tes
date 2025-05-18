@@ -1,5 +1,5 @@
 // lib/app/di/service_locator.dart
-import 'package:flutter/material.dart';  // Añade esta importación para debugPrint
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,7 +58,7 @@ class ServiceLocator {
       StorageServiceImpl(sharedPreferences),
     );
     
-    // Registro de nuevos servicios
+    // Registro de servicios principales
     getIt.registerSingleton<BatteryService>(
       BatteryServiceImpl(),
     );
@@ -77,6 +77,7 @@ class ServiceLocator {
         flutterLocalNotificationsPlugin,
         getIt<BatteryService>(),
         getIt<DoNotDisturbService>(),
+        getIt<TimezoneService>(), // Añadido TimezoneService
       ),
     );
     
@@ -130,6 +131,7 @@ class ServiceLocator {
     await getIt<TimezoneService>().initializeTimeZones();
 
     _isInitialized = true;
+    debugPrint('Servicios inicializados correctamente');
   }
   
   /// Limpieza de recursos al cerrar la aplicación
@@ -150,6 +152,11 @@ class ServiceLocator {
       // Limpieza del servicio No molestar
       if (getIt.isRegistered<DoNotDisturbService>()) {
         await getIt<DoNotDisturbService>().unregisterDoNotDisturbListener();
+      }
+      
+      // Limpieza del servicio de batería
+      if (getIt.isRegistered<BatteryService>()) {
+        await getIt<BatteryService>().dispose();
       }
       
       // Restablecer el estado de registro

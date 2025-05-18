@@ -1,10 +1,12 @@
 // lib/core/services/utils/notification_scheduler.dart
 import 'package:flutter/material.dart';
 import '../../../app/di/service_locator.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/services/interfaces/battery_service.dart';
 import '../../../core/services/interfaces/do_not_disturb_service.dart';
 import '../../../core/services/interfaces/notification_service.dart';
 import '../../../core/services/interfaces/prayer_times_service.dart';
+import '../../../core/services/interfaces/timezone_service.dart';
 import '../../../domain/entities/settings.dart';
 
 /// مساعد لجدولة الإشعارات المختلفة في التطبيق
@@ -13,6 +15,7 @@ class NotificationScheduler {
   final BatteryService _batteryService = getIt<BatteryService>();
   final DoNotDisturbService _doNotDisturbService = getIt<DoNotDisturbService>();
   final PrayerTimesService _prayerTimesService = getIt<PrayerTimesService>();
+  final TimezoneService _timezoneService = getIt<TimezoneService>();
   
   // تخزين معرفات الإشعارات التي تم جدولتها
   final Set<int> _scheduledNotificationIds = {};
@@ -50,7 +53,12 @@ class NotificationScheduler {
       return;
     }
     
-    // إشعار أذكار الصباح
+    await _scheduleMorningAthkarNotification(settings);
+    await _scheduleEveningAthkarNotification(settings);
+  }
+  
+  /// جدولة إشعار أذكار الصباح
+  Future<void> _scheduleMorningAthkarNotification(Settings settings) async {
     final DateTime now = DateTime.now();
     final int morningHour = settings.morningAthkarTime[0];
     final int morningMinute = settings.morningAthkarTime[1];
@@ -103,22 +111,33 @@ class NotificationScheduler {
           : NotificationPriority.normal,
       respectBatteryOptimizations: settings.respectBatteryOptimizations,
       respectDoNotDisturb: settings.respectDoNotDisturb,
-      channelId: 'athkar_channel',
-      soundName: settings.enableSilentMode ? null : 'athkar_sound',
+      channelId: AppConstants.athkarNotificationChannelId,
+      soundName: settings.enableSilentMode ? null : settings.notificationSounds['athkar_morning'],
       payload: morningPayload,
     );
     
     // محاولة جدولة الإشعار مع الإجراءات
-    final scheduled = await _notificationService.scheduleNotificationWithActions(
-      morningNotification,
-      morningActions,
-    );
-    
-    if (scheduled) {
-      _scheduledNotificationIds.add(1001);
+    if (settings.enableActionButtons) {
+      final scheduled = await _notificationService.scheduleNotificationWithActions(
+        morningNotification,
+        morningActions,
+      );
+      
+      if (scheduled) {
+        _scheduledNotificationIds.add(1001);
+      }
+    } else {
+      final scheduled = await _notificationService.scheduleNotification(morningNotification);
+      
+      if (scheduled) {
+        _scheduledNotificationIds.add(1001);
+      }
     }
-    
-    // إشعار أذكار المساء
+  }
+  
+  /// جدولة إشعار أذكار المساء
+  Future<void> _scheduleEveningAthkarNotification(Settings settings) async {
+    final DateTime now = DateTime.now();
     final int eveningHour = settings.eveningAthkarTime[0];
     final int eveningMinute = settings.eveningAthkarTime[1];
     
@@ -170,98 +189,134 @@ class NotificationScheduler {
           : NotificationPriority.normal,
       respectBatteryOptimizations: settings.respectBatteryOptimizations,
       respectDoNotDisturb: settings.respectDoNotDisturb,
-      channelId: 'athkar_channel',
-      soundName: settings.enableSilentMode ? null : 'athkar_sound',
+      channelId: AppConstants.athkarNotificationChannelId,
+      soundName: settings.enableSilentMode ? null : settings.notificationSounds['athkar_evening'],
       payload: eveningPayload,
     );
     
-    final scheduledEvening = await _notificationService.scheduleNotificationWithActions(
-      eveningNotification,
-      eveningActions,
-    );
-    
-    if (scheduledEvening) {
-      _scheduledNotificationIds.add(1002);
+    if (settings.enableActionButtons) {
+      final scheduled = await _notificationService.scheduleNotificationWithActions(
+        eveningNotification,
+        eveningActions,
+      );
+      
+      if (scheduled) {
+        _scheduledNotificationIds.add(1002);
+      }
+    } else {
+      final scheduled = await _notificationService.scheduleNotification(eveningNotification);
+      
+      if (scheduled) {
+        _scheduledNotificationIds.add(1002);
+      }
     }
   }
   
   /// جدولة إشعارات مواقيت الصلاة
   Future<void> _schedulePrayerNotifications(Settings settings) async {
-    // الحصول على مواقيت الصلاة لليوم الحالي
-    final DateTime now = DateTime.now();
-    
-    // معلمات حساب مواقيت الصلاة
-    final params = PrayerTimesCalculationParams(
-      calculationMethod: _getCalculationMethodFromSettings(settings.calculationMethod),
-      adjustmentMinutes: 0,
-    );
-    
     try {
       // الحصول على موقع المستخدم واستخدامه في الحصول على مواقيت الصلاة
       // ملاحظة: في التطبيق الحقيقي، يجب استخدام موقع المستخدم الفعلي
       const double latitude = 21.422487; // مكة المكرمة
       const double longitude = 39.826206;
       
+      // معلمات حساب مواقيت الصلاة
+      final params = PrayerTimesCalculationParams(
+        calculationMethod: _getCalculationMethodFromSettings(settings.calculationMethod),
+        adjustmentMinutes: 0,
+        asrMethodIndex: settings.asrMethod,
+      );
+      
+      // الحصول على مواقيت الصلاة لليوم الحالي والأيام القادمة
+      await _schedulePrayerTimesForNextDays(settings, latitude, longitude, params, 7);
+      
+    } catch (e) {
+      debugPrint('حدث خطأ أثناء جدولة إشعارات الصلاة: $e');
+    }
+  }
+  
+  /// جدولة مواقيت الصلاة لعدة أيام قادمة
+  Future<void> _schedulePrayerTimesForNextDays(
+    Settings settings,
+    double latitude,
+    double longitude,
+    PrayerTimesCalculationParams params,
+    int numberOfDays,
+  ) async {
+    final DateTime now = DateTime.now();
+    
+    for (int i = 0; i < numberOfDays; i++) {
+      final DateTime date = now.add(Duration(days: i));
+      final DateTime dateOnly = DateTime(date.year, date.month, date.day);
+      
       final PrayerData prayerTimes = await _prayerTimesService.getPrayerTimes(
         latitude: latitude,
         longitude: longitude,
-        date: now,
+        date: dateOnly,
         params: params,
       );
       
-      // قائمة بالصلوات لجدولة إشعاراتها
-      final prayerInfo = [
-        {
-          'prayer': 'الفجر', 
-          'time': prayerTimes.fajr, 
-          'id': 2001, 
-          'reminder_id': 2101,
-          'notification_time': NotificationTime.fajr,
-        },
-        {
-          'prayer': 'الظهر', 
-          'time': prayerTimes.dhuhr, 
-          'id': 2002, 
-          'reminder_id': 2102,
-          'notification_time': NotificationTime.dhuhr,
-        },
-        {
-          'prayer': 'العصر', 
-          'time': prayerTimes.asr, 
-          'id': 2003, 
-          'reminder_id': 2103,
-          'notification_time': NotificationTime.asr,
-        },
-        {
-          'prayer': 'المغرب', 
-          'time': prayerTimes.maghrib, 
-          'id': 2004, 
-          'reminder_id': 2104,
-          'notification_time': NotificationTime.maghrib,
-        },
-        {
-          'prayer': 'العشاء', 
-          'time': prayerTimes.isha, 
-          'id': 2005, 
-          'reminder_id': 2105,
-          'notification_time': NotificationTime.isha,
-        },
-      ];
-      
-      // جدولة إشعارات لكل صلاة
-      for (final prayer in prayerInfo) {
-        await _schedulePrayerNotification(
-          prayer['time'] as DateTime,
-          prayer['prayer'] as String,
-          'حان وقت صلاة ${prayer['prayer']}',
-          prayer['id'] as int,
-          prayer['notification_time'] as NotificationTime,
-          prayer['reminder_id'] as int,
-          settings,
-        );
-      }
-    } catch (e) {
-      debugPrint('حدث خطأ أثناء جدولة إشعارات الصلاة: $e');
+      // جدولة الإشعارات لهذا اليوم
+      await _schedulePrayerTimesForDay(settings, prayerTimes, i);
+    }
+  }
+  
+  /// جدولة إشعارات مواقيت الصلاة ليوم معين
+  Future<void> _schedulePrayerTimesForDay(
+    Settings settings,
+    PrayerData prayerTimes,
+    int dayOffset,
+  ) async {
+    // قائمة بالصلوات لجدولة إشعاراتها
+    final prayerInfo = [
+      {
+        'prayer': 'الفجر', 
+        'time': prayerTimes.fajr, 
+        'id': 2001 + (dayOffset * 100), 
+        'reminder_id': 2101 + (dayOffset * 100),
+        'notification_time': NotificationTime.fajr,
+      },
+      {
+        'prayer': 'الظهر', 
+        'time': prayerTimes.dhuhr, 
+        'id': 2002 + (dayOffset * 100), 
+        'reminder_id': 2102 + (dayOffset * 100),
+        'notification_time': NotificationTime.dhuhr,
+      },
+      {
+        'prayer': 'العصر', 
+        'time': prayerTimes.asr, 
+        'id': 2003 + (dayOffset * 100), 
+        'reminder_id': 2103 + (dayOffset * 100),
+        'notification_time': NotificationTime.asr,
+      },
+      {
+        'prayer': 'المغرب', 
+        'time': prayerTimes.maghrib, 
+        'id': 2004 + (dayOffset * 100), 
+        'reminder_id': 2104 + (dayOffset * 100),
+        'notification_time': NotificationTime.maghrib,
+      },
+      {
+        'prayer': 'العشاء', 
+        'time': prayerTimes.isha, 
+        'id': 2005 + (dayOffset * 100), 
+        'reminder_id': 2105 + (dayOffset * 100),
+        'notification_time': NotificationTime.isha,
+      },
+    ];
+    
+    // جدولة إشعارات لكل صلاة
+    for (final prayer in prayerInfo) {
+      await _schedulePrayerNotification(
+        prayer['time'] as DateTime,
+        prayer['prayer'] as String,
+        prayer['id'] as int,
+        prayer['notification_time'] as NotificationTime,
+        prayer['reminder_id'] as int,
+        settings,
+        dayOffset,
+      );
     }
   }
   
@@ -269,29 +324,27 @@ class NotificationScheduler {
   Future<void> _schedulePrayerNotification(
     DateTime prayerTime,
     String prayerName,
-    String body,
     int id,
     NotificationTime notificationTime,
     int reminderId,
     Settings settings,
+    int dayOffset,
   ) async {
-    // التحقق مما إذا كان وقت الصلاة قد فات
     final DateTime now = DateTime.now();
-    DateTime scheduledTime = prayerTime;
     
-    // إذا كان وقت الصلاة قد فات اليوم، جدولته ليوم غد
-    if (scheduledTime.isBefore(now)) {
-      scheduledTime = DateTime(
-        now.year,
-        now.month,
-        now.day + 1,
-        scheduledTime.hour,
-        scheduledTime.minute,
-      );
+    // تجاهل الصلوات التي مرت بالفعل في هذا اليوم
+    if (dayOffset == 0 && prayerTime.isBefore(now)) {
+      return;
     }
     
-    // تعيين تذكير قبل وقت الصلاة بـ 15 دقيقة
-    final DateTime reminderTime = scheduledTime.subtract(const Duration(minutes: 15));
+    // تعيين تذكير قبل وقت الصلاة بـ الوقت المحدد في الإعدادات
+    final reminderMinutes = AppConstants.prayerNotificationAdvanceMinutes;
+    final DateTime reminderTime = prayerTime.subtract(Duration(minutes: reminderMinutes));
+    
+    // تجاهل التذكيرات التي مرت بالفعل
+    if (reminderTime.isBefore(now)) {
+      return;
+    }
     
     // إعداد إجراءات الإشعار
     final List<NotificationAction> prayerActions = [
@@ -314,54 +367,59 @@ class NotificationScheduler {
     };
     
     // جدولة تذكير قبل الصلاة
-    if (reminderTime.isAfter(now)) {
-      final NotificationData reminderNotification = NotificationData(
-        id: reminderId,
-        title: 'تذكير: صلاة $prayerName',
-        body: 'سيحين وقت صلاة $prayerName بعد 15 دقيقة',
-        scheduledDate: reminderTime,
-        notificationTime: notificationTime,
-        priority: settings.enableHighPriorityForPrayers
-            ? NotificationPriority.high
-            : NotificationPriority.normal,
-        respectBatteryOptimizations: settings.respectBatteryOptimizations,
-        respectDoNotDisturb: false, // دائماً إظهار تذكير الصلاة حتى في وضع عدم الإزعاج
-        channelId: 'prayer_channel',
-        soundName: settings.enableSilentMode ? null : 'prayer_reminder_sound',
-        payload: prayerPayload,
-      );
-      
-      final scheduledReminder = await _notificationService.scheduleNotification(reminderNotification);
-      if (scheduledReminder) {
-        _scheduledNotificationIds.add(reminderId);
-      }
+    final NotificationData reminderNotification = NotificationData(
+      id: reminderId,
+      title: 'تذكير: صلاة $prayerName',
+      body: 'سيحين وقت صلاة $prayerName بعد $reminderMinutes دقيقة',
+      scheduledDate: reminderTime,
+      notificationTime: notificationTime,
+      priority: settings.enableHighPriorityForPrayers
+          ? NotificationPriority.high
+          : NotificationPriority.normal,
+      respectBatteryOptimizations: settings.respectBatteryOptimizations,
+      respectDoNotDisturb: false, // دائماً إظهار تذكير الصلاة حتى في وضع عدم الإزعاج
+      channelId: AppConstants.prayerTimesNotificationChannelId,
+      soundName: settings.enableSilentMode ? null : settings.notificationSounds['prayer'],
+      payload: prayerPayload,
+    );
+    
+    final scheduledReminder = await _notificationService.scheduleNotification(reminderNotification);
+    if (scheduledReminder) {
+      _scheduledNotificationIds.add(reminderId);
     }
     
     // جدولة إشعار وقت الصلاة
     final NotificationData prayerNotification = NotificationData(
       id: id,
       title: 'صلاة $prayerName',
-      body: body,
-      scheduledDate: scheduledTime,
-      repeatInterval: NotificationRepeatInterval.daily,
+      body: 'حان وقت صلاة $prayerName',
+      scheduledDate: prayerTime,
       notificationTime: notificationTime,
       priority: settings.enableHighPriorityForPrayers
           ? NotificationPriority.high
           : NotificationPriority.normal,
       respectBatteryOptimizations: settings.respectBatteryOptimizations,
       respectDoNotDisturb: false, // دائماً إظهار إشعار الصلاة حتى في وضع عدم الإزعاج
-      channelId: 'prayer_channel',
-      soundName: settings.enableSilentMode ? null : 'prayer_sound',
+      channelId: AppConstants.prayerTimesNotificationChannelId,
+      soundName: settings.enableSilentMode ? null : settings.notificationSounds['prayer'],
       payload: prayerPayload,
     );
     
-    final scheduledPrayer = await _notificationService.scheduleNotificationWithActions(
-      prayerNotification,
-      prayerActions,
-    );
-    
-    if (scheduledPrayer) {
-      _scheduledNotificationIds.add(id);
+    if (settings.enableActionButtons) {
+      final scheduledPrayer = await _notificationService.scheduleNotificationWithActions(
+        prayerNotification,
+        prayerActions,
+      );
+      
+      if (scheduledPrayer) {
+        _scheduledNotificationIds.add(id);
+      }
+    } else {
+      final scheduledPrayer = await _notificationService.scheduleNotification(prayerNotification);
+      
+      if (scheduledPrayer) {
+        _scheduledNotificationIds.add(id);
+      }
     }
   }
   

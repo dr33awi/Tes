@@ -28,9 +28,32 @@ class AppConstants {
   static const int defaultSleepAthkarMinute = 0;
   
   // معرفات قنوات الإشعارات
-  static const String athkarNotificationChannelId = 'athkar_notification_channel';
-  static const String prayerTimesNotificationChannelId = 'prayer_times_notification_channel';
+  static const String athkarNotificationChannelId = 'athkar_channel';
+  static const String prayerTimesNotificationChannelId = 'prayer_channel';
   
   // فترات التنبيه قبل الصلاة (بالدقائق)
   static const int prayerNotificationAdvanceMinutes = 15;
+  
+  // معرفات الإشعارات
+  // - إشعارات الأذكار: 1001-1999
+  static const int morningAthkarNotificationId = 1001;
+  static const int eveningAthkarNotificationId = 1002;
+  static const int sleepAthkarNotificationId = 1003;
+  
+  // - إشعارات الصلوات: 2001-2999 (اليوم الأول)
+  // -- الفجر: 2001
+  // -- الظهر: 2002
+  // -- العصر: 2003
+  // -- المغرب: 2004
+  // -- العشاء: 2005
+  
+  // - تذكيرات الصلوات: 2101-2999 (اليوم الأول)
+  // -- تذكير الفجر: 2101
+  // -- تذكير الظهر: 2102
+  // -- تذكير العصر: 2103
+  // -- تذكير المغرب: 2104
+  // -- تذكير العشاء: 2105
+  
+  // - إشعارات الصلوات لليوم الثاني: 2101-2999
+  // إلخ...
 }

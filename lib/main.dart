@@ -3,18 +3,15 @@ import 'dart:async';
 import 'package:athkar_app/core/services/utils/notification_scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:timezone/data/latest.dart' as tz;
 import 'app/app.dart';
 import 'app/di/service_locator.dart';
 import 'core/services/interfaces/notification_service.dart';
+import 'core/services/interfaces/timezone_service.dart';
 import 'domain/usecases/settings/get_settings.dart';
 
 Future<void> main() async {
   // تهيئة ربط Flutter
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // تهيئة المناطق الزمنية
-  tz.initializeTimeZones();
   
   // تعيين اتجاه التطبيق من اليمين إلى اليسار
   await SystemChrome.setPreferredOrientations([
@@ -25,6 +22,9 @@ Future<void> main() async {
   try {
     // تهيئة خدمات التطبيق
     await ServiceLocator().init();
+    
+    // التأكد من تهيئة التوقيت
+    await _initializeTimeZones();
     
     // إنشاء NavigationService
     await _setupNavigationService();
@@ -40,6 +40,7 @@ Future<void> main() async {
     
     runApp(const AthkarApp());
   } catch (e) {
+    debugPrint('Error al iniciar la aplicación: $e');
     runApp(
       MaterialApp(
         home: Scaffold(
@@ -49,6 +50,17 @@ Future<void> main() async {
         ),
       ),
     );
+  }
+}
+
+/// التأكد من تهيئة المناطق الزمنية
+Future<void> _initializeTimeZones() async {
+  try {
+    final timezoneService = getIt<TimezoneService>();
+    await timezoneService.initializeTimeZones();
+    debugPrint('Zonas horarias inicializadas correctamente');
+  } catch (e) {
+    debugPrint('Error inicializando zonas horarias: $e');
   }
 }
 
@@ -68,7 +80,8 @@ Future<void> _setupNavigationService() async {
 Future<void> _requestNotificationPermissions() async {
   try {
     final notificationService = getIt<NotificationService>();
-    await notificationService.requestPermission();
+    final hasPermission = await notificationService.requestPermission();
+    debugPrint('Permiso de notificaciones: $hasPermission');
   } catch (e) {
     debugPrint('Error requesting notification permissions: $e');
   }
@@ -84,6 +97,7 @@ Future<void> _scheduleNotifications() async {
     if (settings.enableNotifications) {
       final notificationScheduler = getIt<NotificationScheduler>();
       await notificationScheduler.scheduleAllNotifications(settings);
+      debugPrint('Notificaciones programadas correctamente');
     }
   } catch (e) {
     debugPrint('حدث خطأ أثناء جدولة الإشعارات: $e');
@@ -99,6 +113,8 @@ class NavigationService {
 class AppLifecycleObserver extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('Estado de ciclo de vida cambiado a: $state');
+    
     if (state == AppLifecycleState.detached) {
       // عندما يتم إغلاق التطبيق نهائيًا
       _disposeResources();
@@ -111,8 +127,10 @@ class AppLifecycleObserver extends WidgetsBindingObserver {
       debugPrint('Disposing resources...');
       
       // تنظيف موارد خدمة الإشعارات
-      final notificationService = getIt<NotificationService>();
-      await notificationService.dispose();
+      if (getIt.isRegistered<NotificationService>()) {
+        final notificationService = getIt<NotificationService>();
+        await notificationService.dispose();
+      }
       
       // تنظيف موارد جميع الخدمات
       await ServiceLocator().dispose();

@@ -4,17 +4,17 @@ import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
-// Renombrar la importación para evitar conflictos
 import '../interfaces/notification_service.dart' as app_notification;
 import '../interfaces/battery_service.dart';
 import '../interfaces/do_not_disturb_service.dart';
+import '../interfaces/timezone_service.dart';
 import '../../../main.dart';
 
 class NotificationServiceImpl implements app_notification.NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
   final BatteryService _batteryService;
   final DoNotDisturbService _doNotDisturbService;
+  final TimezoneService _timezoneService;
 
   bool _respectBatteryOptimizations = true;
   bool _respectDoNotDisturb = true;
@@ -23,11 +23,13 @@ class NotificationServiceImpl implements app_notification.NotificationService {
     this._flutterLocalNotificationsPlugin,
     this._batteryService,
     this._doNotDisturbService,
+    this._timezoneService,
   );
 
   @override
   Future<void> initialize() async {
-    tz_data.initializeTimeZones();
+    // Asegurar que las zonas horarias estén inicializadas
+    await _timezoneService.initializeTimeZones();
 
     const AndroidInitializationSettings androidInitSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -50,6 +52,7 @@ class NotificationServiceImpl implements app_notification.NotificationService {
     );
     
     await _setupNotificationChannels();
+    debugPrint('NotificationService inicializado correctamente');
   }
 
   Future<void> _setupNotificationChannels() async {
@@ -161,16 +164,24 @@ class NotificationServiceImpl implements app_notification.NotificationService {
       final String payloadJson = notification.payload != null 
           ? json.encode(notification.payload)
           : '';
-
-await _flutterLocalNotificationsPlugin.zonedSchedule(
-  notification.id,
-  notification.title,
-  notification.body,
-  tz.TZDateTime.from(notification.scheduledDate, tz.local),
-  _getNotificationDetails(notification),
-  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
-);
+      
+      // Usar TimezoneService para obtener la fecha correcta
+      final tz.TZDateTime scheduledDate = _timezoneService.getNextDateTimeInstance(
+        notification.scheduledDate,
+      );
+      
+      debugPrint('Programando notificación: ID ${notification.id} para ${scheduledDate.toString()}');
+      
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        notification.id,
+        notification.title,
+        notification.body,
+        scheduledDate,
+        _getNotificationDetails(notification),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payloadJson,
+      );
+      
       return true;
     } catch (e) {
       debugPrint('Error al programar notificación: $e');
@@ -188,38 +199,57 @@ await _flutterLocalNotificationsPlugin.zonedSchedule(
           ? json.encode(notification.payload)
           : '';
 
+      // Notificaciones diarias y semanales usando zonedSchedule con matchDateTimeComponents
       if (notification.repeatInterval == app_notification.NotificationRepeatInterval.daily ||
           notification.repeatInterval == app_notification.NotificationRepeatInterval.weekly) {
-        final RepeatInterval flutterRepeatInterval =
-            _mapToFlutterRepeatInterval(notification.repeatInterval!);
-
-        await _flutterLocalNotificationsPlugin.periodicallyShow(
+        
+        final tz.TZDateTime scheduledDate = _timezoneService.getNextDateTimeInstance(
+          notification.scheduledDate,
+        );
+        
+        debugPrint('Programando notificación repetitiva: ID ${notification.id} para ${scheduledDate.toString()}');
+        
+        // Componentes de fecha para repetición
+        DateTimeComponents? dateTimeComponents;
+        if (notification.repeatInterval == app_notification.NotificationRepeatInterval.daily) {
+          dateTimeComponents = DateTimeComponents.time;
+        } else if (notification.repeatInterval == app_notification.NotificationRepeatInterval.weekly) {
+          dateTimeComponents = DateTimeComponents.dayOfWeekAndTime;
+        }
+        
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
           notification.id,
           notification.title,
           notification.body,
-          flutterRepeatInterval,
+          scheduledDate,
+          _getNotificationDetails(notification),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: dateTimeComponents,
+          payload: payloadJson,
+        );
+        
+        return true;
+      } 
+      // Para notificaciones mensuales, programar una notificación normal
+      else if (notification.repeatInterval == app_notification.NotificationRepeatInterval.monthly) {
+        final tz.TZDateTime scheduledDate = _timezoneService.getNextDateTimeInstance(
+          notification.scheduledDate,
+        );
+        
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
+          notification.id,
+          notification.title,
+          notification.body,
+          scheduledDate,
           _getNotificationDetails(notification),
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           payload: payloadJson,
         );
-        return true;
-      } else {
-        final tz.TZDateTime scheduledDate = tz.TZDateTime.from(
-          notification.scheduledDate,
-          tz.local,
-        );
         
-await _flutterLocalNotificationsPlugin.zonedSchedule(
-  notification.id,
-  notification.title,
-  notification.body,
-  tz.TZDateTime.from(notification.scheduledDate, tz.local),
-  _getNotificationDetails(notification),
-  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
-);
         return true;
       }
+      
+      return false;
     } catch (e) {
       debugPrint('Error al programar notificación repetitiva: $e');
       return false;
@@ -234,22 +264,28 @@ await _flutterLocalNotificationsPlugin.zonedSchedule(
     if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
-      final location = tz.getLocation(timeZone);
-      final scheduledDate = tz.TZDateTime.from(notification.scheduledDate, location);
-      
       final String payloadJson = notification.payload != null 
           ? json.encode(notification.payload)
           : '';
       
-await _flutterLocalNotificationsPlugin.zonedSchedule(
-  notification.id,
-  notification.title,
-  notification.body,
-  tz.TZDateTime.from(notification.scheduledDate, tz.local),
-  _getNotificationDetails(notification),
-  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
-);
+      // Convertir la fecha a la zona horaria especificada
+      final tz.TZDateTime scheduledDate = _timezoneService.getDateTimeInTimeZone(
+        notification.scheduledDate,
+        timeZone,
+      );
+      
+      debugPrint('Programando notificación en zona horaria $timeZone: ID ${notification.id} para ${scheduledDate.toString()}');
+      
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        notification.id,
+        notification.title,
+        notification.body,
+        scheduledDate,
+        _getNotificationDetails(notification),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payloadJson,
+      );
+      
       return true;
     } catch (e) {
       debugPrint('Error al programar notificación en zona horaria: $e');
@@ -268,16 +304,29 @@ await _flutterLocalNotificationsPlugin.zonedSchedule(
       final String payloadJson = notification.payload != null 
           ? json.encode(notification.payload)
           : '';
-
-await _flutterLocalNotificationsPlugin.zonedSchedule(
-  notification.id,
-  notification.title,
-  notification.body,
-  tz.TZDateTime.from(notification.scheduledDate, tz.local),
-  _getNotificationDetails(notification),
-  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-  matchDateTimeComponents: DateTimeComponents.time, // لتكرار يومي
-);
+      
+      // Obtener los detalles de notificación con acciones
+      final NotificationDetails details = _getNotificationDetailsWithActions(
+        notification,
+        actions,
+      );
+      
+      // Obtener la fecha programada con la zona horaria correcta
+      final tz.TZDateTime scheduledDate = _timezoneService.getNextDateTimeInstance(
+        notification.scheduledDate,
+      );
+      
+      debugPrint('Programando notificación con acciones: ID ${notification.id} para ${scheduledDate.toString()}');
+      
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        notification.id,
+        notification.title,
+        notification.body,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payloadJson,
+      );
 
       return true;
     } catch (e) {
@@ -286,15 +335,53 @@ await _flutterLocalNotificationsPlugin.zonedSchedule(
     }
   }
 
-  RepeatInterval _mapToFlutterRepeatInterval(app_notification.NotificationRepeatInterval interval) {
-    switch (interval) {
-      case app_notification.NotificationRepeatInterval.daily:
-        return RepeatInterval.daily;
-      case app_notification.NotificationRepeatInterval.weekly:
-        return RepeatInterval.weekly;
-      case app_notification.NotificationRepeatInterval.monthly:
-        return RepeatInterval.weekly;
-    }
+  // Método adaptado para trabajar con las acciones
+  NotificationDetails _getNotificationDetailsWithActions(
+    app_notification.NotificationData notification,
+    List<app_notification.NotificationAction> actions,
+  ) {
+    final Importance importance = _mapToAndroidImportance(notification.priority);
+    final Priority priority = _mapToAndroidPriority(notification.priority);
+
+    // Crear acciones para Android
+    final List<AndroidNotificationAction> androidActions = actions.map((action) {
+      return AndroidNotificationAction(
+        action.id,
+        action.title,
+        showsUserInterface: action.showsUserInterface,
+        cancelNotification: action.cancelNotification,
+      );
+    }).toList();
+
+    // Configurar detalles para Android
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      notification.channelId,
+      'Athkar ${notification.notificationTime.name.toUpperCase()} Notifications',
+      channelDescription: 'Channel for ${notification.notificationTime.name} notifications',
+      importance: importance,
+      priority: priority,
+      showWhen: true,
+      styleInformation: const BigTextStyleInformation(''),
+      icon: '@mipmap/ic_launcher',
+      sound: notification.soundName != null ? RawResourceAndroidNotificationSound(notification.soundName!) : null,
+      playSound: notification.soundName != null,
+      visibility: _getAndroidVisibility(notification.visibility),
+      actions: androidActions,
+    );
+
+    // Configurar detalles para iOS (sin acciones avanzadas)
+    final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: notification.soundName != null,
+      sound: notification.soundName,
+      // No usamos categoryIdentifier para esta versión
+    );
+
+    return NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
   }
 
   NotificationDetails _getNotificationDetails(app_notification.NotificationData notification) {
@@ -384,10 +471,8 @@ await _flutterLocalNotificationsPlugin.zonedSchedule(
 
   @override
   Future<void> cancelNotificationsByTag(String tag) async {
-    if (Platform.isAndroid) {
-      final List<int> idsToCancel = _getNotificationIdsByTag(tag);
-      await cancelNotificationsByIds(idsToCancel);
-    }
+    final List<int> idsToCancel = _getNotificationIdsByTag(tag);
+    await cancelNotificationsByIds(idsToCancel);
   }
 
   List<int> _getNotificationIdsByTag(String tag) {
@@ -427,8 +512,15 @@ await _flutterLocalNotificationsPlugin.zonedSchedule(
       final bool isDndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
       if (isDndEnabled) {
         debugPrint('DND está habilitado');
-        return notification.priority == app_notification.NotificationPriority.high || 
-               notification.priority == app_notification.NotificationPriority.critical;
+        // Verificar si debemos anular el modo No molestar según la prioridad
+        final bool shouldOverride = await _doNotDisturbService.shouldOverrideDoNotDisturb(
+          notification.priority == app_notification.NotificationPriority.high ||
+          notification.priority == app_notification.NotificationPriority.critical
+            ? DoNotDisturbOverrideType.prayer
+            : DoNotDisturbOverrideType.none,
+        );
+        
+        return shouldOverride;
       }
     }
 
