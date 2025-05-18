@@ -6,8 +6,12 @@ import 'app/app.dart';
 import 'app/di/service_locator.dart';
 import 'core/services/interfaces/notification_service.dart';
 import 'core/services/interfaces/timezone_service.dart';
+import 'core/services/interfaces/storage_service.dart';
 import 'domain/usecases/settings/get_settings.dart';
 import 'core/services/utils/notification_scheduler.dart';
+import 'core/constants/app_constants.dart';
+import 'app/themes/app_theme.dart';
+import 'presentation/screens/onboarding/permissions_onboarding_screen.dart';
 
 Future<void> main() async {
   // تهيئة ربط Flutter
@@ -23,13 +27,26 @@ Future<void> main() async {
     // تهيئة خدمات التطبيق الأساسية فقط
     await _initBasicServices();
     
+    // التحقق من أول تشغيل للتطبيق
+    final storageService = getIt<StorageService>();
+    final isFirstRun = storageService.getBool('isFirstRun') ?? true;
+    
     // إنشاء NavigationService
     _setupNavigationService();
     
     // تسجيل Observer لمراقبة دورة حياة التطبيق
     WidgetsBinding.instance.addObserver(AppLifecycleObserver());
     
-    runApp(const AthkarApp());
+    if (isFirstRun) {
+      // عرض شاشة الأذونات عند أول تشغيل
+      runApp(OnboardingApp());
+      
+      // حفظ حالة أول تشغيل
+      await storageService.setBool('isFirstRun', false);
+    } else {
+      // تشغيل التطبيق العادي
+      runApp(const AthkarApp());
+    }
     
     // تهيئة الخدمات غير الأساسية في الخلفية
     _initNonEssentialServices();
@@ -100,6 +117,21 @@ Future<void> _scheduleNotifications() async {
     }
   } catch (e) {
     debugPrint('حدث خطأ أثناء جدولة الإشعارات: $e');
+  }
+}
+
+// تطبيق شاشة الأذونات والترحيب
+class OnboardingApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: AppConstants.appName,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      debugShowCheckedModeBanner: false,
+      home: const PermissionsOnboardingScreen(),
+    );
   }
 }
 

@@ -17,6 +17,9 @@ import '../../core/services/interfaces/do_not_disturb_service.dart';
 import '../../core/services/implementations/do_not_disturb_service_impl.dart';
 import '../../core/services/interfaces/timezone_service.dart';
 import '../../core/services/implementations/timezone_service_impl.dart';
+import '../../core/services/interfaces/permission_service.dart';
+import '../../core/services/implementations/permission_service_impl.dart';
+import '../../core/services/permission_manager.dart';
 import '../../data/datasources/local/athkar_local_data_source.dart';
 import '../../data/datasources/local/settings_local_data_source.dart';
 import '../../data/repositories/athkar_repository_impl.dart';
@@ -60,6 +63,16 @@ class ServiceLocator {
     getIt.registerSingleton<TimezoneService>(
       TimezoneServiceImpl(),
     );
+    
+    // Permission Service
+getIt.registerSingleton<PermissionService>(
+  PermissionServiceImpl(),
+);
+    
+    // Permission Manager
+getIt.registerSingleton<PermissionManager>(
+  PermissionManager(getIt<PermissionService>()),
+);
     
     // Data Sources
     getIt.registerSingleton<SettingsLocalDataSource>(

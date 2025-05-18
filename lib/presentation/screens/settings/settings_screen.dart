@@ -5,6 +5,8 @@ import '../../../app/di/service_locator.dart';
 import '../../../core/services/interfaces/notification_service.dart';
 import '../../../core/services/interfaces/battery_service.dart';
 import '../../../core/services/interfaces/do_not_disturb_service.dart';
+import '../../../core/services/interfaces/permission_service.dart';
+import '../../../core/services/permission_manager.dart';
 import '../../blocs/prayers/prayer_times_provider.dart';
 import '../../blocs/settings/settings_provider.dart';
 import '../../widgets/common/custom_app_bar.dart';
@@ -22,6 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   final NotificationService _notificationService = getIt<NotificationService>();
   final BatteryService _batteryService = getIt<BatteryService>();
   final DoNotDisturbService _doNotDisturbService = getIt<DoNotDisturbService>();
+  final PermissionManager _permissionManager = getIt<PermissionManager>();
   
   int _batteryLevel = 100;
   bool _isCharging = false;
@@ -31,7 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // زيادة عدد التبويبات لإضافة تبويب الأذونات
     _loadBatteryInfo();
     _loadDoNotDisturbStatus();
   }
@@ -97,6 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             Tab(text: 'عام', icon: Icon(Icons.settings)),
             Tab(text: 'الإشعارات', icon: Icon(Icons.notifications)),
             Tab(text: 'مواقيت الصلاة', icon: Icon(Icons.access_time)),
+            Tab(text: 'الأذونات', icon: Icon(Icons.security)), // تبويب جديد للأذونات
           ],
         ),
       ),
@@ -128,6 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               _buildGeneralSettingsTab(provider),
               _buildNotificationSettingsTab(provider),
               _buildPrayerSettingsTab(provider),
+              _buildPermissionsTab(), // تبويب الأذونات الجديد
             ],
           );
         },
@@ -188,6 +193,59 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         children: [
           _buildSectionTitle(context, 'إعدادات مواقيت الصلاة'),
           _buildPrayerSettings(provider),
+        ],
+      ),
+    );
+  }
+  
+  // علامة تبويب الأذونات الجديدة
+  Widget _buildPermissionsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(context, 'إدارة الأذونات'),
+          _buildPermissionSettingsCard(context),
+          
+          const SizedBox(height: 16),
+          
+          // شرح عن أهمية الأذونات
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'أهمية الأذونات',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const Divider(),
+                  const Text(
+                    'يحتاج التطبيق إلى عدة أذونات لتقديم أفضل تجربة:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '• إذن الإشعارات: للتذكير بمواقيت الصلاة والأذكار في الأوقات المحددة',
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '• إذن الموقع: لتحديد اتجاه القبلة بدقة وضبط مواقيت الصلاة حسب موقعك',
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '• إذن عدم الإزعاج: للسماح بظهور إشعارات الصلاة حتى في وضع عدم الإزعاج',
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '• استثناء البطارية: للسماح بعمل الإشعارات بشكل موثوق حتى مع تفعيل وضع توفير الطاقة',
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -324,8 +382,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             onChanged: (value) async {
               if (value) {
                 // طلب إذن الإشعارات
-                final hasPermission = await _notificationService.requestPermission();
-                if (hasPermission) {
+                final hasPermission = await _permissionManager.requestEssentialPermissions(context);
+                if (hasPermission[PermissionType.notification] ?? false) {
                   provider.updateSetting(key: 'enableNotifications', value: value);
                 } else {
                   // إظهار رسالة تنبيه بأنه لا يمكن تفعيل الإشعارات
@@ -568,6 +626,155 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             },
           ),
         ],
+      ),
+    );
+  }
+
+  // قسم إدارة الأذونات
+  Widget _buildPermissionSettingsCard(BuildContext context) {
+    return FutureBuilder<Map<PermissionType, PermissionStatus>>(
+      future: _permissionManager.checkPermissions(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          );
+        }
+        
+        final permissions = snapshot.data!;
+        
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'حالة الأذونات',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Divider(),
+                
+                _buildPermissionItem(
+                  context,
+                  title: 'إشعارات',
+                  type: PermissionType.notification,
+                  status: permissions[PermissionType.notification]!,
+                  icon: Icons.notifications,
+                  onTap: () async {
+                    final result = await _permissionManager.requestEssentialPermissions(context);
+                    setState(() {});
+                  },
+                ),
+                
+                _buildPermissionItem(
+                  context,
+                  title: 'الموقع',
+                  type: PermissionType.location,
+                  status: permissions[PermissionType.location]!,
+                  icon: Icons.location_on,
+                  onTap: () async {
+                    await _permissionManager.requestLocationPermission(context);
+                    setState(() {});
+                  },
+                ),
+                
+                _buildPermissionItem(
+                  context,
+                  title: 'استثناء البطارية',
+                  type: PermissionType.batteryOptimization,
+                  status: permissions[PermissionType.batteryOptimization]!,
+                  icon: Icons.battery_charging_full,
+                  onTap: () async {
+                    final result = await _permissionManager.requestOptionalPermissions(context);
+                    setState(() {});
+                  },
+                ),
+                
+                _buildPermissionItem(
+                  context,
+                  title: 'وضع عدم الإزعاج',
+                  type: PermissionType.doNotDisturb,
+                  status: permissions[PermissionType.doNotDisturb]!,
+                  icon: Icons.do_not_disturb_on,
+                  onTap: () async {
+                    final result = await _permissionManager.requestOptionalPermissions(context);
+                    setState(() {});
+                  },
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // زر لإعادة تعيين جميع الأذونات
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await _permissionManager.requestEssentialPermissions(context);
+                      await _permissionManager.requestOptionalPermissions(context);
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.security),
+                    label: const Text('تحديث جميع الأذونات'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPermissionItem(
+    BuildContext context, {
+    required String title,
+    required PermissionType type,
+    required PermissionStatus status,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    // تحديد اللون والحالة حسب حالة الإذن
+    Color statusColor;
+    String statusText;
+    
+    switch (status) {
+      case PermissionStatus.granted:
+        statusColor = Colors.green;
+        statusText = 'ممنوح';
+        break;
+      case PermissionStatus.denied:
+        statusColor = Colors.orange;
+        statusText = 'مرفوض';
+        break;
+      case PermissionStatus.permanentlyDenied:
+        statusColor = Colors.red;
+        statusText = 'مرفوض دائمًا';
+        break;
+      case PermissionStatus.restricted:
+        statusColor = Colors.red;
+        statusText = 'مقيد';
+        break;
+      case PermissionStatus.limited:
+        statusColor = Colors.orange;
+        statusText = 'محدود';
+        break;
+    }
+    
+    return ListTile(
+      leading: Icon(icon, color: statusColor),
+      title: Text(title),
+      subtitle: Text(statusText),
+      trailing: TextButton(
+        onPressed: onTap,
+        child: const Text('تعديل'),
       ),
     );
   }

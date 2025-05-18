@@ -1,54 +1,58 @@
-// lib/core/services/utils/permission_utils.dart
-import 'package:permission_handler/permission_handler.dart';
-import 'package:app_settings/app_settings.dart';
+// lib/core/utils/permission_util.dart
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-class AppPermissionUtils {
-  /// طلب إذن الموقع
-  static Future<bool> requestLocationPermission() async {
-    final status = await Permission.location.request();
-    return status.isGranted;
-  }
-  
-  /// التحقق من حالة إذن الموقع
-  static Future<bool> checkLocationPermission() async {
-    return await Permission.location.isGranted;
-  }
-  
-  /// طلب إذن الإشعارات
-  static Future<bool> requestNotificationPermission() async {
+/// Utilidad simple para gestionar permisos
+class PermissionUtil {
+  /// Solicita permiso de notificaciones
+  static Future<bool> requestNotification(BuildContext context) async {
     final status = await Permission.notification.request();
+    if (status.isPermanentlyDenied) {
+      final shouldOpen = await _showOpenSettingsDialog(
+        context,
+        'إذن الإشعارات',
+        'تم رفض إذن الإشعارات بشكل دائم. يرجى فتح إعدادات التطبيق وتفعيل الإذن يدويًا.',
+      );
+      
+      if (shouldOpen) {
+        await openAppSettings();
+      }
+    }
     return status.isGranted;
   }
   
-  /// التحقق من حالة إذن الإشعارات
-  static Future<bool> checkNotificationPermission() async {
-    return await Permission.notification.isGranted;
+  /// Solicita permiso de ubicación
+  static Future<bool> requestLocation(BuildContext context) async {
+    final status = await Permission.location.request();
+    if (status.isPermanentlyDenied) {
+      final shouldOpen = await _showOpenSettingsDialog(
+        context,
+        'إذن الموقع',
+        'تم رفض إذن الموقع بشكل دائم. يرجى فتح إعدادات التطبيق وتفعيل الإذن يدويًا.',
+      );
+      
+      if (shouldOpen) {
+        await openAppSettings();
+      }
+    }
+    return status.isGranted;
   }
   
-  /// فتح إعدادات التطبيق
-  static Future<void> openAppSettings() async {
-    await AppSettings.openAppSettings();
+  /// Verifica el estado de los permisos principales
+  static Future<Map<String, bool>> checkMainPermissions() async {
+    return {
+      'notification': await Permission.notification.isGranted,
+      'location': await Permission.location.isGranted,
+    };
   }
   
-  /// فتح إعدادات الموقع
-  static Future<void> openLocationSettings() async {
-    await AppSettings.openLocationSettings();
-  }
-  
-  /// فتح إعدادات الإشعارات
-  static Future<void> openNotificationSettings() async {
-    await AppSettings.openNotificationSettings();
-  }
-  
-  /// عرض حوار طلب الإذن مع شرح السبب
-  static Future<bool> showPermissionDialog({
-    required BuildContext context,
-    required String title,
-    required String message,
-    required Function() onOpenSettings,
-  }) async {
-    final result = await showDialog<bool>(
+  /// Muestra un diálogo para abrir la configuración
+  static Future<bool> _showOpenSettingsDialog(
+    BuildContext context,
+    String title,
+    String message,
+  ) async {
+    return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(title),
@@ -58,17 +62,12 @@ class AppPermissionUtils {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('إلغاء'),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-              onOpenSettings();
-            },
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('فتح الإعدادات'),
           ),
         ],
       ),
-    );
-    
-    return result ?? false;
+    ) ?? false;
   }
 }
