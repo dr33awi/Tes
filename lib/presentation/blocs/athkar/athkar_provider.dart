@@ -1,4 +1,3 @@
-// lib/presentation/blocs/athkar/athkar_provider.dart
 import 'package:flutter/material.dart';
 import '../../../domain/entities/athkar.dart';
 import '../../../domain/usecases/athkar/get_athkar_by_category.dart';
@@ -8,16 +7,16 @@ class AthkarProvider extends ChangeNotifier {
   final GetAthkarCategories _getAthkarCategories;
   final GetAthkarByCategory _getAthkarByCategory;
   
-  // قائمة الفئات
+  // تحسين: استخدام نوع عام للبيانات
   List<AthkarCategory>? _categories;
-  // خريطة للأذكار حسب الفئة
   Map<String, List<Athkar>> _athkarByCategory = {};
-  // خريطة للتحكم في عمليات التحميل المتزامنة لتجنب التكرار
-  final Map<String, bool> _loadingStatus = {};
+  Map<String, bool> _loadingStatus = {};
   
   bool _isLoading = false;
   String? _error;
   bool _isDisposed = false;
+  // تحسين: إضافة متغير لتتبع ما إذا تم تحميل البيانات
+  bool _hasInitialDataLoaded = false;
   
   AthkarProvider({
     required GetAthkarCategories getAthkarCategories,
@@ -25,92 +24,62 @@ class AthkarProvider extends ChangeNotifier {
   })  : _getAthkarCategories = getAthkarCategories,
         _getAthkarByCategory = getAthkarByCategory;
   
-  // الحالة الحالية
+  // الحالة الحالية مع getters محسنة
   List<AthkarCategory>? get categories => _categories;
   List<Athkar>? getAthkarForCategory(String categoryId) => _athkarByCategory[categoryId];
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasError => _error != null;
+  bool get hasInitialDataLoaded => _hasInitialDataLoaded;
   
   bool isCategoryLoading(String categoryId) => _loadingStatus[categoryId] ?? false;
   
   // تحميل فئات الأذكار بتحسين الأداء
   Future<void> loadCategories() async {
-    // تجنب التحميل المتكرر أو إذا كان التطبيق في حالة الإغلاق
+    // تحسين: التحقق من حالة التحميل بشكل أفضل
     if (_categories != null || _isLoading || _isDisposed) return;
     
-    // تعيين حالة التحميل
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    _setLoading(true);
     
     try {
-      // تنفيذ التحميل من المصدر
       _categories = await _getAthkarCategories();
-      _isLoading = false;
-      
-      // إخطار المستمعين فقط إذا كان التطبيق لا يزال نشطًا
-      if (!_isDisposed) {
-        notifyListeners();
-      }
+      _hasInitialDataLoaded = true;
+      _setLoading(false);
     } catch (e) {
-      // معالجة الخطأ
-      _isLoading = false;
-      _error = e.toString();
-      
-      // إخطار المستمعين فقط إذا كان التطبيق لا يزال نشطًا
-      if (!_isDisposed) {
-        notifyListeners();
-      }
+      _setError(e.toString());
     }
   }
   
   // تحميل الأذكار حسب الفئة بتحسين الأداء
   Future<void> loadAthkarByCategory(String categoryId) async {
-    // تجنب التحميل المتكرر أو إذا كان التطبيق في حالة الإغلاق
+    // تجنب التحميل المتكرر
     if (_athkarByCategory.containsKey(categoryId) || 
         _loadingStatus[categoryId] == true || 
         _isDisposed) {
       return;
     }
     
-    // تعيين حالة التحميل لهذه الفئة
     _loadingStatus[categoryId] = true;
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    _setLoading(true);
     
     try {
-      // تنفيذ التحميل من المصدر
       final athkar = await _getAthkarByCategory(categoryId);
+      
+      // تحسين: التحقق من حالة الإغلاق قبل تحديث البيانات
+      if (_isDisposed) return;
+      
       _athkarByCategory[categoryId] = athkar;
       _loadingStatus[categoryId] = false;
-      _isLoading = false;
-      
-      // إخطار المستمعين فقط إذا كان التطبيق لا يزال نشطًا
-      if (!_isDisposed) {
-        notifyListeners();
-      }
+      _setLoading(false);
     } catch (e) {
-      // معالجة الخطأ
-      _loadingStatus[categoryId] = false;
-      _isLoading = false;
-      _error = e.toString();
-      
-      // إخطار المستمعين فقط إذا كان التطبيق لا يزال نشطًا
-      if (!_isDisposed) {
-        notifyListeners();
-      }
+      _setError(e.toString());
     }
   }
   
   // تحميل أو إعادة تحميل الفئة بشكل قسري
   Future<void> refreshCategory(String categoryId) async {
-    // إعادة تعيين حالة الفئة
     _athkarByCategory.remove(categoryId);
     _loadingStatus[categoryId] = false;
-    
-    // إعادة تحميل البيانات
     await loadAthkarByCategory(categoryId);
   }
   
@@ -121,33 +90,44 @@ class AthkarProvider extends ChangeNotifier {
     _loadingStatus.clear();
     _isLoading = false;
     _error = null;
+    _hasInitialDataLoaded = false;
     
     await loadCategories();
+    notifyListeners();
   }
   
-  // تنظيف الموارد عند التخلص من Provider
+  // تحسين: طرق مساعدة لتحديث الحالة
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    _error = null;
+    if (!_isDisposed) notifyListeners();
+  }
+  
+  void _setError(String errorMessage) {
+    _isLoading = false;
+    _error = errorMessage;
+    if (!_isDisposed) notifyListeners();
+  }
+  
+  // تحميل البيانات الشائعة مسبقاً
+  Future<void> preloadCommonCategories() async {
+    if (_isDisposed || _hasInitialDataLoaded) return;
+    
+    await loadCategories();
+    
+    if (_categories != null && _categories!.isNotEmpty) {
+      for (final category in _categories!) {
+        if (['morning', 'evening', 'sleep'].contains(category.id)) {
+          await loadAthkarByCategory(category.id);
+        }
+      }
+    }
+  }
+  
   @override
   void dispose() {
     _isDisposed = true;
     _loadingStatus.clear();
     super.dispose();
-  }
-  
-  // تحسين: تحميل البيانات الشائعة مسبقًا
-  Future<void> preloadCommonCategories() async {
-    if (_isDisposed) return;
-    
-    // تحميل الفئات أولاً
-    await loadCategories();
-    
-    if (_categories != null && _categories!.isNotEmpty) {
-      // تحميل الفئات الأكثر استخداماً في الخلفية
-      for (final category in _categories!) {
-        if (['morning', 'evening', 'sleep'].contains(category.id)) {
-          // استخدام Future.microtask للسماح بتحميل أكثر من فئة في وقت واحد
-          Future.microtask(() => loadAthkarByCategory(category.id));
-        }
-      }
-    }
   }
 }
