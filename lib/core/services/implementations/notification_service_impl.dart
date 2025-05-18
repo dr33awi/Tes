@@ -18,6 +18,8 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   bool _respectBatteryOptimizations = true;
   bool _respectDoNotDisturb = true;
+  bool _isInitialized = false;
+  bool _isDisposed = false;
 
   NotificationServiceImpl(
     this._flutterLocalNotificationsPlugin,
@@ -28,31 +30,39 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<void> initialize() async {
-    // Asegurar que las zonas horarias estén inicializadas
-    await _timezoneService.initializeTimeZones();
-
-    const AndroidInitializationSettings androidInitSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const DarwinInitializationSettings iosInitSettings =
-        DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidInitSettings,
-      iOS: iosInitSettings,
-    );
-
-    await _flutterLocalNotificationsPlugin.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
-    );
+    if (_isInitialized || _isDisposed) return;
     
-    await _setupNotificationChannels();
-    debugPrint('NotificationService inicializado correctamente');
+    try {
+      // Asegurar que las zonas horarias estén inicializadas
+      await _timezoneService.initializeTimeZones();
+
+      const AndroidInitializationSettings androidInitSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+
+      const DarwinInitializationSettings iosInitSettings =
+          DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidInitSettings,
+        iOS: iosInitSettings,
+      );
+
+      await _flutterLocalNotificationsPlugin.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
+      );
+      
+      await _setupNotificationChannels();
+      _isInitialized = true;
+      debugPrint('NotificationService inicializado correctamente');
+    } catch (e) {
+      debugPrint('Error initializing notification service: $e');
+      throw Exception('Failed to initialize notification service: $e');
+    }
   }
 
   Future<void> _setupNotificationChannels() async {
@@ -91,8 +101,10 @@ class NotificationServiceImpl implements app_notification.NotificationService {
   }
 
   void _onDidReceiveNotificationResponse(NotificationResponse response) {
-    final String? payload = response.payload;
-    if (payload != null && payload.isNotEmpty) {
+    try {
+      final String? payload = response.payload;
+      if (payload == null || payload.isEmpty) return;
+      
       try {
         final Map<String, dynamic> data = json.decode(payload);
         final String? type = data['type'];
@@ -100,23 +112,35 @@ class NotificationServiceImpl implements app_notification.NotificationService {
         final Map<String, dynamic>? arguments = data['arguments'];
         
         if (type != null && route != null) {
+          // التحقق أولاً من وجود navigatorKey و currentState
           final navigatorKey = NavigationService.navigatorKey;
-          if (navigatorKey.currentState != null) {
-            if (arguments != null) {
-              navigatorKey.currentState!.pushNamed(route, arguments: arguments);
+          if (navigatorKey.currentState != null && navigatorKey.currentContext != null) {
+            // التأكد أن السياق لا يزال فعالاً (التطبيق في الواجهة)
+            if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+              if (arguments != null) {
+                navigatorKey.currentState!.pushNamed(route, arguments: arguments);
+              } else {
+                navigatorKey.currentState!.pushNamed(route);
+              }
             } else {
-              navigatorKey.currentState!.pushNamed(route);
+              debugPrint('App not in foreground, skipping notification navigation');
             }
+          } else {
+            debugPrint('Navigator key not ready, cannot navigate from notification');
           }
         }
       } catch (e) {
         debugPrint('Error al analizar payload de notificación: $e');
       }
+    } catch (e) {
+      debugPrint('Error handling notification response: $e');
     }
   }
 
   @override
   Future<bool> requestPermission() async {
+    if (_isDisposed) return false;
+    
     try {
       if (Platform.isAndroid) {
         final AndroidFlutterLocalNotificationsPlugin? androidPlugin = 
@@ -158,6 +182,7 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<bool> scheduleNotification(app_notification.NotificationData notification) async {
+    if (_isDisposed) return false;
     if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
@@ -191,6 +216,7 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<bool> scheduleRepeatingNotification(app_notification.NotificationData notification) async {
+    if (_isDisposed) return false;
     if (notification.repeatInterval == null) return false;
     if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
@@ -261,6 +287,7 @@ class NotificationServiceImpl implements app_notification.NotificationService {
     app_notification.NotificationData notification, 
     String timeZone
   ) async {
+    if (_isDisposed) return false;
     if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
@@ -298,6 +325,7 @@ class NotificationServiceImpl implements app_notification.NotificationService {
     app_notification.NotificationData notification,
     List<app_notification.NotificationAction> actions,
   ) async {
+    if (_isDisposed) return false;
     if (!await _canSendNotificationBasedOnSettings(notification)) return false;
 
     try {
@@ -454,16 +482,19 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<void> cancelNotification(int id) async {
+    if (_isDisposed) return;
     await _flutterLocalNotificationsPlugin.cancel(id);
   }
 
   @override
   Future<void> cancelAllNotifications() async {
+    if (_isDisposed) return;
     await _flutterLocalNotificationsPlugin.cancelAll();
   }
 
   @override
   Future<void> cancelNotificationsByIds(List<int> ids) async {
+    if (_isDisposed) return;
     for (final id in ids) {
       await _flutterLocalNotificationsPlugin.cancel(id);
     }
@@ -471,6 +502,7 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<void> cancelNotificationsByTag(String tag) async {
+    if (_isDisposed) return;
     final List<int> idsToCancel = _getNotificationIdsByTag(tag);
     await cancelNotificationsByIds(idsToCancel);
   }
@@ -488,39 +520,62 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<void> setRespectBatteryOptimizations(bool enabled) async {
+    if (_isDisposed) return;
     _respectBatteryOptimizations = enabled;
   }
 
   @override
   Future<void> setRespectDoNotDisturb(bool enabled) async {
+    if (_isDisposed) return;
     _respectDoNotDisturb = enabled;
   }
 
   Future<bool> _canSendNotificationBasedOnSettings(app_notification.NotificationData notification) async {
-    final bool hasPermission = await requestPermission();
+    if (_isDisposed) return false;
+    
+    bool hasPermission = false;
+    try {
+      hasPermission = await requestPermission();
+    } catch (e) {
+      debugPrint('Error checking notification permission: $e');
+      return false;
+    }
+    
     if (!hasPermission) return false;
 
+    // التحقق من حالة البطارية بشكل آمن
     if (notification.respectBatteryOptimizations && _respectBatteryOptimizations) {
-      final bool canSendBasedOnBattery = await _batteryService.canSendNotification();
-      if (!canSendBasedOnBattery) {
-        debugPrint('No se puede enviar notificación debido a optimizaciones de batería');
-        return false;
+      try {
+        final bool canSendBasedOnBattery = await _batteryService.canSendNotification();
+        if (!canSendBasedOnBattery) {
+          debugPrint('No se puede enviar notificación debido a optimizaciones de batería');
+          return false;
+        }
+      } catch (e) {
+        debugPrint('Error checking battery status: $e');
+        // نستمر في الإرسال إذا حدث خطأ في فحص البطارية
       }
     }
 
+    // التحقق من وضع عدم الإزعاج بشكل آمن
     if (notification.respectDoNotDisturb && _respectDoNotDisturb) {
-      final bool isDndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
-      if (isDndEnabled) {
-        debugPrint('DND está habilitado');
-        // Verificar si debemos anular el modo No molestar según la prioridad
-        final bool shouldOverride = await _doNotDisturbService.shouldOverrideDoNotDisturb(
-          notification.priority == app_notification.NotificationPriority.high ||
-          notification.priority == app_notification.NotificationPriority.critical
-            ? DoNotDisturbOverrideType.prayer
-            : DoNotDisturbOverrideType.none,
-        );
-        
-        return shouldOverride;
+      try {
+        final bool isDndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
+        if (isDndEnabled) {
+          debugPrint('DND está habilitado');
+          // Verificar si debemos anular el modo No molestar según la prioridad
+          final bool shouldOverride = await _doNotDisturbService.shouldOverrideDoNotDisturb(
+            notification.priority == app_notification.NotificationPriority.high ||
+            notification.priority == app_notification.NotificationPriority.critical
+              ? DoNotDisturbOverrideType.prayer
+              : DoNotDisturbOverrideType.none,
+          );
+          
+          return shouldOverride;
+        }
+      } catch (e) {
+        debugPrint('Error checking DND status: $e');
+        // نستمر في الإرسال إذا حدث خطأ في فحص وضع عدم الإزعاج
       }
     }
 
@@ -529,17 +584,29 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<bool> canSendNotificationsNow() async {
+    if (_isDisposed) return false;
+    
     final bool hasPermission = await requestPermission();
     if (!hasPermission) return false;
 
     if (_respectBatteryOptimizations) {
-      final bool canSendBasedOnBattery = await _batteryService.canSendNotification();
-      if (!canSendBasedOnBattery) return false;
+      try {
+        final bool canSendBasedOnBattery = await _batteryService.canSendNotification();
+        if (!canSendBasedOnBattery) return false;
+      } catch (e) {
+        debugPrint('Error checking battery status: $e');
+        // نستمر إذا فشل التحقق
+      }
     }
 
     if (_respectDoNotDisturb) {
-      final bool isDndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
-      if (isDndEnabled) return false;
+      try {
+        final bool isDndEnabled = await _doNotDisturbService.isDoNotDisturbEnabled();
+        if (isDndEnabled) return false;
+      } catch (e) {
+        debugPrint('Error checking DND status: $e');
+        // نستمر إذا فشل التحقق
+      }
     }
 
     return true;
@@ -547,6 +614,18 @@ class NotificationServiceImpl implements app_notification.NotificationService {
 
   @override
   Future<void> dispose() async {
-    debugPrint('NotificationService disposed');
+    if (_isDisposed) return;
+    
+    try {
+      _isDisposed = true;
+      _isInitialized = false;
+      
+      // Cancel any active notifications if needed
+      // Release any resources
+      
+      debugPrint('NotificationService disposed');
+    } catch (e) {
+      debugPrint('Error disposing NotificationService: $e');
+    }
   }
 }

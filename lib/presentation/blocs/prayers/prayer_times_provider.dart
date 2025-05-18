@@ -17,10 +17,14 @@ class PrayerTimesProvider extends ChangeNotifier {
   
   bool _isLoading = false;
   String? _error;
+  bool _isDisposed = false;
   
   // موقع المستخدم
   double? _latitude;
   double? _longitude;
+  
+  // خرائط لتتبع حالة التحميل
+  final Map<String, bool> _loadingStatus = {};
   
   PrayerTimesProvider({
     required GetPrayerTimes getPrayerTimes,
@@ -37,6 +41,8 @@ class PrayerTimesProvider extends ChangeNotifier {
   bool get hasError => _error != null;
   bool get hasLocation => _latitude != null && _longitude != null;
   
+  bool isOperationLoading(String operation) => _loadingStatus[operation] ?? false;
+  
   // تعيين موقع المستخدم
   void setLocation({required double latitude, required double longitude}) {
     _latitude = latitude;
@@ -46,12 +52,16 @@ class PrayerTimesProvider extends ChangeNotifier {
   
   // تحميل مواقيت الصلاة لليوم الحالي
   Future<void> loadTodayPrayerTimes(Settings settings) async {
-    if (!hasLocation) {
-      _error = 'Location not available';
-      notifyListeners();
+    // التحقق من توفر الموقع ومنع التحميل المتكرر
+    if (!hasLocation || isOperationLoading('todayPrayers') || _isDisposed) {
+      if (!hasLocation) {
+        _error = 'Location not available';
+        notifyListeners();
+      }
       return;
     }
     
+    _loadingStatus['todayPrayers'] = true;
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -64,30 +74,45 @@ class PrayerTimesProvider extends ChangeNotifier {
         asrMethodIndex: settings.asrMethod,
       );
       
-      // تحميل مواقيت اليوم
+      // إضافة مهلة زمنية للعملية
       _todayPrayerTimes = await _getPrayerTimes.getTodayPrayerTimes(
         params,
         latitude: _latitude!,
         longitude: _longitude!,
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException('Operation timed out'),
       );
       
-      _isLoading = false;
-      notifyListeners();
+      _loadingStatus['todayPrayers'] = false;
+      _isLoading = _loadingStatus.values.any((isLoading) => isLoading);
+      
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     } catch (e) {
-      _isLoading = false;
+      _loadingStatus['todayPrayers'] = false;
+      _isLoading = _loadingStatus.values.any((isLoading) => isLoading);
       _error = e.toString();
-      notifyListeners();
+      
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     }
   }
   
   // تحميل مواقيت الصلاة للأسبوع الحالي
   Future<void> loadWeekPrayerTimes(Settings settings) async {
-    if (!hasLocation) {
-      _error = 'Location not available';
-      notifyListeners();
+    // التحقق من توفر الموقع ومنع التحميل المتكرر
+    if (!hasLocation || isOperationLoading('weekPrayers') || _isDisposed) {
+      if (!hasLocation) {
+        _error = 'Location not available';
+        notifyListeners();
+      }
       return;
     }
     
+    _loadingStatus['weekPrayers'] = true;
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -105,56 +130,109 @@ class PrayerTimesProvider extends ChangeNotifier {
       final startDate = DateTime(now.year, now.month, now.day);
       final endDate = startDate.add(const Duration(days: 6));
       
-      // تحميل مواقيت الأسبوع
+      // إضافة مهلة زمنية للعملية
       _weekPrayerTimes = await _getPrayerTimes.getPrayerTimesForRange(
         params: params,
         startDate: startDate,
         endDate: endDate,
         latitude: _latitude!,
         longitude: _longitude!,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw TimeoutException('Operation timed out'),
       );
       
-      _isLoading = false;
-      notifyListeners();
+      _loadingStatus['weekPrayers'] = false;
+      _isLoading = _loadingStatus.values.any((isLoading) => isLoading);
+      
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     } catch (e) {
-      _isLoading = false;
+      _loadingStatus['weekPrayers'] = false;
+      _isLoading = _loadingStatus.values.any((isLoading) => isLoading);
       _error = e.toString();
-      notifyListeners();
+      
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     }
   }
   
   // تحميل اتجاه القبلة
   Future<void> loadQiblaDirection() async {
-    if (!hasLocation) {
-      _error = 'Location not available';
-      notifyListeners();
+    // التحقق من توفر الموقع ومنع التحميل المتكرر
+    if (!hasLocation || isOperationLoading('qibla') || _isDisposed) {
+      if (!hasLocation) {
+        _error = 'Location not available';
+        notifyListeners();
+      }
       return;
     }
     
+    _loadingStatus['qibla'] = true;
     _isLoading = true;
     _error = null;
     notifyListeners();
     
     try {
+      // إضافة مهلة زمنية للعملية
       _qiblaDirection = await _getQiblaDirection(
         latitude: _latitude!,
         longitude: _longitude!,
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException('Operation timed out'),
       );
       
-      _isLoading = false;
-      notifyListeners();
+      _loadingStatus['qibla'] = false;
+      _isLoading = _loadingStatus.values.any((isLoading) => isLoading);
+      
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     } catch (e) {
-      _isLoading = false;
+      _loadingStatus['qibla'] = false;
+      _isLoading = _loadingStatus.values.any((isLoading) => isLoading);
       _error = e.toString();
-      notifyListeners();
+      
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     }
   }
   
   // إعادة تحميل البيانات
   Future<void> refreshData(Settings settings) async {
+    // إعادة تعيين حالة الخطأ
+    _error = null;
+    
+    // تحميل جميع البيانات بشكل متوازٍ
+    final futures = [
+      loadTodayPrayerTimes(settings),
+      loadWeekPrayerTimes(settings),
+      loadQiblaDirection(),
+    ];
+    
+    // الانتظار حتى اكتمال جميع العمليات
+    await Future.wait(futures);
+  }
+  
+  // التحميل الأولي (يُستخدم عند بدء التطبيق)
+  Future<void> initialLoad(Settings settings) async {
+    if (!hasLocation) return;
+    
+    // تحميل بيانات اليوم أولاً
     await loadTodayPrayerTimes(settings);
-    await loadWeekPrayerTimes(settings);
-    await loadQiblaDirection();
+    
+    // ثم تحميل باقي البيانات في الخلفية
+    if (!_isDisposed) {
+      // استخدام microtask لتجنب تعطيل واجهة المستخدم
+      Future.microtask(() {
+        loadQiblaDirection();
+        loadWeekPrayerTimes(settings);
+      });
+    }
   }
   
   // تحويل رقم طريقة الحساب إلى اسم الطريقة
@@ -186,4 +264,22 @@ class PrayerTimesProvider extends ChangeNotifier {
         return 'muslim_world_league';
     }
   }
+  
+  // تنظيف الموارد عند التخلص من Provider
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _loadingStatus.clear();
+    super.dispose();
+  }
+}
+
+// إضافة استثناء مخصص للمهلة الزمنية
+class TimeoutException implements Exception {
+  final String message;
+  
+  TimeoutException(this.message);
+  
+  @override
+  String toString() => 'TimeoutException: $message';
 }

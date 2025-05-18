@@ -1,6 +1,5 @@
 // lib/main.dart
 import 'dart:async';
-import 'package:athkar_app/core/services/utils/notification_scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app/app.dart';
@@ -8,37 +7,32 @@ import 'app/di/service_locator.dart';
 import 'core/services/interfaces/notification_service.dart';
 import 'core/services/interfaces/timezone_service.dart';
 import 'domain/usecases/settings/get_settings.dart';
+import 'core/services/utils/notification_scheduler.dart';
 
 Future<void> main() async {
   // تهيئة ربط Flutter
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تعيين اتجاه التطبيق من اليمين إلى اليسار
+  // تعيين اتجاه التطبيق
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
   
   try {
-    // تهيئة خدمات التطبيق
-    await ServiceLocator().init();
-    
-    // التأكد من تهيئة التوقيت
-    await _initializeTimeZones();
+    // تهيئة خدمات التطبيق الأساسية فقط
+    await _initBasicServices();
     
     // إنشاء NavigationService
-    await _setupNavigationService();
-    
-    // طلب أذونات الإشعارات عند بدء التطبيق
-    await _requestNotificationPermissions();
-    
-    // جدولة الإشعارات بناءً على الإعدادات المحفوظة
-    await _scheduleNotifications();
+    _setupNavigationService();
     
     // تسجيل Observer لمراقبة دورة حياة التطبيق
     WidgetsBinding.instance.addObserver(AppLifecycleObserver());
     
     runApp(const AthkarApp());
+    
+    // تهيئة الخدمات غير الأساسية في الخلفية
+    _initNonEssentialServices();
   } catch (e) {
     debugPrint('Error al iniciar la aplicación: $e');
     runApp(
@@ -53,27 +47,32 @@ Future<void> main() async {
   }
 }
 
-/// التأكد من تهيئة المناطق الزمنية
-Future<void> _initializeTimeZones() async {
-  try {
-    final timezoneService = getIt<TimezoneService>();
-    await timezoneService.initializeTimeZones();
-    debugPrint('Zonas horarias inicializadas correctamente');
-  } catch (e) {
-    debugPrint('Error inicializando zonas horarias: $e');
-  }
+/// تهيئة الخدمات الأساسية المطلوبة لبدء التطبيق
+Future<void> _initBasicServices() async {
+  // تهيئة خدمات التطبيق الأساسية فقط
+  await ServiceLocator().initBasicServices();
+  
+  // التأكد من تهيئة التوقيت
+  final timezoneService = getIt<TimezoneService>();
+  await timezoneService.initializeTimeZones();
+}
+
+/// تهيئة الخدمات غير الأساسية في الخلفية
+Future<void> _initNonEssentialServices() async {
+  // إكمال تهيئة باقي الخدمات
+  await ServiceLocator().initRemainingServices();
+  
+  // طلب أذونات الإشعارات عند بدء التطبيق
+  await _requestNotificationPermissions();
+  
+  // جدولة الإشعارات بناءً على الإعدادات المحفوظة
+  await _scheduleNotifications();
 }
 
 /// إعداد خدمة التنقل
-Future<void> _setupNavigationService() async {
-  // إضافة NavigationService للوصول إلى السياق
-  runApp(MaterialApp(
-    navigatorKey: NavigationService.navigatorKey,
-    home: Container(), // هذا فقط لتهيئة NavigatorKey
-  ));
-  
-  // انتظار قليلاً للسماح للتطبيق بإعداد السياق
-  await Future.delayed(const Duration(milliseconds: 100));
+void _setupNavigationService() {
+  // إعداد NavigationKey للوصول إلى السياق
+  NavigationService.navigatorKey = GlobalKey<NavigatorState>();
 }
 
 /// طلب أذونات الإشعارات
@@ -106,7 +105,7 @@ Future<void> _scheduleNotifications() async {
 
 // خدمة التنقل للوصول إلى السياق العام للتطبيق
 class NavigationService {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 }
 
 /// مراقب دورة حياة التطبيق لتنظيف الموارد عند إغلاق التطبيق

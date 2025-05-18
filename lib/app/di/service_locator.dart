@@ -40,25 +40,55 @@ class ServiceLocator {
   factory ServiceLocator() => _instance;
   ServiceLocator._internal();
 
-  bool _isInitialized = false;
+  bool _basicServicesInitialized = false;
+  bool _fullInitialized = false;
 
-  /// Inicialización de servicios de la aplicación
-  Future<void> init() async {
-    if (_isInitialized) return;
+  /// تهيئة الخدمات الأساسية المطلوبة لبدء التطبيق
+  Future<void> initBasicServices() async {
+    if (_basicServicesInitialized) return;
 
     // External Services
     final sharedPreferences = await SharedPreferences.getInstance();
     getIt.registerSingleton<SharedPreferences>(sharedPreferences);
     
-    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-    getIt.registerSingleton<FlutterLocalNotificationsPlugin>(flutterLocalNotificationsPlugin);
-
     // Core Services
     getIt.registerSingleton<StorageService>(
       StorageServiceImpl(sharedPreferences),
     );
     
-    // Registro de servicios principales
+    // Timezone Service
+    getIt.registerSingleton<TimezoneService>(
+      TimezoneServiceImpl(),
+    );
+    
+    // Data Sources
+    getIt.registerSingleton<SettingsLocalDataSource>(
+      SettingsLocalDataSourceImpl(getIt<StorageService>()),
+    );
+
+    // Repositories
+    getIt.registerSingleton<SettingsRepository>(
+      SettingsRepositoryImpl(getIt<SettingsLocalDataSource>()),
+    );
+
+    // Use Cases
+    getIt.registerLazySingleton(() => GetSettings(getIt<SettingsRepository>()));
+    getIt.registerLazySingleton(() => UpdateSettings(getIt<SettingsRepository>()));
+
+    _basicServicesInitialized = true;
+    debugPrint('Basic services initialized successfully');
+  }
+
+  /// تهيئة باقي الخدمات في الخلفية
+  Future<void> initRemainingServices() async {
+    if (_fullInitialized) return;
+    if (!_basicServicesInitialized) await initBasicServices();
+
+    // External Services
+    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    getIt.registerSingleton<FlutterLocalNotificationsPlugin>(flutterLocalNotificationsPlugin);
+
+    // Core Services
     getIt.registerSingleton<BatteryService>(
       BatteryServiceImpl(),
     );
@@ -67,17 +97,13 @@ class ServiceLocator {
       DoNotDisturbServiceImpl(),
     );
     
-    getIt.registerSingleton<TimezoneService>(
-      TimezoneServiceImpl(),
-    );
-    
     // Registro del servicio de notificaciones con los nuevos servicios
     getIt.registerSingleton<NotificationService>(
       NotificationServiceImpl(
         flutterLocalNotificationsPlugin,
         getIt<BatteryService>(),
         getIt<DoNotDisturbService>(),
-        getIt<TimezoneService>(), // Añadido TimezoneService
+        getIt<TimezoneService>(),
       ),
     );
     
@@ -98,10 +124,6 @@ class ServiceLocator {
     getIt.registerSingleton<AthkarLocalDataSource>(
       AthkarLocalDataSourceImpl(),
     );
-    
-    getIt.registerSingleton<SettingsLocalDataSource>(
-      SettingsLocalDataSourceImpl(getIt<StorageService>()),
-    );
 
     // Repositories
     getIt.registerSingleton<AthkarRepository>(
@@ -111,18 +133,12 @@ class ServiceLocator {
     getIt.registerSingleton<PrayerTimesRepository>(
       PrayerTimesRepositoryImpl(getIt<PrayerTimesService>()),
     );
-    
-    getIt.registerSingleton<SettingsRepository>(
-      SettingsRepositoryImpl(getIt<SettingsLocalDataSource>()),
-    );
 
     // Use Cases
     getIt.registerLazySingleton(() => GetAthkarByCategory(getIt<AthkarRepository>()));
     getIt.registerLazySingleton(() => GetAthkarCategories(getIt<AthkarRepository>()));
     getIt.registerLazySingleton(() => GetPrayerTimes(getIt<PrayerTimesRepository>()));
     getIt.registerLazySingleton(() => GetQiblaDirection(getIt<PrayerTimesRepository>()));
-    getIt.registerLazySingleton(() => GetSettings(getIt<SettingsRepository>()));
-    getIt.registerLazySingleton(() => UpdateSettings(getIt<SettingsRepository>()));
 
     // Inicialización del servicio de notificaciones
     await getIt<NotificationService>().initialize();
@@ -130,13 +146,21 @@ class ServiceLocator {
     // Inicialización del servicio de zonas horarias
     await getIt<TimezoneService>().initializeTimeZones();
 
-    _isInitialized = true;
-    debugPrint('Servicios inicializados correctamente');
+    _fullInitialized = true;
+    debugPrint('All services initialized successfully');
   }
   
-  /// Limpieza de recursos al cerrar la aplicación
+  /// تهيئة جميع الخدمات (الطريقة القديمة للتوافق الخلفي)
+  Future<void> init() async {
+    if (_fullInitialized) return;
+    
+    await initBasicServices();
+    await initRemainingServices();
+  }
+  
+  /// تنظيف الموارد عند إغلاق التطبيق
   Future<void> dispose() async {
-    if (!_isInitialized) return;
+    if (!_basicServicesInitialized) return;
     
     try {
       // Limpieza del servicio de notificaciones
@@ -161,7 +185,8 @@ class ServiceLocator {
       
       // Restablecer el estado de registro
       await getIt.reset();
-      _isInitialized = false;
+      _basicServicesInitialized = false;
+      _fullInitialized = false;
       
       debugPrint('Todos los servicios se han eliminado correctamente');
     } catch (e) {
@@ -169,7 +194,7 @@ class ServiceLocator {
     }
   }
   
-  // Para uso durante las pruebas de la aplicación
+  // لاستخدام خلال الاختبارات
   Future<void> reset() async {
     await dispose();
   }
