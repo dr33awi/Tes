@@ -11,18 +11,18 @@ import 'app/themes/app_theme.dart';
 import 'core/services/interfaces/notification_service.dart';
 import 'core/services/interfaces/timezone_service.dart';
 import 'core/services/interfaces/storage_service.dart';
-import 'domain/usecases/settings/get_settings.dart';
-import 'domain/usecases/settings/update_settings.dart';
+import 'features/settings/domain/usecases/get_settings.dart';
+import 'features/settings/domain/usecases/update_settings.dart';
 import 'core/services/utils/notification_scheduler.dart';
 import 'core/constants/app_constants.dart';
-import 'presentation/screens/onboarding/permissions_onboarding_screen.dart';
-import 'presentation/blocs/athkar/athkar_provider.dart';
-import 'presentation/blocs/prayers/prayer_times_provider.dart';
-import 'presentation/blocs/settings/settings_provider.dart';
-import 'domain/usecases/athkar/get_athkar_by_category.dart';
-import 'domain/usecases/athkar/get_athkar_categories.dart';
-import 'domain/usecases/prayers/get_prayer_times.dart';
-import 'domain/usecases/prayers/get_qibla_direction.dart';
+import 'features/onboarding/presentation/screens/permissions_onboarding_screen.dart';
+import 'features/athkar/presentation/providers/athkar_provider.dart';
+import 'features/prayers/presentation/providers/prayer_times_provider.dart';
+import 'features/settings/presentation/providers/settings_provider.dart';
+import 'features/athkar/domain/usecases/get_athkar_by_category.dart';
+import 'features/athkar/domain/usecases/get_athkar_categories.dart';
+import 'features/prayers/domain/usecases/get_prayer_times.dart';
+import 'features/prayers/domain/usecases/get_qibla_direction.dart';
 import 'app/themes/app_theme.dart';
 Future<void> main() async {
   // تهيئة ربط Flutter

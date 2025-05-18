@@ -7,7 +7,7 @@ import '../../../core/services/interfaces/do_not_disturb_service.dart';
 import '../../../core/services/interfaces/notification_service.dart';
 import '../../../core/services/interfaces/prayer_times_service.dart';
 import '../../../core/services/interfaces/timezone_service.dart';
-import '../../../domain/entities/settings.dart';
+import '../../../features/settings/domain/entities/settings.dart';
 
 /// مساعد لجدولة الإشعارات المختلفة في التطبيق
 class NotificationScheduler {

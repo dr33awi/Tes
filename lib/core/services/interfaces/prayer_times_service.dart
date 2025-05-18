@@ -1,6 +1,6 @@
 // lib/core/services/interfaces/prayer_times_service.dart
 import 'package:adhan/adhan.dart' as adhan;
-import '../../../domain/entities/prayer_times.dart';
+import '../../../features/prayers/domain/entities/prayer_times.dart';
 
 // استخدام نوع PrayerTimes المخصص
 typedef PrayerData = PrayerTimes;

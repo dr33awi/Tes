@@ -1,6 +1,6 @@
 // lib/core/services/implementations/prayer_times_service_impl.dart
 import 'package:adhan/adhan.dart' as adhan;
-import '../../../domain/entities/prayer_times.dart';
+import '../../../features/prayers/domain/entities/prayer_times.dart';
 import '../interfaces/prayer_times_service.dart';
 
 class PrayerTimesServiceImpl implements PrayerTimesService {

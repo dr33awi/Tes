@@ -1,12 +1,12 @@
 // lib/app/routes/app_router.dart
 import 'package:flutter/material.dart';
-import '../../presentation/screens/prayers/prayer_times_screen.dart';
-import '../../presentation/screens/prayers/qibla_screen.dart';
-import '../../presentation/screens/athkar/athkar_categories_screen.dart';
-import '../../presentation/screens/athkar/athkar_details_screen.dart';
-import '../../presentation/screens/settings/settings_screen.dart';
-import '../../presentation/screens/home/home_screen.dart';
-import '../../presentation/screens/onboarding/permissions_onboarding_screen.dart';
+import '../../features/prayers/presentation/screens/prayer_times_screen.dart';
+import '../../features/prayers/presentation/screens/qibla_screen.dart';
+import '../../features/athkar/presentation/screens/athkar_categories_screen.dart';
+import '../../features/athkar/presentation/screens/athkar_details_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/home/presentation/screens/home_screen.dart';
+import '../../features/onboarding/presentation/screens/permissions_onboarding_screen.dart';
 
 class AppRouter {
 
