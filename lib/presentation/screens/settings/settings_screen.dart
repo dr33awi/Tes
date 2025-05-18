@@ -46,6 +46,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   bool _isCharging = false;
   bool _isPowerSaveMode = false;
   bool _isDoNotDisturbEnabled = false;
+  
+  // نضيف حالة الأذونات مباشرة في الكلاس
+  Map<LocalPermissionType, LocalPermissionStatus> _permissions = {
+    LocalPermissionType.notification: LocalPermissionStatus.denied,
+    LocalPermissionType.location: LocalPermissionStatus.denied,
+    LocalPermissionType.batteryOptimization: LocalPermissionStatus.denied,
+    LocalPermissionType.doNotDisturb: LocalPermissionStatus.denied,
+  };
+  bool _loadingPermissions = false;
 
   @override
   void initState() {
@@ -53,12 +62,71 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     _tabController = TabController(length: 4, vsync: this);
     _loadBatteryInfo();
     _loadDoNotDisturbStatus();
+    _updatePermissionsStatus(); // تحميل حالة الأذونات عند البدء
   }
   
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+  
+  // تحديث حالة الأذونات
+  Future<void> _updatePermissionsStatus() async {
+    if (mounted) {
+      setState(() {
+        _loadingPermissions = true;
+      });
+    }
+    
+    try {
+      final permissionsStatus = await _permissionManager.checkPermissions();
+      
+      final updatedPermissions = <LocalPermissionType, LocalPermissionStatus>{
+        LocalPermissionType.notification: _convertToLocalStatus(
+          permissionsStatus[AppPermissionType.notification] ?? AppPermissionStatus.denied
+        ),
+        LocalPermissionType.location: _convertToLocalStatus(
+          permissionsStatus[AppPermissionType.location] ?? AppPermissionStatus.denied
+        ),
+        LocalPermissionType.batteryOptimization: _convertToLocalStatus(
+          permissionsStatus[AppPermissionType.batteryOptimization] ?? AppPermissionStatus.denied
+        ),
+        LocalPermissionType.doNotDisturb: _convertToLocalStatus(
+          permissionsStatus[AppPermissionType.doNotDisturb] ?? AppPermissionStatus.denied
+        ),
+      };
+      
+      if (mounted) {
+        setState(() {
+          _permissions = updatedPermissions;
+          _loadingPermissions = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('خطأ في تحديث حالة الأذونات: $e');
+      if (mounted) {
+        setState(() {
+          _loadingPermissions = false;
+        });
+      }
+    }
+  }
+  
+  // تحويل حالة الإذن من نوع التطبيق إلى النوع المحلي
+  LocalPermissionStatus _convertToLocalStatus(AppPermissionStatus status) {
+    switch (status) {
+      case AppPermissionStatus.granted:
+        return LocalPermissionStatus.granted;
+      case AppPermissionStatus.permanentlyDenied:
+        return LocalPermissionStatus.permanentlyDenied;
+      case AppPermissionStatus.restricted:
+        return LocalPermissionStatus.restricted;
+      case AppPermissionStatus.limited:
+        return LocalPermissionStatus.limited;
+      default:
+        return LocalPermissionStatus.denied;
+    }
   }
   
   Future<void> _loadBatteryInfo() async {
@@ -190,11 +258,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           
           _buildSectionTitle(context, 'إعدادات البطارية وعدم الإزعاج'),
           _buildBatteryAndDndSettingsCard(provider),
-          
-          const SizedBox(height: 16),
-          
-          _buildSectionTitle(context, 'توقيت الأذكار'),
-          _buildAthkarTimingCard(provider),
         ],
       ),
     );
@@ -222,7 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionTitle(context, 'إدارة الأذونات'),
-          _buildPermissionSettingsCard(context),
+          _buildPermissionSettingsCard(),
           
           const SizedBox(height: 16),
           
@@ -399,8 +462,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               if (value) {
                 // طلب إذن الإشعارات
                 final hasPermission = await _permissionManager.requestEssentialPermissions(context);
-                if (hasPermission[LocalPermissionType.notification] ?? false) {
+                if (hasPermission[AppPermissionType.notification] ?? false) {
                   provider.updateSetting(key: 'enableNotifications', value: value);
+                  // تحديث حالة الأذونات
+                  _updatePermissionsStatus();
                 } else {
                   // إظهار رسالة تنبيه بأنه لا يمكن تفعيل الإشعارات
                   if (mounted) {
@@ -517,73 +582,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
   
-  Widget _buildAthkarTimingCard(SettingsProvider provider) {
-    final morningHour = provider.settings!.morningAthkarTime[0];
-    final morningMinute = provider.settings!.morningAthkarTime[1];
-    final eveningHour = provider.settings!.eveningAthkarTime[0];
-    final eveningMinute = provider.settings!.eveningAthkarTime[1];
-    
-    final morningTime = TimeOfDay(hour: morningHour, minute: morningMinute);
-    final eveningTime = TimeOfDay(hour: eveningHour, minute: eveningMinute);
-    
-    return Card(
-      child: Column(
-        children: [
-          SwitchListTile(
-            title: const Text('تذكير بالأذكار'),
-            subtitle: const Text('إظهار تذكير بالأذكار في الأوقات المحددة'),
-            value: provider.settings!.showAthkarReminders,
-            secondary: const Icon(Icons.notification_important),
-            onChanged: (value) {
-              provider.updateSetting(key: 'showAthkarReminders', value: value);
-            },
-          ),
-          
-          if (provider.settings!.showAthkarReminders) ...[
-            const Divider(),
-            ListTile(
-              title: const Text('وقت أذكار الصباح'),
-              subtitle: Text(_formatTimeOfDay(morningTime)),
-              leading: const Icon(Icons.wb_sunny),
-              trailing: const Icon(Icons.access_time, size: 20),
-              onTap: () {
-                _selectTime(
-                  context,
-                  initialTime: morningTime,
-                  onTimeSelected: (time) {
-                    provider.updateSetting(
-                      key: 'morningAthkarTime',
-                      value: [time.hour, time.minute],
-                    );
-                  },
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              title: const Text('وقت أذكار المساء'),
-              subtitle: Text(_formatTimeOfDay(eveningTime)),
-              leading: const Icon(Icons.nights_stay),
-              trailing: const Icon(Icons.access_time, size: 20),
-              onTap: () {
-                _selectTime(
-                  context,
-                  initialTime: eveningTime,
-                  onTimeSelected: (time) {
-                    provider.updateSetting(
-                      key: 'eveningAthkarTime',
-                      value: [time.hour, time.minute],
-                    );
-                  },
-                );
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-  
   Widget _buildPrayerSettings(SettingsProvider provider) {
     return Card(
       child: Column(
@@ -646,121 +644,200 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  // Fixed with local enums for permission handling
-  Widget _buildPermissionSettingsCard(BuildContext context) {
-    // Create a mock future with hardcoded permission data for now
-    // We can replace this with actual permission checks when the backend is ready
-    Future<Map<LocalPermissionType, LocalPermissionStatus>> mockPermissionCheck() async {
-      return {
-        LocalPermissionType.notification: LocalPermissionStatus.granted,
-        LocalPermissionType.location: LocalPermissionStatus.granted,
-        LocalPermissionType.batteryOptimization: LocalPermissionStatus.denied,
-        LocalPermissionType.doNotDisturb: LocalPermissionStatus.denied,
-      };
+  // بناء قسم الأذونات المحسن باستخدام البيانات المخزنة مسبقًا
+  Widget _buildPermissionSettingsCard() {
+    if (_loadingPermissions) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
     }
     
-    return FutureBuilder<Map<LocalPermissionType, LocalPermissionStatus>>(
-      future: mockPermissionCheck(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(
-                child: CircularProgressIndicator(),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'حالة الأذونات',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          );
-        }
-        
-        final permissions = snapshot.data!;
-        
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'حالة الأذونات',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Divider(),
-                
-                _buildPermissionItem(
-                  context,
-                  title: 'إشعارات',
-                  type: LocalPermissionType.notification,
-                  status: permissions[LocalPermissionType.notification]!,
-                  icon: Icons.notifications,
-                  onTap: () async {
-                    // We'll use a simple dialog instead of requesting permissions directly
-                    _showRequestPermissionDialog('الإشعارات');
-                    setState(() {});
-                  },
-                ),
-                
-                _buildPermissionItem(
-                  context,
-                  title: 'الموقع',
-                  type: LocalPermissionType.location,
-                  status: permissions[LocalPermissionType.location]!,
-                  icon: Icons.location_on,
-                  onTap: () async {
-                    _showRequestPermissionDialog('الموقع');
-                    setState(() {});
-                  },
-                ),
-                
-                _buildPermissionItem(
-                  context,
-                  title: 'استثناء البطارية',
-                  type: LocalPermissionType.batteryOptimization,
-                  status: permissions[LocalPermissionType.batteryOptimization]!,
-                  icon: Icons.battery_charging_full,
-                  onTap: () async {
-                    _showRequestPermissionDialog('استثناء البطارية');
-                    setState(() {});
-                  },
-                ),
-                
-                _buildPermissionItem(
-                  context,
-                  title: 'وضع عدم الإزعاج',
-                  type: LocalPermissionType.doNotDisturb,
-                  status: permissions[LocalPermissionType.doNotDisturb]!,
-                  icon: Icons.do_not_disturb_on,
-                  onTap: () async {
-                    _showRequestPermissionDialog('وضع عدم الإزعاج');
-                    setState(() {});
-                  },
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // زر لإعادة تعيين جميع الأذونات
-                Center(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      _showRequestPermissionDialog('جميع الأذونات');
-                      setState(() {});
-                    },
-                    icon: const Icon(Icons.security),
-                    label: const Text('تحديث جميع الأذونات'),
-                  ),
-                ),
-              ],
+            const Divider(),
+            
+            _buildPermissionItem(
+              context,
+              title: 'إشعارات',
+              type: LocalPermissionType.notification,
+              status: _permissions[LocalPermissionType.notification]!,
+              icon: Icons.notifications,
+              onTap: () async {
+                await _requestSpecificPermission(LocalPermissionType.notification);
+              },
             ),
-          ),
-        );
-      },
+            
+            _buildPermissionItem(
+              context,
+              title: 'الموقع',
+              type: LocalPermissionType.location,
+              status: _permissions[LocalPermissionType.location]!,
+              icon: Icons.location_on,
+              onTap: () async {
+                await _requestSpecificPermission(LocalPermissionType.location);
+              },
+            ),
+            
+            _buildPermissionItem(
+              context,
+              title: 'استثناء البطارية',
+              type: LocalPermissionType.batteryOptimization,
+              status: _permissions[LocalPermissionType.batteryOptimization]!,
+              icon: Icons.battery_charging_full,
+              onTap: () async {
+                await _requestSpecificPermission(LocalPermissionType.batteryOptimization);
+              },
+            ),
+            
+            _buildPermissionItem(
+              context,
+              title: 'وضع عدم الإزعاج',
+              type: LocalPermissionType.doNotDisturb,
+              status: _permissions[LocalPermissionType.doNotDisturb]!,
+              icon: Icons.do_not_disturb_on,
+              onTap: () async {
+                await _requestSpecificPermission(LocalPermissionType.doNotDisturb);
+              },
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // زر لإعادة تعيين جميع الأذونات
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  // طلب جميع الأذونات
+                  await _permissionManager.requestEssentialPermissions(context);
+                  await _permissionManager.requestOptionalPermissions(context);
+                  // تحديث حالة الأذونات
+                  await _updatePermissionsStatus();
+                },
+                icon: const Icon(Icons.security),
+                label: const Text('تحديث جميع الأذونات'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  // Fixed with local enums
+  // طريقة محسنة لطلب الأذونات بشكل أفضل
+  Future<void> _requestSpecificPermission(LocalPermissionType permissionType) async {
+    switch (permissionType) {
+      case LocalPermissionType.notification:
+        await _permissionManager.requestEssentialPermissions(context);
+        break;
+      case LocalPermissionType.location:
+        await _permissionManager.requestLocationPermission(context);
+        break;
+      case LocalPermissionType.batteryOptimization:
+        // طلب إذن البطارية بطريقة خاصة مع عرض رسالة توضيحية
+        final result = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('استثناء تحسين البطارية'),
+            content: const Text(
+              'يحتاج التطبيق إلى إذن استثناء البطارية لتشغيل الإشعارات بشكل موثوق حتى عند تفعيل وضع توفير الطاقة. سيتم فتح إعدادات البطارية لتفعيل هذا الاستثناء.'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('متابعة'),
+              ),
+            ],
+          ),
+        ) ?? false;
+        
+        if (result) {
+          // طلب إذن البطارية واستخدام طريقة محسنة للتحقق
+          await _permissionManager.openPermissionSettings(AppPermissionType.batteryOptimization);
+          
+          // انتظار قليلاً ثم إعادة التحقق من الحالة
+          await Future.delayed(const Duration(seconds: 2));
+        }
+        break;
+      case LocalPermissionType.doNotDisturb:
+        // تحسين: عرض رسالة توضيحية قبل فتح الإعدادات
+        final result = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('وضع عدم الإزعاج'),
+            content: const Text(
+              'يحتاج التطبيق إلى إذن لإظهار إشعارات الصلاة والأذكار حتى عندما يكون وضع عدم الإزعاج مفعّلاً. سيتم فتح إعدادات وضع عدم الإزعاج لتفعيل هذا الاستثناء.'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('متابعة'),
+              ),
+            ],
+          ),
+        ) ?? false;
+        
+        if (result) {
+          try {
+            // استخدام الطريقة openDoNotDisturbSettings بدلاً من openDoNotDisturbSettings
+            await _doNotDisturbService.openDoNotDisturbSettings();
+            
+            // عرض تعليمات إضافية للمستخدم بعد فتح الإعدادات
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('ابحث عن "التطبيقات المستثناة" أو "الاستثناءات" وأضف تطبيق الأذكار إلى القائمة'),
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            }
+          } catch (e) {
+            debugPrint('خطأ في فتح إعدادات وضع عدم الإزعاج: $e');
+            // فتح إعدادات الإشعارات العامة كخطة بديلة
+            await _permissionManager.openAppSettings(AppSettingsType.notification);
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('انتقل إلى إعدادات الإشعارات > وضع عدم الإزعاج > الاستثناءات > التطبيقات، وأضف تطبيق الأذكار'),
+                  duration: Duration(seconds: 7),
+                ),
+              );
+            }
+          }
+          
+          // انتظار قليلاً ثم إعادة التحقق من الحالة
+          await Future.delayed(const Duration(seconds: 2));
+        }
+        break;
+    }
+    
+    // تحديث حالة الأذونات بعد الطلب
+    await _updatePermissionsStatus();
+  }
+
   Widget _buildPermissionItem(
     BuildContext context, {
     required String title,
@@ -805,58 +882,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         child: const Text('تعديل'),
       ),
     );
-  }
-  
-  // Helper method to show a permission dialog
-  void _showRequestPermissionDialog(String permissionName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('إذن $permissionName'),
-        content: Text('يجب منح إذن $permissionName لتعمل هذه الميزة بشكل صحيح. هل تريد منح الإذن الآن؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('لاحقاً'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Here we would usually call the actual permission request
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('تم طلب إذن $permissionName'),
-                ),
-              );
-            },
-            child: const Text('منح الإذن'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Future<void> _selectTime(
-    BuildContext context, {
-    required TimeOfDay initialTime,
-    required Function(TimeOfDay) onTimeSelected,
-  }) async {
-    final TimeOfDay? selectedTime = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-      builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            alwaysUse24HourFormat: false,
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (selectedTime != null) {
-      onTimeSelected(selectedTime);
-    }
   }
   
   void _showPermissionDeniedDialog() {
@@ -1049,12 +1074,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ],
       ),
     );
-  }
-  
-  String _formatTimeOfDay(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute ${time.period == DayPeriod.am ? 'ص' : 'م'}';
   }
   
   String _getCalculationMethodName(int methodIndex) {

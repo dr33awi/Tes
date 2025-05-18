@@ -42,7 +42,24 @@ class PermissionServiceImpl implements PermissionService {
       _permissionAttempts[AppPermissionType.batteryOptimization] = 
           (_permissionAttempts[AppPermissionType.batteryOptimization] ?? 0) + 1;
           
+      // الطريقة المحسنة - التحقق أولاً إذا كان الإذن ممنوحًا بالفعل
+      if (await Permission.ignoreBatteryOptimizations.isGranted) {
+        return true;
+      }
+      
+      // إذا لم يكن ممنوحًا، نطلب الإذن
       final status = await Permission.ignoreBatteryOptimizations.request();
+      
+      // للتأكد من تحديث حالة الإذن، نتحقق مرة أخرى بعد الطلب
+      if (!status.isGranted) {
+        // قد نحتاج إلى التوجيه إلى إعدادات البطارية يدويًا
+        await app_settings.AppSettings.openAppSettings(type: app_settings.AppSettingsType.batteryOptimization);
+        
+        // انتظار وقت قصير ثم إعادة التحقق من الحالة
+        await Future.delayed(const Duration(seconds: 2));
+        return await Permission.ignoreBatteryOptimizations.isGranted;
+      }
+      
       return status.isGranted;
     } catch (e) {
       return false;
@@ -51,12 +68,37 @@ class PermissionServiceImpl implements PermissionService {
 
   @override
   Future<Map<AppPermissionType, AppPermissionStatus>> checkAllPermissions() async {
+    // تحسين طريقة التحقق من استثناء البطارية
+    final batteryOptStatus = await Permission.ignoreBatteryOptimizations.status;
+    final batteryOptGranted = await checkBatteryOptimizationStatus();
+    
     return {
       AppPermissionType.location: _mapToPermissionStatus(await Permission.location.status),
       AppPermissionType.notification: _mapToPermissionStatus(await Permission.notification.status),
       AppPermissionType.doNotDisturb: _mapToPermissionStatus(await Permission.accessNotificationPolicy.status),
-      AppPermissionType.batteryOptimization: _mapToPermissionStatus(await Permission.ignoreBatteryOptimizations.status),
+      // استخدام النتيجة المحسنة للبطارية
+      AppPermissionType.batteryOptimization: batteryOptGranted 
+          ? AppPermissionStatus.granted 
+          : _mapToPermissionStatus(batteryOptStatus),
     };
+  }
+  
+  /// طريقة جديدة للتحقق بشكل أفضل من حالة استثناء البطارية
+  Future<bool> checkBatteryOptimizationStatus() async {
+    try {
+      // التحقق من حالة الإذن باستخدام permission_handler
+      bool isGranted = await Permission.ignoreBatteryOptimizations.isGranted;
+      
+      // إذا كان الإذن غير ممنوح، يمكننا محاولة التحقق بطريقة ثانية
+      if (!isGranted) {
+        // اختياري: يمكن إضافة تحقق إضافي هنا باستخدام منفذ خاص إلى نظام التشغيل
+        // على سبيل المثال باستخدام method channel للتحقق من حالة البطارية مباشرة
+      }
+      
+      return isGranted;
+    } catch (e) {
+      return false;
+    }
   }
 
   @override
