@@ -6,6 +6,7 @@ import '../../presentation/screens/athkar/athkar_categories_screen.dart';
 import '../../presentation/screens/athkar/athkar_details_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
+import '../../presentation/screens/onboarding/permissions_onboarding_screen.dart'; // تأكد من إضافة هذا الاستيراد
 
 class AppRouter {
   // معرفات الطرق الثابتة
@@ -15,7 +16,8 @@ class AppRouter {
   static const String athkarCategories = '/athkar-categories';
   static const String athkarDetails = '/athkar-details';
   static const String qibla = '/qibla';
-  static const String settingsRoute = '/settings'; // تغيير الاسم لتجنب التضارب
+  static const String settingsRoute = '/settings';
+  static const String permissionsOnboarding = '/permissions-onboarding'; // إضافة مسار جديد
   
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     // استخدام متغير آخر لتجنب تداخل الأسماء
@@ -51,9 +53,15 @@ class AppRouter {
           builder: (_) => const QiblaScreen(),
         );
         
-      case settingsRoute: // استخدام الاسم الجديد
+      case settingsRoute:
         return MaterialPageRoute(
           builder: (_) => const SettingsScreen(),
+        );
+      
+      // إضافة مسار شاشة الأذونات
+      case permissionsOnboarding:
+        return MaterialPageRoute(
+          builder: (_) => const PermissionsOnboardingScreen(),
         );
         
       default:

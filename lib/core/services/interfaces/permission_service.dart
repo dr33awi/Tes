@@ -1,3 +1,4 @@
+// lib/core/services/interfaces/permission_service.dart
 import 'package:permission_handler/permission_handler.dart';
 
 enum AppPermissionType {
@@ -13,6 +14,13 @@ enum AppPermissionStatus {
   permanentlyDenied,
   restricted,
   limited,
+}
+
+enum AppSettingsType {
+  app,
+  location,
+  notification,
+  battery,
 }
 
 abstract class PermissionService {
@@ -33,12 +41,4 @@ abstract class PermissionService {
   
   /// فتح إعدادات التطبيق أو إعدادات محددة
   Future<void> openAppSettings([AppSettingsType? type]);
-}
-
-/// أنواع الإعدادات التي يمكن فتحها
-enum AppSettingsType {
-  app,
-  location,
-  notification,
-  battery,
 }

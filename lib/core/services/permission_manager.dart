@@ -1,269 +1,71 @@
-// lib/presentation/screens/onboarding/permissions_onboarding_screen.dart
+// lib/core/services/permission_manager.dart
 import 'package:flutter/material.dart';
-import '../../../app/di/service_locator.dart';
-import '../../../app/routes/app_router.dart';
-import '../../../core/services/permission_manager.dart';
-import '../../../core/services/interfaces/permission_service.dart';
+import './interfaces/permission_service.dart';
 
-class PermissionsOnboardingScreen extends StatefulWidget {
-  const PermissionsOnboardingScreen({super.key});
+class PermissionManager {
+  final PermissionService _permissionService;
 
-  @override
-  State<PermissionsOnboardingScreen> createState() => _PermissionsOnboardingScreenState();
-}
+  PermissionManager(this._permissionService);
 
-class _PermissionsOnboardingScreenState extends State<PermissionsOnboardingScreen> {
-  final PermissionManager _permissionManager = getIt<PermissionManager>();
-  
-  bool _notificationsGranted = false;
-  bool _locationGranted = false;
-  bool _batteryOptGranted = false;
-  bool _dndGranted = false;
-  
-  @override
-  void initState() {
-    super.initState();
-    _checkInitialPermissions();
+  // Check status of all permissions
+  Future<Map<AppPermissionType, AppPermissionStatus>> checkPermissions() async {
+    return await _permissionService.checkAllPermissions();
   }
-  
-  Future<void> _checkInitialPermissions() async {
-    final permissions = await _permissionManager.checkPermissions();
+
+  // Request essential permissions (notification and location)
+  Future<Map<AppPermissionType, bool>> requestEssentialPermissions(BuildContext context) async {
+    Map<AppPermissionType, bool> results = {};
     
-    setState(() {
-      _notificationsGranted = permissions[AppPermissionType.notification] == AppPermissionStatus.granted;
-      _locationGranted = permissions[AppPermissionType.location] == AppPermissionStatus.granted;
-      _batteryOptGranted = permissions[AppPermissionType.batteryOptimization] == AppPermissionStatus.granted;
-      _dndGranted = permissions[AppPermissionType.doNotDisturb] == AppPermissionStatus.granted;
-    });
+    // Request notification permission
+    final notificationGranted = await _permissionService.requestNotificationPermission();
+    results[AppPermissionType.notification] = notificationGranted;
+    
+    // Request location permission
+    final locationGranted = await _permissionService.requestLocationPermission();
+    results[AppPermissionType.location] = locationGranted;
+    
+    return results;
+  }
+
+  // Request optional permissions (battery optimization and DND)
+  Future<Map<AppPermissionType, bool>> requestOptionalPermissions(BuildContext context) async {
+    Map<AppPermissionType, bool> results = {};
+    
+    // Request battery optimization permission
+    final batteryOptGranted = await _permissionService.requestBatteryOptimizationPermission();
+    results[AppPermissionType.batteryOptimization] = batteryOptGranted;
+    
+    // Request DND permission
+    final dndGranted = await _permissionService.requestDoNotDisturbPermission();
+    results[AppPermissionType.doNotDisturb] = dndGranted;
+    
+    return results;
+  }
+
+  // Request location permission specifically
+  Future<bool> requestLocationPermission(BuildContext context) async {
+    return await _permissionService.requestLocationPermission();
   }
   
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('إعداد الأذونات'),
-        automaticallyImplyLeading: false,
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'مرحبًا بك في تطبيق الأذكار',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'يرجى منح الأذونات التالية لضمان عمل التطبيق بشكل صحيح:',
-                style: TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              
-              // الأذونات الأساسية
-              _buildPermissionCard(
-                icon: Icons.notifications,
-                title: 'الإشعارات',
-                description: 'للتذكير بمواقيت الصلاة والأذكار',
-                isGranted: _notificationsGranted,
-                isRequired: true,
-                onRequest: () async {
-                  final result = await _permissionManager.requestEssentialPermissions(context);
-                  setState(() {
-                    _notificationsGranted = result[AppPermissionType.notification] ?? false;
-                  });
-                },
-              ),
-              
-              _buildPermissionCard(
-                icon: Icons.location_on,
-                title: 'الموقع',
-                description: 'لتحديد اتجاه القبلة ومواقيت الصلاة',
-                isGranted: _locationGranted,
-                isRequired: true,
-                onRequest: () async {
-                  final result = await _permissionManager.requestLocationPermission(context);
-                  setState(() {
-                    _locationGranted = result;
-                  });
-                },
-              ),
-              
-              // الأذونات الاختيارية
-              _buildPermissionCard(
-                icon: Icons.battery_charging_full,
-                title: 'استثناء تحسينات البطارية',
-                description: 'لضمان عمل الإشعارات بشكل موثوق',
-                isGranted: _batteryOptGranted,
-                isRequired: false,
-                onRequest: () async {
-                  final result = await _permissionManager.requestOptionalPermissions(context);
-                  setState(() {
-                    _batteryOptGranted = result[AppPermissionType.batteryOptimization] ?? false;
-                  });
-                },
-              ),
-              
-              _buildPermissionCard(
-                icon: Icons.do_not_disturb_on,
-                title: 'وضع عدم الإزعاج',
-                description: 'لإظهار إشعارات الصلاة في وضع عدم الإزعاج',
-                isGranted: _dndGranted,
-                isRequired: false,
-                onRequest: () async {
-                  final result = await _permissionManager.requestOptionalPermissions(context);
-                  setState(() {
-                    _dndGranted = result[AppPermissionType.doNotDisturb] ?? false;
-                  });
-                },
-              ),
-              
-              const Spacer(),
-              
-              // زر المتابعة للشاشة الرئيسية
-              ElevatedButton(
-                onPressed: _notificationsGranted && _locationGranted
-                    ? () {
-                        Navigator.pushReplacementNamed(context, AppRouter.home);
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text(
-                  'متابعة',
-                  style: TextStyle(fontSize: 18),
-                ),
-              ),
-              
-              // خيار تخطي بعض الأذونات
-              if (!_notificationsGranted || !_locationGranted)
-                TextButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('تأكيد'),
-                        content: const Text(
-                          'بعض الأذونات المطلوبة غير ممنوحة. قد لا تعمل بعض ميزات التطبيق بشكل صحيح.\n\nهل تريد المتابعة على أي حال؟',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('إلغاء'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              Navigator.pushReplacementNamed(context, AppRouter.home);
-                            },
-                            child: const Text('متابعة على أي حال'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: const Text('تخطي'),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildPermissionCard({
-    required IconData icon,
-    required String title,
-    required String description,
-    required bool isGranted,
-    required bool isRequired,
-    required VoidCallback onRequest,
-  }) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: isGranted ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: isGranted ? Colors.green : Colors.grey,
-                size: 30,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (isRequired) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'مطلوب',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: isGranted ? null : onRequest,
-              child: Text(
-                isGranted ? 'ممنوح' : 'منح الإذن',
-                style: TextStyle(
-                  color: isGranted ? Colors.green : Theme.of(context).primaryColor,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  // Open app settings for a specific permission type
+  Future<void> openPermissionSettings(AppPermissionType type) async {
+    AppSettingsType? settingsType;
+    
+    switch (type) {
+      case AppPermissionType.location:
+        settingsType = AppSettingsType.location;
+        break;
+      case AppPermissionType.notification:
+        settingsType = AppSettingsType.notification;
+        break;
+      case AppPermissionType.batteryOptimization:
+        settingsType = AppSettingsType.battery;
+        break;
+      case AppPermissionType.doNotDisturb:
+        settingsType = AppSettingsType.app;
+        break;
+    }
+    
+    await _permissionService.openAppSettings(settingsType);
   }
 }

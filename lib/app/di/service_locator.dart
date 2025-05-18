@@ -162,7 +162,10 @@ getIt.registerSingleton<PermissionManager>(
     _fullInitialized = true;
     debugPrint('All services initialized successfully');
   }
-  
+  void setupServiceLocator() {
+  getIt.registerSingleton<PermissionService>(PermissionServiceImpl());
+}
+
   /// تهيئة جميع الخدمات (الطريقة القديمة للتوافق الخلفي)
   Future<void> init() async {
     if (_fullInitialized) return;
