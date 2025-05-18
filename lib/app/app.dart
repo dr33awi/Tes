@@ -1,12 +1,12 @@
-// lib/app/app.dart - Corregir las rutas y constantes
+// في بداية ملف lib/app/app.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
-// Importaciones con alias para evitar conflictos
+// استيراد الثيمات 
+import 'themes/app_theme.dart';
 import 'di/service_locator.dart' as di;
 import 'routes/app_router.dart';
-import 'themes/app_theme.dart';
 import '../core/constants/app_constants.dart';
 import '../presentation/blocs/athkar/athkar_provider.dart';
 import '../presentation/blocs/prayers/prayer_times_provider.dart';
@@ -64,8 +64,8 @@ class AthkarApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            initialRoute: '/', // Usar un valor directo en lugar de AppConstants.initialRoute
-            onGenerateRoute: AppRouter.onGenerateRoute, // Asegurarse de que AppRouter existe y está importado correctamente
+            initialRoute: '/',
+            onGenerateRoute: AppRouter.onGenerateRoute,
           );
         },
       ),

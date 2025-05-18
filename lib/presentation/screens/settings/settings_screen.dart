@@ -1,6 +1,7 @@
 // lib/presentation/screens/settings/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import '../../../app/di/service_locator.dart';
 import '../../../core/services/interfaces/notification_service.dart';
 import '../../../core/services/interfaces/battery_service.dart';
@@ -778,64 +779,157 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         }
         break;
       case LocalPermissionType.doNotDisturb:
-        // تحسين: عرض رسالة توضيحية قبل فتح الإعدادات
-        final result = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('وضع عدم الإزعاج'),
-            content: const Text(
-              'يحتاج التطبيق إلى إذن لإظهار إشعارات الصلاة والأذكار حتى عندما يكون وضع عدم الإزعاج مفعّلاً. سيتم فتح إعدادات وضع عدم الإزعاج لتفعيل هذا الاستثناء.'
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('إلغاء'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('متابعة'),
-              ),
-            ],
-          ),
-        ) ?? false;
-        
-        if (result) {
-          try {
-            // استخدام الطريقة openDoNotDisturbSettings بدلاً من openDoNotDisturbSettings
-            await _doNotDisturbService.openDoNotDisturbSettings();
-            
-            // عرض تعليمات إضافية للمستخدم بعد فتح الإعدادات
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('ابحث عن "التطبيقات المستثناة" أو "الاستثناءات" وأضف تطبيق الأذكار إلى القائمة'),
-                  duration: Duration(seconds: 5),
-                ),
-              );
-            }
-          } catch (e) {
-            debugPrint('خطأ في فتح إعدادات وضع عدم الإزعاج: $e');
-            // فتح إعدادات الإشعارات العامة كخطة بديلة
-            await _permissionManager.openAppSettings(AppSettingsType.notification);
-            
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('انتقل إلى إعدادات الإشعارات > وضع عدم الإزعاج > الاستثناءات > التطبيقات، وأضف تطبيق الأذكار'),
-                  duration: Duration(seconds: 7),
-                ),
-              );
-            }
-          }
-          
-          // انتظار قليلاً ثم إعادة التحقق من الحالة
-          await Future.delayed(const Duration(seconds: 2));
-        }
+        // تعديل: تحسين طلب إذن وضع عدم الإزعاج مباشرةً
+        await _openDoNotDisturbSettingDirectly();
         break;
     }
     
     // تحديث حالة الأذونات بعد الطلب
     await _updatePermissionsStatus();
+  }
+
+  // طريقة جديدة مباشرة لفتح إعدادات وضع عدم الإزعاج
+  Future<void> _openDoNotDisturbSettingDirectly() async {
+    try {
+      // الحصول على إصدار Android 
+      final androidVersion = await _getAndroidVersion();
+      
+      // تحديد تعليمات المسار المناسب حسب إصدار Android
+      final List<String> dndInstructions = _getDndInstructionsForAndroidVersion(androidVersion);
+      
+      // تعديل: استخدام رسالة حوار مع شرح مُحسن وإرشادات مخصصة حسب إصدار الجهاز
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('وضع عدم الإزعاج'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'يحتاج التطبيق إلى إذن خاص للسماح بإظهار الإشعارات الهامة (مثل أوقات الصلاة) حتى عند تفعيل وضع عدم الإزعاج.',
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'للإصدار الحالي من Android، اتبع الخطوات التالية:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              // عرض التعليمات المخصصة حسب إصدار Android
+              ...dndInstructions.map((instruction) => 
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(instruction),
+                )
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('فتح الإعدادات'),
+            ),
+          ],
+        ),
+      ) ?? false;
+
+      if (result) {
+        // تعديل: استخدام الطريقة المباشرة لفتح إعدادات عدم الإزعاج
+        await _doNotDisturbService.openDoNotDisturbSettings();
+        
+        // تعديل: إضافة رسالة مفيدة بعد فتح الإعدادات
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('يرجى إضافة تطبيق الأذكار إلى قائمة التطبيقات المسموح بها في وضع عدم الإزعاج'),
+              duration: Duration(seconds: 6),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('خطأ في فتح إعدادات وضع عدم الإزعاج: $e');
+      
+      // تعديل: إضافة معالجة أفضل للخطأ مع تقديم مساعدة للمستخدم
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('تعذر فتح إعدادات وضع عدم الإزعاج مباشرة'),
+                const SizedBox(height: 4),
+                const Text('يرجى اتباع الخطوات التالية:'),
+                const Text('1. افتح إعدادات الجهاز'),
+                const Text('2. ابحث عن "عدم الإزعاج" أو "الإشعارات" في شريط البحث'),
+                const Text('3. ابحث عن "الاستثناءات" أو "التطبيقات المسموح بها"'),
+                const Text('4. أضف تطبيق الأذكار ضمن القائمة'),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    await _permissionManager.openPermissionSettings(AppPermissionType.notification);
+                  },
+                  child: const Text('فتح إعدادات الجهاز', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 10),
+            backgroundColor: Colors.deepOrange.shade700,
+          ),
+        );
+      }
+    }
+  }
+  
+  // طريقة مساعدة للحصول على إصدار Android
+  Future<int> _getAndroidVersion() async {
+    try {
+      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+      AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+      
+      // الحصول على إصدار SDK
+      int sdkInt = androidInfo.version.sdkInt;
+      debugPrint('تم اكتشاف إصدار Android: $sdkInt');
+      
+      return sdkInt;
+    } catch (e) {
+      debugPrint('خطأ في الحصول على إصدار Android: $e');
+      return 12; // افتراض أن الإصدار هو Android 12 كحل وسط
+    }
+  }
+  
+  // تحديد التعليمات المناسبة بناءً على إصدار Android
+  List<String> _getDndInstructionsForAndroidVersion(int androidVersion) {
+    if (androidVersion >= 12) {
+      // Android 12 وما فوق
+      return [
+        '1. اختر "الإشعارات" من إعدادات الجهاز',
+        '2. اختر "وضع عدم الإزعاج"',
+        '3. اختر "الاستثناءات" أو "التطبيقات"',
+        '4. ابحث عن تطبيق الأذكار وفعّله',
+      ];
+    } else if (androidVersion >= 10) {
+      // Android 10-11
+      return [
+        '1. اختر "الصوت" أو "الصوت والاهتزاز" من إعدادات الجهاز',
+        '2. اختر "وضع عدم الإزعاج"',
+        '3. اختر "الاستثناءات" أو "السماح للتطبيقات"',
+        '4. ابحث عن تطبيق الأذكار وفعّله',
+      ];
+    } else {
+      // Android 6-9
+      return [
+        '1. اختر "الإشعارات" من إعدادات الجهاز',
+        '2. اختر "سياسة الإشعارات" أو "عدم الإزعاج"',
+        '3. اختر "استثناءات التطبيقات ذات الأولوية"',
+        '4. ابحث عن تطبيق الأذكار وفعّله',
+      ];
+    }
   }
 
   Widget _buildPermissionItem(
@@ -901,7 +995,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             onPressed: () {
               Navigator.pop(context);
               // Open notification settings
-              _doNotDisturbService.openDoNotDisturbSettings();
+              _permissionManager.openPermissionSettings(AppPermissionType.notification);
             },
             child: const Text('فتح الإعدادات'),
           ),

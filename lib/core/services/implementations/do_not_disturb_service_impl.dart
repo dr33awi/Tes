@@ -8,8 +8,6 @@ import '../interfaces/do_not_disturb_service.dart';
 
 class DoNotDisturbServiceImpl implements DoNotDisturbService {
   static const MethodChannel _channel = MethodChannel('com.athkar.app/do_not_disturb');
-  static const EventChannel _eventChannel = EventChannel('com.athkar.app/do_not_disturb_events');
-  
   StreamSubscription<dynamic>? _subscription;
   Function(bool)? _onDoNotDisturbChange;
   bool _isDoNotDisturbEnabled = false;
@@ -55,39 +53,20 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
   Future<void> openDoNotDisturbSettings() async {
     try {
       if (Platform.isAndroid) {
-        // تحسين: محاولة فتح إعدادات وضع عدم الإزعاج مباشرة بناءً على إصدار النظام
-        bool opened = false;
+        // Primero intenta usar el método del canal para abrir la configuración específica
+        final bool? opened = await _channel.invokeMethod<bool>('openDoNotDisturbSettings');
         
-        // أولاً، نحاول استخدام الطريقة المحددة في القناة
-        try {
-          final result = await _channel.invokeMethod<bool>('openDoNotDisturbSettings');
-          opened = result ?? false;
-        } catch (e) {
-          debugPrint('Error opening DND settings via method channel: $e');
-        }
-        
-        // إذا لم تنجح الطريقة الأولى، نستخدم طرق بديلة حسب إصدار Android
-        if (!opened) {
-          // حسب إصدار Android، نحاول فتح الصفحة المناسبة مباشرة
-          final androidVersion = await _getAndroidVersion();
-          
-          if (androidVersion >= 12) {
-            // Android 12 وما فوق - نحاول فتح صفحة الاستثناءات مباشرة
-            await AppSettings.openAppSettings(type: AppSettingsType.notificationSettings);
-          } else if (androidVersion >= 10) {
-            // Android 10-11
-            await AppSettings.openAppSettings(type: AppSettingsType.dndAccess);
-          } else {
-            // لإصدارات أقدم، نفتح إعدادات التطبيق العامة
-            await AppSettings.openAppSettings();
-          }
+        // Si no funciona, usa AppSettings
+        if (!(opened ?? false)) {
+          await AppSettings.openAppSettings(type: AppSettingsType.notification);
         }
       } else if (Platform.isIOS) {
-        // في iOS، نفتح إعدادات التطبيق العامة
+        // En iOS, abre la configuración general de la aplicación
         await AppSettings.openAppSettings();
       }
       
-      // بعد فتح الإعدادات، نعطي وقتاً للتأخير ثم نعيد التحقق من الحالة
+      // Después de abrir la configuración, damos un pequeño delay
+      // y luego verificamos nuevamente el estado
       await Future.delayed(const Duration(seconds: 1));
       final bool isDndEnabled = await isDoNotDisturbEnabled();
       if (_onDoNotDisturbChange != null) {
@@ -95,25 +74,8 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
       }
     } catch (e) {
       debugPrint('Error opening DND settings: $e');
-      // كخطة بديلة، نفتح إعدادات التطبيق العامة
+      // Como fallback, abre la configuración general de la app
       await AppSettings.openAppSettings();
-    }
-  }
-  
-  // طريقة مساعدة للحصول على إصدار Android
-  Future<int> _getAndroidVersion() async {
-    try {
-      if (!Platform.isAndroid) return 0;
-      
-      final androidVersion = await _channel.invokeMethod<String>('getAndroidVersion');
-      if (androidVersion == null) return 0;
-      
-      // تحويل النسخة من نمط "X.Y.Z" إلى رقم
-      final major = int.tryParse(androidVersion.split('.').first) ?? 0;
-      return major;
-    } catch (e) {
-      debugPrint('Error getting Android version: $e');
-      return 0; // القيمة الافتراضية
     }
   }
   
@@ -123,7 +85,7 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
     
     if (Platform.isAndroid) {
       // Configurar un receptor para cambios en el modo No molestar en Android
-      _subscription = _eventChannel
+      _subscription = const EventChannel('com.athkar.app/do_not_disturb_events')
           .receiveBroadcastStream()
           .listen((dynamic event) {
         if (event is bool) {

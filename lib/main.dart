@@ -23,7 +23,7 @@ import 'domain/usecases/athkar/get_athkar_by_category.dart';
 import 'domain/usecases/athkar/get_athkar_categories.dart';
 import 'domain/usecases/prayers/get_prayer_times.dart';
 import 'domain/usecases/prayers/get_qibla_direction.dart';
-
+import 'app/themes/app_theme.dart';
 Future<void> main() async {
   // تهيئة ربط Flutter
   WidgetsFlutterBinding.ensureInitialized();
