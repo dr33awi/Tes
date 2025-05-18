@@ -2,12 +2,13 @@
 import 'package:flutter/material.dart';
 import '../../features/prayers/presentation/screens/prayer_times_screen.dart';
 import '../../features/prayers/presentation/screens/qibla_screen.dart';
-import '../../features/athkar/presentation/screens/athkar_categories_screen.dart';
 import '../../features/athkar/presentation/screens/athkar_details_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/onboarding/presentation/screens/permissions_onboarding_screen.dart';
+import '../../features/athkar/presentation/screens/athkar_screen.dart';
 
+import '../../features/athkar/data/models/athkar_model.dart';
 class AppRouter {
 
   static const String initialRoute = '/';
@@ -18,7 +19,8 @@ class AppRouter {
   static const String qibla = '/qibla';
   static const String settingsRoute = '/settings';
   static const String permissionsOnboarding = '/permissions-onboarding';
-  
+  static const String athkarScreen = '/athkar';
+  static const String athkarDetailsScreen = '/athkar-details';
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
 
     final routeName = settings.name;
@@ -38,21 +40,19 @@ class AppRouter {
           builder: (_) => const PrayerTimesScreen(),
         );
         
-      case athkarCategories:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const AthkarCategoriesScreen(),
-        );
-        
-      case athkarDetails:
-        final Map<String, dynamic> args = settings.arguments as Map<String, dynamic>;
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => AthkarDetailsScreen(
-            categoryId: args['categoryId'],
-            categoryName: args['categoryName'],
-          ),
-        );
+      case athkarScreen:
+  return MaterialPageRoute(
+    settings: settings,
+    builder: (_) => const AthkarScreen(),
+  );
+  
+    case athkarDetailsScreen:
+  final Map<String, dynamic> args = settings.arguments as Map<String, dynamic>;
+  final AthkarCategory category = args['category'];
+  return MaterialPageRoute(
+    settings: settings,
+    builder: (_) => AthkarDetailsScreen(category: category),
+  );
         
       case qibla:
         return MaterialPageRoute(
