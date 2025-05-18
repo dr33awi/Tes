@@ -1,17 +1,28 @@
-// lib/main.dart
+// lib/main.dart - Modificado para resolver el error de NotificationService
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app/app.dart';
 import 'app/di/service_locator.dart';
+import 'app/routes/app_router.dart';
+import 'app/themes/app_theme.dart';
 import 'core/services/interfaces/notification_service.dart';
 import 'core/services/interfaces/timezone_service.dart';
 import 'core/services/interfaces/storage_service.dart';
 import 'domain/usecases/settings/get_settings.dart';
+import 'domain/usecases/settings/update_settings.dart';
 import 'core/services/utils/notification_scheduler.dart';
 import 'core/constants/app_constants.dart';
-import 'app/themes/app_theme.dart';
 import 'presentation/screens/onboarding/permissions_onboarding_screen.dart';
+import 'presentation/blocs/athkar/athkar_provider.dart';
+import 'presentation/blocs/prayers/prayer_times_provider.dart';
+import 'presentation/blocs/settings/settings_provider.dart';
+import 'domain/usecases/athkar/get_athkar_by_category.dart';
+import 'domain/usecases/athkar/get_athkar_categories.dart';
+import 'domain/usecases/prayers/get_prayer_times.dart';
+import 'domain/usecases/prayers/get_qibla_direction.dart';
 
 Future<void> main() async {
   // تهيئة ربط Flutter
@@ -24,32 +35,57 @@ Future<void> main() async {
   ]);
   
   try {
-    // تهيئة خدمات التطبيق الأساسية فقط
-    await _initBasicServices();
-    
-    // التحقق من أول تشغيل للتطبيق
-    final storageService = getIt<StorageService>();
-    final isFirstRun = storageService.getBool('isFirstRun') ?? true;
-    
-    // إنشاء NavigationService
+    // إعداد NavigationService
     _setupNavigationService();
     
     // تسجيل Observer لمراقبة دورة حياة التطبيق
     WidgetsBinding.instance.addObserver(AppLifecycleObserver());
     
+    // IMPORTANTE: Inicializar TODOS los servicios antes de crear los proveedores
+    await _initAllServices();
+    
+    // التحقق من أول تشغيل للتطبيق
+    final storageService = getIt<StorageService>();
+    final isFirstRun = storageService.getBool('isFirstRun') ?? true;
+    
+    // Create all providers at the application root level
+    final providers = MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(
+            getSettings: getIt<GetSettings>(),
+            updateSettings: getIt<UpdateSettings>(),
+          )..loadSettings(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AthkarProvider(
+            getAthkarCategories: getIt<GetAthkarCategories>(),
+            getAthkarByCategory: getIt<GetAthkarByCategory>(),
+          )..loadCategories(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PrayerTimesProvider(
+            getPrayerTimes: getIt<GetPrayerTimes>(),
+            getQiblaDirection: getIt<GetQiblaDirection>(),
+          ),
+        ),
+      ],
+      child: isFirstRun ? OnboardingApp() : const AthkarApp(),
+    );
+    
+    runApp(providers);
+    
+    // حفظ حالة أول تشغيل
     if (isFirstRun) {
-      // عرض شاشة الأذونات عند أول تشغيل
-      runApp(OnboardingApp());
-      
-      // حفظ حالة أول تشغيل
       await storageService.setBool('isFirstRun', false);
-    } else {
-      // تشغيل التطبيق العادي
-      runApp(const AthkarApp());
     }
     
-    // تهيئة الخدمات غير الأساسية في الخلفية
-    _initNonEssentialServices();
+    // طلب أذونات الإشعارات عند بدء التطبيق
+    await _requestNotificationPermissions();
+    
+    // جدولة الإشعارات بناءً على الإعدادات المحفوظة
+    await _scheduleNotifications();
+    
   } catch (e) {
     debugPrint('Error al iniciar la aplicación: $e');
     runApp(
@@ -64,26 +100,16 @@ Future<void> main() async {
   }
 }
 
-/// تهيئة الخدمات الأساسية المطلوبة لبدء التطبيق
-Future<void> _initBasicServices() async {
-  // تهيئة خدمات التطبيق الأساسية فقط
-  await ServiceLocator().initBasicServices();
+/// تهيئة جميع الخدمات (الأساسية وغير الأساسية) في مرة واحدة
+Future<void> _initAllServices() async {
+  // تهيئة كل الخدمات في مرة واحدة (لحل مشكلة الاعتمادات)
+  await ServiceLocator().init();
   
   // التأكد من تهيئة التوقيت
   final timezoneService = getIt<TimezoneService>();
   await timezoneService.initializeTimeZones();
-}
-
-/// تهيئة الخدمات غير الأساسية في الخلفية
-Future<void> _initNonEssentialServices() async {
-  // إكمال تهيئة باقي الخدمات
-  await ServiceLocator().initRemainingServices();
   
-  // طلب أذونات الإشعارات عند بدء التطبيق
-  await _requestNotificationPermissions();
-  
-  // جدولة الإشعارات بناءً على الإعدادات المحفوظة
-  await _scheduleNotifications();
+  debugPrint('Todos los servicios inicializados correctamente');
 }
 
 /// إعداد خدمة التنقل
@@ -130,7 +156,48 @@ class OnboardingApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
-      home: const PermissionsOnboardingScreen(),
+      navigatorKey: NavigationService.navigatorKey,
+      onGenerateRoute: AppRouter.onGenerateRoute,
+      initialRoute: AppRouter.permissionsOnboarding,
+      navigatorObservers: [
+        _NavigationObserver(), 
+      ],
+    );
+  }
+}
+
+// Implementación actualizada para AthkarApp
+class AthkarApp extends StatelessWidget {
+  const AthkarApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Acceder al SettingsProvider ya disponible globalmente
+    final settingsProvider = Provider.of<SettingsProvider>(context);
+    final isDarkMode = settingsProvider.settings?.enableDarkMode ?? false;
+    final language = settingsProvider.settings?.language ?? AppConstants.defaultLanguage;
+    
+    return MaterialApp(
+      title: AppConstants.appName,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      locale: Locale(language),
+      supportedLocales: const [
+        Locale('ar'), // العربية
+        Locale('en'), // الإنجليزية
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      navigatorKey: NavigationService.navigatorKey,
+      onGenerateRoute: AppRouter.onGenerateRoute,
+      initialRoute: AppRouter.home,
+      navigatorObservers: [
+        _NavigationObserver(),
+      ],
     );
   }
 }
@@ -184,5 +251,32 @@ class AppShutdownManager {
       debugPrint('Error during app shutdown: $e');
       return false;
     }
+  }
+}
+
+/// Observador de navegación para depuración
+class _NavigationObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    debugPrint('Navegación: Ruta empujada - ${route.settings.name} (previa: ${previousRoute?.settings.name})');
+    super.didPush(route, previousRoute);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    debugPrint('Navegación: Ruta retirada - ${route.settings.name} (volviendo a: ${previousRoute?.settings.name})');
+    super.didPop(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    debugPrint('Navegación: Ruta reemplazada - Nueva: ${newRoute?.settings.name}, Vieja: ${oldRoute?.settings.name}');
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    debugPrint('Navegación: Ruta eliminada - ${route.settings.name}');
+    super.didRemove(route, previousRoute);
   }
 }

@@ -6,10 +6,10 @@ import '../../presentation/screens/athkar/athkar_categories_screen.dart';
 import '../../presentation/screens/athkar/athkar_details_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
-import '../../presentation/screens/onboarding/permissions_onboarding_screen.dart'; // تأكد من إضافة هذا الاستيراد
+import '../../presentation/screens/onboarding/permissions_onboarding_screen.dart';
 
 class AppRouter {
-  // معرفات الطرق الثابتة
+
   static const String initialRoute = '/';
   static const String home = '/';
   static const String prayerTimes = '/prayer-times';
@@ -17,31 +17,37 @@ class AppRouter {
   static const String athkarDetails = '/athkar-details';
   static const String qibla = '/qibla';
   static const String settingsRoute = '/settings';
-  static const String permissionsOnboarding = '/permissions-onboarding'; // إضافة مسار جديد
+  static const String permissionsOnboarding = '/permissions-onboarding';
   
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    // استخدام متغير آخر لتجنب تداخل الأسماء
+
     final routeName = settings.name;
+    
+    debugPrint('Generando ruta para: $routeName');
     
     switch (routeName) {
       case home:
         return MaterialPageRoute(
+          settings: settings, 
           builder: (_) => const HomeScreen(),
         );
         
       case prayerTimes:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => const PrayerTimesScreen(),
         );
         
       case athkarCategories:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => const AthkarCategoriesScreen(),
         );
         
       case athkarDetails:
         final Map<String, dynamic> args = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => AthkarDetailsScreen(
             categoryId: args['categoryId'],
             categoryName: args['categoryName'],
@@ -50,22 +56,26 @@ class AppRouter {
         
       case qibla:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => const QiblaScreen(),
         );
         
       case settingsRoute:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => const SettingsScreen(),
         );
       
-      // إضافة مسار شاشة الأذونات
       case permissionsOnboarding:
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => const PermissionsOnboardingScreen(),
         );
         
       default:
+        debugPrint('¡RUTA NO ENCONTRADA! ${settings.name}');
         return MaterialPageRoute(
+          settings: settings,
           builder: (_) => Scaffold(
             body: Center(
               child: Text('لا يوجد طريق للمسار ${settings.name}'),

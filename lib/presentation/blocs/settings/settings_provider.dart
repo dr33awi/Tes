@@ -1,4 +1,5 @@
 // lib/presentation/blocs/settings/settings_provider.dart
+// Modificado para manejar la inicialización segura de servicios
 import 'package:flutter/material.dart';
 import '../../../domain/entities/settings.dart';
 import '../../../domain/usecases/settings/get_settings.dart';
@@ -11,9 +12,11 @@ import '../../../app/di/service_locator.dart';
 class SettingsProvider extends ChangeNotifier {
   final GetSettings _getSettings;
   final UpdateSettings _updateSettings;
-  final NotificationService _notificationService = getIt<NotificationService>();
-  final BatteryService _batteryService = getIt<BatteryService>();
-  final NotificationScheduler _notificationScheduler = getIt<NotificationScheduler>();
+  
+  // Usa métodos para acceder a los servicios de forma segura en lugar de inicializarlos como campos
+  NotificationService? _notificationService;
+  BatteryService? _batteryService;
+  NotificationScheduler? _notificationScheduler;
   
   Settings? _settings;
   bool _isLoading = false;
@@ -31,6 +34,36 @@ class SettingsProvider extends ChangeNotifier {
   String? get error => _error;
   bool get hasError => _error != null;
   
+  // التأكد من تهيئة الخدمات بشكل آمن
+  void _ensureServicesInitialized() {
+    try {
+      _notificationService ??= getIt<NotificationService>();
+      _batteryService ??= getIt<BatteryService>();
+      _notificationScheduler ??= getIt<NotificationScheduler>();
+    } catch (e) {
+      debugPrint('خطأ في تهيئة الخدمات في SettingsProvider: $e');
+      // لا نقوم بإعادة إثارة الاستثناء هنا، فقط نسجله
+    }
+  }
+  
+  // استدعاء خدمة الإشعارات بشكل آمن
+  NotificationService? get _safeNotificationService {
+    _ensureServicesInitialized();
+    return _notificationService;
+  }
+  
+  // استدعاء خدمة البطارية بشكل آمن
+  BatteryService? get _safeBatteryService {
+    _ensureServicesInitialized();
+    return _batteryService;
+  }
+  
+  // استدعاء جدولة الإشعارات بشكل آمن
+  NotificationScheduler? get _safeNotificationScheduler {
+    _ensureServicesInitialized();
+    return _notificationScheduler;
+  }
+  
   // تحميل الإعدادات
   Future<void> loadSettings() async {
     _isLoading = true;
@@ -40,10 +73,10 @@ class SettingsProvider extends ChangeNotifier {
     try {
       _settings = await _getSettings();
       
-      // تحديث إعدادات خدمة الإشعارات
+      // تحديث إعدادات خدمة الإشعارات إذا كانت متوفرة
       await _updateNotificationServiceSettings();
       
-      // تحديث إعدادات خدمة البطارية
+      // تحديث إعدادات خدمة البطارية إذا كانت متوفرة
       await _updateBatteryServiceSettings();
       
       _isLoading = false;
@@ -76,7 +109,7 @@ class SettingsProvider extends ChangeNotifier {
         
         // إعادة جدولة الإشعارات إذا تم تغيير إعدادات الإشعارات
         if (_shouldRescheduleNotifications(oldSettings, newSettings)) {
-          await _notificationScheduler.scheduleAllNotifications(newSettings);
+          await _safeNotificationScheduler?.scheduleAllNotifications(newSettings);
         }
       }
       
@@ -142,7 +175,7 @@ class SettingsProvider extends ChangeNotifier {
         
         // إعادة جدولة الإشعارات إذا لزم الأمر
         if (_shouldRescheduleNotificationForKey(key)) {
-          await _notificationScheduler.scheduleAllNotifications(newSettings);
+          await _safeNotificationScheduler?.scheduleAllNotifications(newSettings);
         }
       }
       
@@ -254,28 +287,47 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> _updateNotificationServiceSettings() async {
     if (_settings == null) return;
     
+    final notificationService = _safeNotificationService;
+    if (notificationService == null) return;
+    
     // تحديث إعدادات احترام البطارية ووضع عدم الإزعاج
-    await _notificationService.setRespectBatteryOptimizations(_settings!.respectBatteryOptimizations);
-    await _notificationService.setRespectDoNotDisturb(_settings!.respectDoNotDisturb);
+    await notificationService.setRespectBatteryOptimizations(_settings!.respectBatteryOptimizations);
+    await notificationService.setRespectDoNotDisturb(_settings!.respectDoNotDisturb);
   }
   
   // تحديث إعدادات خدمة البطارية
   Future<void> _updateBatteryServiceSettings() async {
     if (_settings == null) return;
     
+    final batteryService = _safeBatteryService;
+    if (batteryService == null) return;
+    
     // تحديث الحد الأدنى لمستوى البطارية
-    await _batteryService.setMinimumBatteryLevel(_settings!.lowBatteryThreshold);
+    await batteryService.setMinimumBatteryLevel(_settings!.lowBatteryThreshold);
   }
   
   // إعادة جدولة جميع الإشعارات
   Future<void> rescheduleAllNotifications() async {
     if (_settings == null) return;
     
-    await _notificationScheduler.rescheduleAllNotifications(_settings!);
+    final scheduler = _safeNotificationScheduler;
+    if (scheduler != null) {
+      await scheduler.rescheduleAllNotifications(_settings!);
+    }
   }
   
   // الحصول على حالة الإشعارات
   Future<Map<String, dynamic>> getNotificationStatus() async {
-    return await _notificationScheduler.getNotificationStatus();
+    final scheduler = _safeNotificationScheduler;
+    if (scheduler != null) {
+      return await scheduler.getNotificationStatus();
+    }
+    return {
+      'can_send_now': false,
+      'has_permission': false,
+      'battery_optimization_enabled': false,
+      'dnd_enabled': false,
+      'scheduled_notifications_count': 0,
+    };
   }
 }

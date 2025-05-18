@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import '../interfaces/do_not_disturb_service.dart';
 
 class DoNotDisturbServiceImpl implements DoNotDisturbService {
@@ -19,15 +20,15 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
         _isDoNotDisturbEnabled = isDndEnabled ?? false;
         return _isDoNotDisturbEnabled;
       } else if (Platform.isIOS) {
-        // في نظام iOS، لا يمكن الوصول مباشرة لوضع عدم الإزعاج
-        // يمكن استخدام طرق بديلة مثل معرفة إذا كان النظام يسمح بالإشعارات
+        // En iOS, no se puede acceder directamente al modo No molestar
+        // Podemos usar métodos alternativos como verificar si las notificaciones están permitidas
         final bool? canSendNotifications = await _channel.invokeMethod<bool>('canSendNotifications');
         _isDoNotDisturbEnabled = !(canSendNotifications ?? true);
         return _isDoNotDisturbEnabled;
       }
       return false;
     } on PlatformException catch (e) {
-      print('Error checking DND status: ${e.message}');
+      debugPrint('Error checking DND status: ${e.message}');
       return false;
     }
   }
@@ -39,21 +40,41 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
         final bool? granted = await _channel.invokeMethod<bool>('requestDoNotDisturbPermission');
         return granted ?? false;
       } else {
-        // iOS لا يحتاج إذن خاص لوضع عدم الإزعاج
+        // iOS no necesita un permiso específico para el modo No molestar
         return true;
       }
     } on PlatformException catch (e) {
-      print('Error requesting DND permission: ${e.message}');
+      debugPrint('Error requesting DND permission: ${e.message}');
       return false;
     }
   }
   
   @override
   Future<void> openDoNotDisturbSettings() async {
-    if (Platform.isAndroid) {
-      // استخدام الطريقة المناسبة في إصدار app_settings الحالي
-      await AppSettings.openAppSettings(type: AppSettingsType.notification);
-    } else if (Platform.isIOS) {
+    try {
+      if (Platform.isAndroid) {
+        // Primero intenta usar el método del canal para abrir la configuración específica
+        final bool? opened = await _channel.invokeMethod<bool>('openDoNotDisturbSettings');
+        
+        // Si no funciona, usa AppSettings
+        if (!(opened ?? false)) {
+          await AppSettings.openAppSettings(type: AppSettingsType.notification);
+        }
+      } else if (Platform.isIOS) {
+        // En iOS, abre la configuración general de la aplicación
+        await AppSettings.openAppSettings();
+      }
+      
+      // Después de abrir la configuración, damos un pequeño delay
+      // y luego verificamos nuevamente el estado
+      await Future.delayed(const Duration(seconds: 1));
+      final bool isDndEnabled = await isDoNotDisturbEnabled();
+      if (_onDoNotDisturbChange != null) {
+        _onDoNotDisturbChange!(isDndEnabled);
+      }
+    } catch (e) {
+      debugPrint('Error opening DND settings: $e');
+      // Como fallback, abre la configuración general de la app
       await AppSettings.openAppSettings();
     }
   }
@@ -63,7 +84,7 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
     _onDoNotDisturbChange = onDoNotDisturbChange;
     
     if (Platform.isAndroid) {
-      // إعداد مستمع لتغييرات وضع عدم الإزعاج في نظام Android
+      // Configurar un receptor para cambios en el modo No molestar en Android
       _subscription = const EventChannel('com.athkar.app/do_not_disturb_events')
           .receiveBroadcastStream()
           .listen((dynamic event) {
@@ -74,10 +95,10 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
           }
         }
       }, onError: (Object error) {
-        print('Error in DND listener: $error');
+        debugPrint('Error in DND listener: $error');
       });
     } else if (Platform.isIOS) {
-      // في iOS، يمكننا استخدام المستمع من خلال مراقبة حالة مركز الإشعارات
+      // En iOS, podemos observar cambios en la configuración del centro de notificaciones
       _subscription = const EventChannel('com.athkar.app/notification_settings_events')
           .receiveBroadcastStream()
           .listen((dynamic event) {
@@ -88,11 +109,11 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
           }
         }
       }, onError: (Object error) {
-        print('Error in iOS DND listener: $error');
+        debugPrint('Error in iOS DND listener: $error');
       });
     }
     
-    // التأكد من وجود القيمة الأولية
+    // Obtener el estado inicial
     final currentStatus = await isDoNotDisturbEnabled();
     if (_onDoNotDisturbChange != null && currentStatus != _isDoNotDisturbEnabled) {
       _isDoNotDisturbEnabled = currentStatus;
@@ -109,20 +130,20 @@ class DoNotDisturbServiceImpl implements DoNotDisturbService {
   
   @override
   Future<bool> shouldOverrideDoNotDisturb(DoNotDisturbOverrideType type) async {
-    // التحقق مما إذا كان يجب تجاوز وضع عدم الإزعاج بناءً على نوع الإشعار
+    // Verificar si debemos anular el modo No molestar según el tipo de notificación
     if (!_isDoNotDisturbEnabled) {
-      return true; // وضع عدم الإزعاج غير مفعل، يمكن إرسال الإشعار
+      return true; // El modo No molestar está desactivado, se pueden enviar notificaciones
     }
     
     switch (type) {
       case DoNotDisturbOverrideType.none:
-        return false; // لا تجاوز
+        return false; // No anular
       case DoNotDisturbOverrideType.prayer:
-        return true; // تجاوز لإشعارات الصلاة
+        return true; // Anular para notificaciones de oración
       case DoNotDisturbOverrideType.importantAthkar:
-        return true; // تجاوز للأذكار المهمة
+        return true; // Anular para adhkar importantes
       case DoNotDisturbOverrideType.critical:
-        return true; // تجاوز للإشعارات الحرجة
+        return true; // Anular para notificaciones críticas
       default:
         return false;
     }

@@ -1,9 +1,13 @@
 // lib/presentation/screens/onboarding/permissions_onboarding_screen.dart
+// Actualización para manejar proveedores correctamente
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../app/di/service_locator.dart';
 import '../../../app/routes/app_router.dart';
 import '../../../core/services/permission_manager.dart';
 import '../../../core/services/interfaces/permission_service.dart';
+import '../../../core/services/interfaces/do_not_disturb_service.dart';
+import '../../blocs/settings/settings_provider.dart';
 
 class PermissionsOnboardingScreen extends StatefulWidget {
   const PermissionsOnboardingScreen({super.key});
@@ -13,32 +17,69 @@ class PermissionsOnboardingScreen extends StatefulWidget {
 }
 
 class _PermissionsOnboardingScreenState extends State<PermissionsOnboardingScreen> {
-  final PermissionManager _permissionManager = getIt<PermissionManager>();
+  late final PermissionManager _permissionManager;
+  late final DoNotDisturbService _doNotDisturbService;
   
   bool _notificationsGranted = false;
   bool _locationGranted = false;
   bool _batteryOptGranted = false;
   bool _dndGranted = false;
+  bool _isInitialized = false;
   
   @override
   void initState() {
     super.initState();
-    _checkInitialPermissions();
+    _initServices();
   }
   
+  // تهيئة الخدمات المطلوبة
+  Future<void> _initServices() async {
+    try {
+      _permissionManager = getIt<PermissionManager>();
+      _doNotDisturbService = getIt<DoNotDisturbService>();
+      _isInitialized = true;
+      
+      // التحقق من الأذونات الأولية
+      await _checkInitialPermissions();
+    } catch (e) {
+      debugPrint('خطأ في تهيئة الخدمات: $e');
+      // إظهار رسالة خطأ إذا تعذر تهيئة الخدمات
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تهيئة الخدمات: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  // التحقق من حالة الأذونات الأولية
   Future<void> _checkInitialPermissions() async {
-    final permissions = await _permissionManager.checkPermissions();
+    if (!_isInitialized) return;
     
-    setState(() {
-      _notificationsGranted = permissions[AppPermissionType.notification] == AppPermissionStatus.granted;
-      _locationGranted = permissions[AppPermissionType.location] == AppPermissionStatus.granted;
-      _batteryOptGranted = permissions[AppPermissionType.batteryOptimization] == AppPermissionStatus.granted;
-      _dndGranted = permissions[AppPermissionType.doNotDisturb] == AppPermissionStatus.granted;
-    });
+    try {
+      final permissions = await _permissionManager.checkPermissions();
+      
+      if (mounted) {
+        setState(() {
+          _notificationsGranted = permissions[AppPermissionType.notification] == AppPermissionStatus.granted;
+          _locationGranted = permissions[AppPermissionType.location] == AppPermissionStatus.granted;
+          _batteryOptGranted = permissions[AppPermissionType.batteryOptimization] == AppPermissionStatus.granted;
+          _dndGranted = permissions[AppPermissionType.doNotDisturb] == AppPermissionStatus.granted;
+        });
+      }
+    } catch (e) {
+      debugPrint('خطأ في التحقق من الأذونات الأولية: $e');
+    }
   }
   
   @override
   Widget build(BuildContext context) {
+    // نتأكد أن إعدادات التطبيق متاحة قبل البناء - وهذا يصلح مشكلة Provider
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('إعداد الأذونات'),
@@ -116,21 +157,24 @@ class _PermissionsOnboardingScreenState extends State<PermissionsOnboardingScree
                 description: 'لإظهار إشعارات الصلاة في وضع عدم الإزعاج',
                 isGranted: _dndGranted,
                 isRequired: false,
-                onRequest: () async {
-                  final result = await _permissionManager.requestOptionalPermissions(context);
-                  setState(() {
-                    _dndGranted = result[AppPermissionType.doNotDisturb] ?? false;
-                  });
-                },
+                onRequest: _requestDoNotDisturbPermission,
               ),
               
+              // فاصل لدفع زر المتابعة للأسفل
               const Spacer(),
               
-              // زر المتابعة للشاشة الرئيسية
+              // زر المتابعة مع تحسين التنقل
               ElevatedButton(
                 onPressed: _notificationsGranted && _locationGranted
                     ? () {
-                        Navigator.pushReplacementNamed(context, AppRouter.home);
+                        // استخدام طريقة أفضل للتنقل وتنظيف المسار
+                        // قبل التنقل، نتأكد من تحديث إعدادات التطبيق
+                        settingsProvider.rescheduleAllNotifications();
+                        
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          AppRouter.home,
+                          (route) => false,
+                        );
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
@@ -142,7 +186,7 @@ class _PermissionsOnboardingScreenState extends State<PermissionsOnboardingScree
                 ),
               ),
               
-              // خيار تخطي بعض الأذونات
+              // خيار تخطي الأذونات
               if (!_notificationsGranted || !_locationGranted)
                 TextButton(
                   onPressed: () {
@@ -161,7 +205,14 @@ class _PermissionsOnboardingScreenState extends State<PermissionsOnboardingScree
                           ElevatedButton(
                             onPressed: () {
                               Navigator.pop(context);
-                              Navigator.pushReplacementNamed(context, AppRouter.home);
+                              // استخدام نفس طريقة التنقل المحسنة
+                              // نتأكد من تحديث إعدادات التطبيق قبل التنقل
+                              settingsProvider.rescheduleAllNotifications();
+                              
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                AppRouter.home,
+                                (route) => false,
+                              );
                             },
                             child: const Text('متابعة على أي حال'),
                           ),
@@ -178,6 +229,59 @@ class _PermissionsOnboardingScreenState extends State<PermissionsOnboardingScree
     );
   }
   
+  // طريقة محسنة لطلب إذن عدم الإزعاج
+  Future<void> _requestDoNotDisturbPermission() async {
+    if (!_isInitialized) {
+      debugPrint('الخدمات غير مهيأة، لا يمكن طلب أذونات وضع عدم الإزعاج');
+      return;
+    }
+    
+    try {
+      // أولاً، طلب الإذن
+      final result = await _permissionManager.requestOptionalPermissions(context);
+      setState(() {
+        _dndGranted = result[AppPermissionType.doNotDisturb] ?? false;
+      });
+      
+      // إذا لم يتم منح الإذن، نقدم خيار فتح الإعدادات
+      if (!_dndGranted && mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('إذن وضع عدم الإزعاج'),
+            content: const Text('هذا الإذن مطلوب للسماح بظهور إشعارات الصلاة حتى في وضع عدم الإزعاج. هل تريد فتح الإعدادات لمنح الإذن؟'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('لاحقاً'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  // فتح إعدادات وضع عدم الإزعاج مباشرة
+                  _doNotDisturbService.openDoNotDisturbSettings();
+                },
+                child: const Text('فتح الإعدادات'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('خطأ في طلب إذن وضع عدم الإزعاج: $e');
+      // إظهار رسالة خطأ
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في طلب الإذن: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  // بناء بطاقة الإذن
   Widget _buildPermissionCard({
     required IconData icon,
     required String title,

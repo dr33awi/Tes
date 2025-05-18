@@ -1,4 +1,5 @@
 // lib/app/di/service_locator.dart
+// Asegurarnos de que DoNotDisturbService se registre correctamente
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get_it/get_it.dart';
@@ -65,14 +66,19 @@ class ServiceLocator {
     );
     
     // Permission Service
-getIt.registerSingleton<PermissionService>(
-  PermissionServiceImpl(),
-);
+    getIt.registerSingleton<PermissionService>(
+      PermissionServiceImpl(),
+    );
+    
+    // DoNotDisturb Service - Registrarlo en los servicios básicos para que esté disponible desde el principio
+    getIt.registerSingleton<DoNotDisturbService>(
+      DoNotDisturbServiceImpl(),
+    );
     
     // Permission Manager
-getIt.registerSingleton<PermissionManager>(
-  PermissionManager(getIt<PermissionService>()),
-);
+    getIt.registerSingleton<PermissionManager>(
+      PermissionManager(getIt<PermissionService>()),
+    );
     
     // Data Sources
     getIt.registerSingleton<SettingsLocalDataSource>(
@@ -106,16 +112,14 @@ getIt.registerSingleton<PermissionManager>(
       BatteryServiceImpl(),
     );
     
-    getIt.registerSingleton<DoNotDisturbService>(
-      DoNotDisturbServiceImpl(),
-    );
+    // Ya no necesitamos registrar DoNotDisturbService aquí, pues ya se registró en los servicios básicos
     
     // Registro del servicio de notificaciones con los nuevos servicios
     getIt.registerSingleton<NotificationService>(
       NotificationServiceImpl(
         flutterLocalNotificationsPlugin,
         getIt<BatteryService>(),
-        getIt<DoNotDisturbService>(),
+        getIt<DoNotDisturbService>(), // Este servicio ya debe estar registrado
         getIt<TimezoneService>(),
       ),
     );
@@ -162,9 +166,11 @@ getIt.registerSingleton<PermissionManager>(
     _fullInitialized = true;
     debugPrint('All services initialized successfully');
   }
+  
   void setupServiceLocator() {
-  getIt.registerSingleton<PermissionService>(PermissionServiceImpl());
-}
+    // Este método podría ser eliminado o mantenerlo para compatibilidad
+    getIt.registerSingleton<PermissionService>(PermissionServiceImpl());
+  }
 
   /// تهيئة جميع الخدمات (الطريقة القديمة للتوافق الخلفي)
   Future<void> init() async {
