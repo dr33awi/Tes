@@ -20,6 +20,9 @@ class AthkarService {
   late final NotificationService _notificationService;
   late final NotificationScheduler _notificationScheduler;
   
+  // مسار ملف JSON المحسن
+  static const String _athkarJsonPath = 'assets/data/athkar.json';
+  
   AthkarService._internal() {
     try {
       _notificationService = getIt<NotificationService>();
@@ -29,10 +32,13 @@ class AthkarService {
     }
   }
 
-  // ذاكرة التخزين المؤقت للأذكار لتجنب القراءة المتكررة من الملفات
+  // ذاكرة التخزين المؤقت للأذكار لتجنب القراءة المتكررة من الملف
   final Map<String, AthkarScreen> _athkarCache = {};
 
-  // تحميل الأذكار من ملف JSON
+  /// تحميل جميع فئات الأذكار من ملف JSON
+  /// 
+  /// يقوم بقراءة ملف athkar.json وتحويله إلى قائمة من كائنات AthkarScreen
+  /// مع استخدام التخزين المؤقت لتحسين الأداء
   Future<List<AthkarScreen>> loadAllAthkarCategories() async {
     try {
       // استخدام الكاش إذا كان موجودًا بالفعل
@@ -41,18 +47,22 @@ class AthkarService {
       }
       
       // قراءة ملف JSON من الأصول
-      final String jsonString = await rootBundle.loadString('assets/data/athkar.json');
+      final String jsonString = await rootBundle.loadString(_athkarJsonPath);
       final Map<String, dynamic> jsonData = json.decode(jsonString);
       
       List<AthkarScreen> categories = [];
       
       // تحليل الفئات
-      for (var categoryData in jsonData['categories']) {
-        final category = _parseAthkarCategory(categoryData);
-        categories.add(category);
-        
-        // تخزين مؤقت للفئة للوصول السريع لاحقًا
-        _athkarCache[category.id] = category;
+      if (jsonData.containsKey('categories')) {
+        for (var categoryData in jsonData['categories']) {
+          final category = _parseAthkarCategory(categoryData);
+          categories.add(category);
+          
+          // تخزين مؤقت للفئة للوصول السريع لاحقًا
+          _athkarCache[category.id] = category;
+        }
+      } else {
+        debugPrint('Error: JSON file does not contain "categories" key');
       }
       
       return categories;
@@ -62,7 +72,10 @@ class AthkarService {
     }
   }
 
-  // الحصول على فئة محددة حسب المعرف مع تحسين التخزين المؤقت
+  /// الحصول على فئة محددة حسب المعرف مع تحسين التخزين المؤقت
+  /// 
+  /// @param categoryId معرف الفئة المطلوبة
+  /// @return كائن AthkarScreen إذا وجد، أو null إذا لم يوجد
   Future<AthkarScreen?> getAthkarCategory(String categoryId) async {
     // التحقق مما إذا كانت الفئة موجودة بالفعل في ذاكرة التخزين المؤقت
     if (_athkarCache.containsKey(categoryId)) {
@@ -72,12 +85,15 @@ class AthkarService {
     try {
       // إذا لم تكن موجودة في ذاكرة التخزين المؤقت، قم بتحميل جميع الفئات ثم إرجاع الفئة المحددة
       final categories = await loadAllAthkarCategories();
+      
+      // البحث عن الفئة بالمعرف
       for (var category in categories) {
         if (category.id == categoryId) {
           return category;
         }
       }
       
+      debugPrint('Category not found: $categoryId');
       return null;
     } catch (e) {
       debugPrint('Error getting category $categoryId: $e');
@@ -85,26 +101,32 @@ class AthkarService {
     }
   }
 
-  // تحليل فئة واحدة من JSON مع تحسين معالجة الأيقونة واللون
+  /// تحليل فئة واحدة من JSON مع تحسين معالجة الأيقونة واللون
+  /// 
+  /// @param data بيانات الفئة بتنسيق JSON
+  /// @return كائن AthkarScreen مع جميع الأذكار
   AthkarScreen _parseAthkarCategory(Map<String, dynamic> data) {
+    // التحقق من وجود البيانات الأساسية
+    final id = data['id'] as String? ?? '';
+    final title = data['title'] as String? ?? '';
+    final description = data['description'] as String? ?? '';
+    
     // تحليل نص الأيقونة إلى IconData
-    final iconString = data['icon'] as String;
-    final IconData iconData = IconHelper.getIconFromString(iconString);
+    final iconString = data['icon'] as String? ?? 'Icons.label_important';
     
     // تحليل نص اللون إلى Color
     final colorString = data['color'] as String? ?? '#447055';
-    final Color color = IconHelper.getColorFromHex(colorString);
     
     // تحليل قائمة الأذكار
     List<Athkar> athkarList = [];
     if (data['athkar'] != null) {
       for (var thikrData in data['athkar']) {
         athkarList.add(Athkar(
-          id: thikrData['id'] ?? '',
+          id: thikrData['id']?.toString() ?? '',
           title: thikrData['title'] ?? '',
           content: thikrData['text'] ?? '',
           count: thikrData['count'] ?? 1,
-          categoryId: data['id'],
+          categoryId: id,
           source: thikrData['source'],
           notes: thikrData['notes'],
           fadl: thikrData['fadl'],
@@ -114,9 +136,9 @@ class AthkarService {
     
     // إنشاء وإرجاع الفئة
     return AthkarScreen(
-      id: data['id'],
-      name: data['title'],
-      description: data['description'] ?? '',
+      id: id,
+      name: title,
+      description: description,
       icon: iconString,
       athkar: athkarList,
     );
@@ -124,7 +146,11 @@ class AthkarService {
   
   // طرق للمفضلة/العدادات
   
-  // التحقق مما إذا كان الذكر مفضلاً
+  /// التحقق مما إذا كان الذكر مفضلاً
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
+  /// @return قيمة بولية تشير إلى حالة المفضلة
   Future<bool> isFavorite(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -136,7 +162,10 @@ class AthkarService {
     }
   }
   
-  // تبديل حالة المفضلة
+  /// تبديل حالة المفضلة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
   Future<void> toggleFavorite(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -155,7 +184,10 @@ class AthkarService {
     }
   }
   
-  // الحصول على جميع المفضلات مع تحسين الترتيب
+  /// الحصول على جميع المفضلات مع تحسين الترتيب
+  /// 
+  /// @param sortBy معيار الترتيب (اختياري)
+  /// @return قائمة بالأذكار المفضلة
   Future<List<FavoriteThikr>> getAllFavorites({String? sortBy}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -221,7 +253,10 @@ class AthkarService {
     }
   }
   
-  // حفظ التاريخ عندما تمت إضافة ذكر إلى المفضلة
+  /// حفظ التاريخ عندما تمت إضافة ذكر إلى المفضلة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
   Future<void> saveFavoriteAddedDate(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -232,7 +267,11 @@ class AthkarService {
     }
   }
   
-  // الحصول على التاريخ عندما تمت إضافة ذكر إلى المفضلة
+  /// الحصول على التاريخ عندما تمت إضافة ذكر إلى المفضلة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
+  /// @return تاريخ الإضافة إلى المفضلة
   Future<DateTime?> getFavoriteAddedDate(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -245,7 +284,11 @@ class AthkarService {
     }
   }
   
-  // الحصول على عدد مرات الذكر
+  /// الحصول على عدد مرات الذكر
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
+  /// @return عدد مرات الذكر
   Future<int> getThikrCount(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -257,7 +300,11 @@ class AthkarService {
     }
   }
   
-  // تحديث عدد مرات الذكر
+  /// تحديث عدد مرات الذكر
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
+  /// @param count العدد الجديد
   Future<void> updateThikrCount(String categoryId, int thikrIndex, int count) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -289,14 +336,41 @@ class AthkarService {
 
   // تحسين نظام إعدادات الإشعارات - متوافق مع النظام الموحد
   
-  // الحصول على إعدادات الإشعارات الكاملة لفئة معينة
+  /// الحصول على إعدادات الإشعارات الكاملة لفئة معينة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @return إعدادات الإشعارات
   Future<AthkarNotificationSettings> getNotificationSettings(String categoryId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
       // الحصول على الإعدادات الأساسية
       final enabled = prefs.getBool('notification_${categoryId}_enabled') ?? true;
-      final customTime = prefs.getString('notification_${categoryId}_time');
+      
+      // الوقت المخصص - استخراج من البيانات الأصلية إذا لم يكن محدداً
+      String? customTime = prefs.getString('notification_${categoryId}_time');
+      
+      if (customTime == null) {
+        // محاولة استخراج الوقت الافتراضي من ملف JSON
+        try {
+          final category = await getAthkarCategory(categoryId);
+          if (category != null) {
+            // محاولة الحصول على الوقت من التخزين المؤقت
+            final jsonString = await rootBundle.loadString(_athkarJsonPath);
+            final jsonData = json.decode(jsonString);
+            
+            for (var cat in jsonData['categories']) {
+              if (cat['id'] == categoryId && cat['notify_time'] != null && cat['notify_time'].isNotEmpty) {
+                customTime = cat['notify_time'];
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error getting default time from JSON: $e');
+        }
+      }
+      
       final vibrate = prefs.getBool('notification_${categoryId}_vibrate') ?? true;
       
       // استرجاع أهمية الإشعار
@@ -314,7 +388,10 @@ class AthkarService {
     }
   }
   
-  // حفظ إعدادات الإشعارات الكاملة لفئة معينة
+  /// حفظ إعدادات الإشعارات الكاملة لفئة معينة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param settings إعدادات الإشعارات
   Future<void> saveNotificationSettings(String categoryId, AthkarNotificationSettings settings) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -335,7 +412,10 @@ class AthkarService {
     }
   }
   
-  // تبسيط - الحصول على حالة تفعيل الإشعار
+  /// الحصول على حالة تفعيل الإشعار بطريقة مبسطة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @return حالة تفعيل الإشعار
   Future<bool> getNotificationEnabled(String categoryId) async {
     try {
       final settings = await getNotificationSettings(categoryId);
@@ -346,7 +426,10 @@ class AthkarService {
     }
   }
   
-  // تبسيط - ضبط حالة تفعيل الإشعار
+  /// ضبط حالة تفعيل الإشعار بطريقة مبسطة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param enabled حالة التفعيل
   Future<void> setNotificationEnabled(String categoryId, bool enabled) async {
     try {
       final settings = await getNotificationSettings(categoryId);
@@ -359,7 +442,10 @@ class AthkarService {
     }
   }
   
-  // تبسيط - الحصول على وقت الإشعار المخصص
+  /// الحصول على وقت الإشعار المخصص بطريقة مبسطة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @return وقت الإشعار المخصص
   Future<String?> getCustomNotificationTime(String categoryId) async {
     try {
       final settings = await getNotificationSettings(categoryId);
@@ -370,7 +456,10 @@ class AthkarService {
     }
   }
   
-  // تبسيط - ضبط وقت الإشعار المخصص
+  /// ضبط وقت الإشعار المخصص بطريقة مبسطة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param time الوقت المخصص
   Future<void> setCustomNotificationTime(String categoryId, String time) async {
     try {
       final settings = await getNotificationSettings(categoryId);
@@ -383,7 +472,10 @@ class AthkarService {
     }
   }
   
-  // الحصول على قائمة الأوقات الإضافية للإشعارات
+  /// الحصول على قائمة الأوقات الإضافية للإشعارات
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @return قائمة بالأوقات الإضافية
   Future<List<String>> getAdditionalNotificationTimes(String categoryId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -406,7 +498,10 @@ class AthkarService {
     }
   }
   
-  // حفظ قائمة الأوقات الإضافية للإشعارات
+  /// حفظ قائمة الأوقات الإضافية للإشعارات
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param times قائمة الأوقات
   Future<void> saveAdditionalNotificationTimes(String categoryId, List<String> times) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -417,7 +512,10 @@ class AthkarService {
     }
   }
   
-  // إضافة وقت إشعار إضافي
+  /// إضافة وقت إشعار إضافي
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param time الوقت
   Future<void> addAdditionalNotificationTime(String categoryId, String time) async {
     try {
       final times = await getAdditionalNotificationTimes(categoryId);
@@ -430,7 +528,10 @@ class AthkarService {
     }
   }
   
-  // حذف وقت إشعار إضافي
+  /// حذف وقت إشعار إضافي
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param time الوقت
   Future<void> removeAdditionalNotificationTime(String categoryId, String time) async {
     try {
       final times = await getAdditionalNotificationTimes(categoryId);
@@ -443,15 +544,23 @@ class AthkarService {
 
   // دوال للتكامل مع النظام الموحد للإشعارات
   
-  // جدولة إشعارات فئة كاملة مع النظام الموحد
+  /// جدولة إشعارات فئة كاملة مع النظام الموحد
+  /// 
+  /// @param categoryId معرف الفئة
   Future<void> scheduleCategoryNotifications(String categoryId) async {
     try {
       final category = await getAthkarCategory(categoryId);
-      if (category == null) return;
+      if (category == null) {
+        debugPrint('Cannot schedule notifications for null category: $categoryId');
+        return;
+      }
       
       // الحصول على إعدادات الإشعارات
       final settings = await getNotificationSettings(categoryId);
-      if (!settings.isEnabled) return;
+      if (!settings.isEnabled) {
+        debugPrint('Notifications are disabled for category: $categoryId');
+        return;
+      }
       
       // تحديد الأوقات
       List<TimeOfDay> times = [];
@@ -497,12 +606,16 @@ class AthkarService {
       
       // حفظ حالة التفعيل
       await setNotificationEnabled(categoryId, true);
+      
+      debugPrint('Scheduled notifications for category: $categoryId at times: ${times.map((t) => '${t.hour}:${t.minute}').join(', ')}');
     } catch (e) {
       debugPrint('Error scheduling category notifications: $e');
     }
   }
   
-  // إلغاء إشعارات فئة
+  /// إلغاء إشعارات فئة
+  /// 
+  /// @param categoryId معرف الفئة
   Future<void> cancelCategoryNotifications(String categoryId) async {
     try {
       // حدد معرفات الإشعارات المرتبطة بهذه الفئة
@@ -523,12 +636,14 @@ class AthkarService {
       
       // تحديث الإعدادات
       await setNotificationEnabled(categoryId, false);
+      
+      debugPrint('Cancelled notifications for category: $categoryId, IDs: $notificationIds');
     } catch (e) {
       debugPrint('Error canceling category notifications: $e');
     }
   }
   
-  // دالة مساعدة لجدولة الإشعارات باستخدام إعدادات الأذكار
+  /// دالة مساعدة لجدولة الإشعارات باستخدام إعدادات الأذكار
   Future<void> _scheduleNotificationUsingAthkarSettings({
     required String categoryId,
     required String title,
@@ -537,6 +652,11 @@ class AthkarService {
     required AthkarNotificationSettings settings,
   }) async {
     try {
+      if (times.isEmpty) {
+        debugPrint('No times provided for notifications');
+        return;
+      }
+      
       // بناء الـ payload
       final Map<String, dynamic> payload = {
         'type': 'athkar',
@@ -603,29 +723,35 @@ class AthkarService {
         
         // جدولة الإشعار المتكرر
         await _notificationService.scheduleRepeatingNotification(notificationData);
+        
+        debugPrint('Scheduled notification ID: ${baseId + i} for ${time.hour}:${time.minute}');
       }
     } catch (e) {
       debugPrint('Error scheduling notification: $e');
     }
   }
   
-  // تحويل TimeOfDay إلى NotificationTime
+  /// تحويل TimeOfDay إلى NotificationTime
   NotificationTime _mapTimeToNotificationTime(TimeOfDay time) {
     // تبسيط: فقط تخمين NotificationTime استنادًا إلى الوقت
     if (time.hour >= 5 && time.hour < 12) {
       return NotificationTime.morning;
     } else if (time.hour >= 12 && time.hour < 17) {
-      return NotificationTime.custom;
+      return NotificationTime.custom; // نستخدم custom للظهر لأن afternoon غير متوفر
     } else if (time.hour >= 17 && time.hour < 20) {
       return NotificationTime.evening;
     } else {
-      return NotificationTime.custom;
+      return NotificationTime.custom; // نستخدم custom للمساء المتأخر لأن night غير متوفر
     }
   }
 
   // إحصائيات الأذكار
   
-  // الحصول على عدد مرات إكمال ذكر معين
+  /// الحصول على عدد مرات إكمال ذكر معين
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
+  /// @return عدد مرات الإكمال
   Future<int> getThikrCompletionCount(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -637,7 +763,11 @@ class AthkarService {
     }
   }
   
-  // الحصول على تاريخ أول إكمال لذكر معين
+  /// الحصول على تاريخ أول إكمال لذكر معين
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
+  /// @return تاريخ أول إكمال
   Future<DateTime?> getThikrFirstCompletionDate(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -650,7 +780,11 @@ class AthkarService {
     }
   }
   
-  // الحصول على تاريخ آخر إكمال لذكر معين
+  /// الحصول على تاريخ آخر إكمال لذكر معين
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @param thikrIndex فهرس الذكر
+  /// @return تاريخ آخر إكمال
   Future<DateTime?> getThikrLastCompletionDate(String categoryId, int thikrIndex) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -663,7 +797,10 @@ class AthkarService {
     }
   }
   
-  // الحصول على إحصائيات إكمال لفئة كاملة
+  /// الحصول على إحصائيات إكمال لفئة كاملة
+  /// 
+  /// @param categoryId معرف الفئة
+  /// @return إحصائيات الفئة
   Future<CategoryStats> getCategoryStats(String categoryId) async {
     try {
       final category = await getAthkarCategory(categoryId);
@@ -711,7 +848,9 @@ class AthkarService {
     }
   }
   
-  // الحصول على إحصائيات إكمال لجميع الفئات
+  /// الحصول على إحصائيات إكمال لجميع الفئات
+  /// 
+  /// @return خريطة بإحصائيات كل فئة
   Future<Map<String, CategoryStats>> getAllCategoriesStats() async {
     try {
       final categories = await loadAllAthkarCategories();
@@ -728,7 +867,7 @@ class AthkarService {
     }
   }
   
-  // مسح الإعدادات وبدء من جديد
+  /// مسح الإعدادات وبدء من جديد
   Future<void> resetAllData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -753,6 +892,11 @@ class AthkarService {
           await scheduleCategoryNotifications(entry.key);
         }
       }
+      
+      // مسح التخزين المؤقت
+      _athkarCache.clear();
+      
+      debugPrint('All data has been reset');
     } catch (e) {
       debugPrint('Error resetting all data: $e');
     }
