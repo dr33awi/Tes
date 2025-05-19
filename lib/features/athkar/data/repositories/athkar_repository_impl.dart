@@ -1,8 +1,8 @@
-// lib/data/repositories/athkar_repository_impl.dart
+// lib/features/athkar/data/repositories/athkar_repository_impl.dart
 import '../../domain/entities/athkar.dart';
 import '../../domain/repositories/athkar_repository.dart';
 import '../datasources/athkar_local_data_source.dart';
-import '../models/athkar_model.dart';
+import '../models/athkar_model.dart'; // تأكد من استيراد النموذج بشكل صحيح
 
 class AthkarRepositoryImpl implements AthkarRepository {
   final AthkarLocalDataSource localDataSource;
@@ -15,7 +15,13 @@ class AthkarRepositoryImpl implements AthkarRepository {
     final categoriesData = await localDataSource.getCategories();
     
     // تحويل البيانات إلى كيانات
-    return categoriesData.map((data) => AthkarCategoryModel.fromJson(data).toEntity()).toList();
+    List<AthkarCategory> categories = [];
+    for (var data in categoriesData) {
+      var model = AthkarCategoryModel.fromJson(data);
+      categories.add(model.toEntity());
+    }
+    
+    return categories;
   }
 
   @override
@@ -24,7 +30,25 @@ class AthkarRepositoryImpl implements AthkarRepository {
     final athkarData = await localDataSource.getAthkarByCategory(categoryId);
     
     // تحويل البيانات إلى كيانات
-    return athkarData.map((data) => AthkarModel.fromJson(data).toEntity()).toList();
+    List<Athkar> athkarList = [];
+    for (var data in athkarData) {
+      var model = ThikrModel.fromJson(data);
+      Athkar athkar = model.toEntity();
+      // تعيين معرف الفئة للذكر
+      athkar = Athkar(
+        id: athkar.id,
+        title: athkar.title,
+        content: athkar.content,
+        count: athkar.count,
+        categoryId: categoryId, // تعيين معرف الفئة
+        source: athkar.source,
+        notes: athkar.notes,
+        fadl: athkar.fadl,
+      );
+      athkarList.add(athkar);
+    }
+    
+    return athkarList;
   }
 
   @override
@@ -38,7 +62,21 @@ class AthkarRepositoryImpl implements AthkarRepository {
     }
     
     // تحويل البيانات إلى كيان
-    return AthkarModel.fromJson(athkarData).toEntity();
+    var model = ThikrModel.fromJson(athkarData);
+    var athkar = model.toEntity();
+    
+    // تعيين معرف الفئة إذا كان متاحًا في البيانات
+    String categoryId = athkarData['categoryId'] ?? '';
+    return Athkar(
+      id: athkar.id,
+      title: athkar.title,
+      content: athkar.content,
+      count: athkar.count,
+      categoryId: categoryId,
+      source: athkar.source,
+      notes: athkar.notes,
+      fadl: athkar.fadl,
+    );
   }
   
   @override
@@ -49,7 +87,28 @@ class AthkarRepositoryImpl implements AthkarRepository {
   @override
   Future<List<Athkar>> getFavoriteAthkar() async {
     final favoritesData = await localDataSource.getFavoriteAthkar();
-    return favoritesData.map((data) => AthkarModel.fromJson(data).toEntity()).toList();
+    
+    // تحويل البيانات إلى كيانات
+    List<Athkar> favoriteList = [];
+    for (var data in favoritesData) {
+      var model = ThikrModel.fromJson(data);
+      Athkar athkar = model.toEntity();
+      // تعيين معرف الفئة للذكر إذا كان متاحًا
+      String categoryId = data['categoryId'] ?? '';
+      athkar = Athkar(
+        id: athkar.id,
+        title: athkar.title,
+        content: athkar.content,
+        count: athkar.count,
+        categoryId: categoryId,
+        source: athkar.source,
+        notes: athkar.notes,
+        fadl: athkar.fadl,
+      );
+      favoriteList.add(athkar);
+    }
+    
+    return favoriteList;
   }
 
   @override
@@ -58,6 +117,25 @@ class AthkarRepositoryImpl implements AthkarRepository {
     final filteredAthkar = await localDataSource.searchAthkar(query);
     
     // تحويل البيانات إلى كيانات
-    return filteredAthkar.map((data) => AthkarModel.fromJson(data).toEntity()).toList();
+    List<Athkar> searchResults = [];
+    for (var data in filteredAthkar) {
+      var model = ThikrModel.fromJson(data);
+      Athkar athkar = model.toEntity();
+      // تعيين معرف الفئة للذكر إذا كان متاحًا
+      String categoryId = data['categoryId'] ?? '';
+      athkar = Athkar(
+        id: athkar.id,
+        title: athkar.title,
+        content: athkar.content,
+        count: athkar.count,
+        categoryId: categoryId,
+        source: athkar.source,
+        notes: athkar.notes,
+        fadl: athkar.fadl,
+      );
+      searchResults.add(athkar);
+    }
+    
+    return searchResults;
   }
 }

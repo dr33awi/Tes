@@ -1,4 +1,3 @@
-// lib/presentation/screens/home/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../app/routes/app_router.dart';
@@ -7,9 +6,8 @@ import '../../../athkar/presentation/providers/athkar_provider.dart';
 import '../../../prayers/presentation/providers/prayer_times_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../widgets/common/loading_widget.dart';
-import '../../../athkar/presentation/widgets/athkar_section.dart';
 import '../../../prayers/presentation/widgets/prayer_times_section.dart';
-import '../../../prayers/presentation/widgets/qibla_section.dart';
+import '../widgets/category_grid.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -67,8 +65,6 @@ class _HomeScreenState extends State<HomeScreen> {
               if (settingsProvider.settings != null) {
                 await Provider.of<PrayerTimesProvider>(context, listen: false)
                     .refreshData(settingsProvider.settings!);
-                await Provider.of<AthkarProvider>(context, listen: false)
-                    .refreshData();
               }
             },
             child: SingleChildScrollView(
@@ -81,12 +77,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   const PrayerTimesSection(),
                   const SizedBox(height: 24),
                   
-                  // قسم تحديد القبلة
-                  const QiblaSection(),
-                  const SizedBox(height: 24),
+                  // عنوان قسم الفئات
+                  Text(
+                    'الأقسام',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
                   
-                  // قسم الأذكار
-                  const AthkarSection(),
+                  // قسم شبكة الفئات
+                  CustomScrollView(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    slivers: [
+                      const CategoryGrid(),
+                    ],
+                  ),
                   const SizedBox(height: 24),
                   
                   // معلومات إضافية

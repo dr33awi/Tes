@@ -1,21 +1,24 @@
+// lib/features/athkar/data/models/athkar_model.dart
 import 'package:flutter/material.dart';
+import '../../domain/entities/athkar.dart';
 
-class AthkarCategory {
+// نموذج لفئة الأذكار مع دعم التحويل من JSON وإلى JSON
+class AthkarCategoryModel {
   final String id;
   final String title;
   final IconData icon;
   final Color color;
   final String? description;
-  final List<Thikr> athkar;
+  final List<ThikrModel> athkar;
   
-  // تحسين نظام الإشعارات (تم إزالة notifySound لتبسيط نظام الإشعارات)
-  final String? notifyTime; // الوقت الافتراضي للإشعارات (بصيغة "HH:MM")
-  final String? notifyTitle; // عنوان الإشعار المخصص
-  final String? notifyBody; // نص الإشعار المخصص
-  final bool hasMultipleReminders; // إمكانية تعيين تذكيرات متعددة
-  final List<String>? additionalNotifyTimes; // أوقات إشعارات إضافية
+  // إعدادات الإشعارات
+  final String? notifyTime;
+  final String? notifyTitle;
+  final String? notifyBody;
+  final bool hasMultipleReminders;
+  final List<String>? additionalNotifyTimes;
 
-  AthkarCategory({
+  AthkarCategoryModel({
     required this.id,
     required this.title,
     required this.icon,
@@ -29,17 +32,23 @@ class AthkarCategory {
     this.additionalNotifyTimes,
   });
 
-  // Factory constructor to create a category from JSON data
-  factory AthkarCategory.fromJson(Map<String, dynamic> json, IconData icon, Color color) {
-    List<Thikr> athkarList = [];
+  // من JSON إلى موديل
+  factory AthkarCategoryModel.fromJson(Map<String, dynamic> json) {
+    // تحويل IconData من النص
+    IconData icon = _getIconFromString(json['icon'] as String? ?? 'Icons.label_important');
+    
+    // تحويل اللون من النص
+    Color color = _getColorFromHex(json['color'] as String? ?? '#447055');
+    
+    List<ThikrModel> athkarList = [];
     
     if (json['athkar'] != null) {
       for (var thikrData in json['athkar']) {
-        athkarList.add(Thikr.fromJson(thikrData));
+        athkarList.add(ThikrModel.fromJson(thikrData));
       }
     }
     
-    return AthkarCategory(
+    return AthkarCategoryModel(
       id: json['id'],
       title: json['title'],
       icon: icon,
@@ -56,7 +65,7 @@ class AthkarCategory {
     );
   }
 
-  // تحويل الفئة إلى JSON
+  // تحويل الموديل إلى JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -73,39 +82,31 @@ class AthkarCategory {
     };
   }
   
-  // Helper method to convert IconData to string
-  String _iconToString(IconData icon) {
-    if (icon == Icons.wb_sunny) return 'Icons.wb_sunny';
-    if (icon == Icons.nightlight_round) return 'Icons.nightlight_round';
-    if (icon == Icons.bedtime) return 'Icons.bedtime';
-    if (icon == Icons.alarm) return 'Icons.alarm';
-    if (icon == Icons.mosque) return 'Icons.mosque';
-    if (icon == Icons.home) return 'Icons.home';
-    if (icon == Icons.restaurant) return 'Icons.restaurant';
-    if (icon == Icons.menu_book) return 'Icons.menu_book';
-    return 'Icons.label_important';
+  // تحويل النموذج إلى كيان
+  AthkarCategory toEntity() {
+    return AthkarCategory(
+      id: id,
+      name: title,
+      description: description ?? '',
+      icon: _iconToString(icon),
+    );
   }
   
-  // Helper method to convert Color to hex string
-  String _colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
-  }
-  
-  // إنشاء نسخة جديدة من الفئة مع تعديل بعض الخصائص
-  AthkarCategory copyWith({
+  // اختصار نسخة معدلة
+  AthkarCategoryModel copyWith({
     String? id,
     String? title,
     IconData? icon,
     Color? color,
     String? description,
-    List<Thikr>? athkar,
+    List<ThikrModel>? athkar,
     String? notifyTime,
     String? notifyTitle,
     String? notifyBody,
     bool? hasMultipleReminders,
     List<String>? additionalNotifyTimes,
   }) {
-    return AthkarCategory(
+    return AthkarCategoryModel(
       id: id ?? this.id,
       title: title ?? this.title,
       icon: icon ?? this.icon,
@@ -119,21 +120,69 @@ class AthkarCategory {
       additionalNotifyTimes: additionalNotifyTimes ?? this.additionalNotifyTimes,
     );
   }
+  
+  // دوال مساعدة لتحويل IconData إلى نص والعكس
+  static String _iconToString(IconData icon) {
+    if (icon == Icons.wb_sunny) return 'Icons.wb_sunny';
+    if (icon == Icons.nightlight_round) return 'Icons.nightlight_round';
+    if (icon == Icons.bedtime) return 'Icons.bedtime';
+    if (icon == Icons.alarm) return 'Icons.alarm';
+    if (icon == Icons.mosque) return 'Icons.mosque';
+    if (icon == Icons.home) return 'Icons.home';
+    if (icon == Icons.restaurant) return 'Icons.restaurant';
+    if (icon == Icons.menu_book) return 'Icons.menu_book';
+    return 'Icons.label_important';
+  }
+  
+  static IconData _getIconFromString(String iconString) {
+    Map<String, IconData> iconMap = {
+      'Icons.wb_sunny': Icons.wb_sunny,
+      'Icons.nightlight_round': Icons.nightlight_round,
+      'Icons.bedtime': Icons.bedtime,
+      'Icons.alarm': Icons.alarm,
+      'Icons.mosque': Icons.mosque,
+      'Icons.home': Icons.home,
+      'Icons.restaurant': Icons.restaurant,
+      'Icons.menu_book': Icons.menu_book,
+      'Icons.favorite': Icons.favorite,
+      'Icons.star': Icons.star,
+      'Icons.auto_awesome': Icons.auto_awesome,
+    };
+    
+    return iconMap[iconString] ?? Icons.label_important;
+  }
+  
+  // تحويل اللون من/إلى هيكس
+  static String _colorToHex(Color color) {
+    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+  }
+  
+  static Color _getColorFromHex(String hexColor) {
+    try {
+      hexColor = hexColor.replaceAll('#', '');
+      if (hexColor.length == 6) {
+        hexColor = 'FF' + hexColor;
+      }
+      return Color(int.parse('0x$hexColor'));
+    } catch (e) {
+      return const Color(0xFF447055); // لون افتراضي
+    }
+  }
 }
 
-class Thikr {
+// نموذج للذكر الواحد
+class ThikrModel {
   final int id;
   final String text;
   final int count;
   final String? fadl;
   final String? source;
-  // إضافة حقول جديدة
-  final bool isQuranVerse; // هل هذا الذكر آية قرآنية؟
-  final String? surahName; // اسم السورة إذا كان آية قرآنية
-  final String? verseNumbers; // أرقام الآيات إذا كان آية قرآنية
-  final String? audioUrl; // رابط ملف صوتي للذكر (إن وجد)
+  final bool isQuranVerse;
+  final String? surahName;
+  final String? verseNumbers;
+  final String? audioUrl;
 
-  Thikr({
+  ThikrModel({
     required this.id,
     required this.text,
     required this.count,
@@ -145,12 +194,12 @@ class Thikr {
     this.audioUrl,
   });
   
-  // Factory constructor to create a thikr from JSON data
-  factory Thikr.fromJson(Map<String, dynamic> json) {
-    return Thikr(
-      id: json['id'],
-      text: json['text'],
-      count: json['count'],
+  // من JSON إلى نموذج
+  factory ThikrModel.fromJson(Map<String, dynamic> json) {
+    return ThikrModel(
+      id: json['id'] is String ? int.parse(json['id']) : json['id'],
+      text: json['text'] ?? json['content'] ?? '', // دعم اسمين مختلفين
+      count: json['count'] ?? 1,
       fadl: json['fadl'],
       source: json['source'],
       isQuranVerse: json['is_quran_verse'] ?? false,
@@ -160,7 +209,7 @@ class Thikr {
     );
   }
   
-  // تحويل الذكر إلى JSON
+  // تحويل النموذج إلى JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -175,8 +224,22 @@ class Thikr {
     };
   }
   
-  // إنشاء نسخة جديدة من الذكر مع تعديل بعض الخصائص
-  Thikr copyWith({
+  // تحويل النموذج إلى كيان
+  Athkar toEntity() {
+    return Athkar(
+      id: id.toString(),
+      title: surahName ?? 'ذكر',
+      content: text,
+      count: count,
+      categoryId: '', // سيتم تعيينه لاحقاً
+      source: source,
+      notes: null,
+      fadl: fadl,
+    );
+  }
+  
+  // اختصار نسخة معدلة
+  ThikrModel copyWith({
     int? id,
     String? text,
     int? count,
@@ -187,7 +250,7 @@ class Thikr {
     String? verseNumbers,
     String? audioUrl,
   }) {
-    return Thikr(
+    return ThikrModel(
       id: id ?? this.id,
       text: text ?? this.text,
       count: count ?? this.count,
@@ -201,21 +264,21 @@ class Thikr {
   }
 }
 
-// نموذج لإعدادات الإشعارات - تبسيط بإزالة خيارات الصوت المخصصة
+// نموذج إعدادات الإشعارات
 class AthkarNotificationSettings {
   final bool isEnabled;
   final String? customTime;
   final bool vibrate;
-  final int? importance; // أهمية الإشعار (0-5)
+  final int? importance;
 
   AthkarNotificationSettings({
     this.isEnabled = true,
     this.customTime,
     this.vibrate = true,
-    this.importance = 4, // High importance by default
+    this.importance = 4,
   });
   
-  // Factory constructor to create settings from JSON data
+  // من JSON إلى نموذج
   factory AthkarNotificationSettings.fromJson(Map<String, dynamic> json) {
     return AthkarNotificationSettings(
       isEnabled: json['is_enabled'] ?? true,
@@ -225,7 +288,7 @@ class AthkarNotificationSettings {
     );
   }
   
-  // تحويل الإعدادات إلى JSON
+  // تحويل النموذج إلى JSON
   Map<String, dynamic> toJson() {
     return {
       'is_enabled': isEnabled,
@@ -235,7 +298,7 @@ class AthkarNotificationSettings {
     };
   }
   
-  // إنشاء نسخة جديدة من الإعدادات مع تعديل بعض الخصائص
+  // اختصار نسخة معدلة
   AthkarNotificationSettings copyWith({
     bool? isEnabled,
     String? customTime,

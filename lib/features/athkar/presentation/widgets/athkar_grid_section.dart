@@ -1,19 +1,18 @@
-// lib/features/athkar/presentation/widgets/athkar_section.dart
+// lib/features/athkar/presentation/widgets/athkar_grid_section.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../app/routes/app_router.dart';
 
 import '../../data/datasources/athkar_service.dart';
 
-class AthkarSection extends StatefulWidget {
-  const AthkarSection({Key? key}) : super(key: key);
+class AthkarGridSection extends StatefulWidget {
+  const AthkarGridSection({Key? key}) : super(key: key);
 
   @override
-  State<AthkarSection> createState() => _AthkarSectionState();
+  State<AthkarGridSection> createState() => _AthkarGridSectionState();
 }
 
-class _AthkarSectionState extends State<AthkarSection> {
+class _AthkarGridSectionState extends State<AthkarGridSection> {
   final AthkarService _athkarService = AthkarService();
   
   // للتحكم في حالة التحميل
@@ -37,15 +36,15 @@ class _AthkarSectionState extends State<AthkarSection> {
       // إذا كانت الفئات متاحة، اختر المناسبة منها
       if (allCategories.isNotEmpty) {
         for (var category in allCategories) {
-          if (['morning', 'evening', 'sleep', 'wake', 'prayer'].contains(category.id)) {
+          if (['morning', 'evening', 'sleep', 'wake', 'prayer', 'quran'].contains(category.id)) {
             featured.add(category);
-            if (featured.length >= 3) break; // اكتفي بثلاثة فئات
+            if (featured.length >= 4) break; // اكتفي بأربعة فئات
           }
         }
         
         // إذا لم نجد الفئات المطلوبة، استخدم أي فئات متاحة
         if (featured.isEmpty && allCategories.length > 0) {
-          featured.addAll(allCategories.take(3));
+          featured.addAll(allCategories.take(4));
         }
       }
       
@@ -116,7 +115,7 @@ class _AthkarSectionState extends State<AthkarSection> {
                   )
                 : _featuredCategories.isEmpty
                     ? _buildEmptyState()
-                    : _buildFeaturedCategories(),
+                    : _buildGridCategories(),
           ],
         ),
       ),
@@ -139,93 +138,89 @@ class _AthkarSectionState extends State<AthkarSection> {
     );
   }
   
-  // بناء قائمة الفئات المميزة
-  Widget _buildFeaturedCategories() {
-    return Column(
-      children: _featuredCategories.map((category) {
-        return _buildCategoryItem(category);
-      }).toList(),
+  // بناء شبكة الفئات المميزة
+  Widget _buildGridCategories() {
+    return AnimationLimiter(
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 1.5,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: _featuredCategories.length,
+        itemBuilder: (context, index) {
+          final category = _featuredCategories[index];
+          
+          return AnimationConfiguration.staggeredGrid(
+            position: index,
+            duration: const Duration(milliseconds: 400),
+            columnCount: 2,
+            child: ScaleAnimation(
+              child: FadeInAnimation(
+                child: _buildCategoryCard(category),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
   
-  // بناء عنصر فئة واحد
-  Widget _buildCategoryItem(dynamic category) {
+  // بناء بطاقة فئة
+  Widget _buildCategoryCard(dynamic category) {
     final Color categoryColor = _getCategoryColor(category.id);
     
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Card(
-        elevation: 2,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: InkWell(
-          onTap: () {
-            // الانتقال إلى صفحة تفاصيل الفئة
-            Navigator.pushNamed(
-              context,
-              AppRouter.athkarDetails,
-              arguments: {
-                'category': category,
-              },
-            );
-          },
-          borderRadius: BorderRadius.circular(10),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: InkWell(
+        onTap: () {
+          // الانتقال إلى صفحة تفاصيل الفئة
+          Navigator.pushNamed(
+            context,
+            AppRouter.athkarDetails,
+            arguments: {
+              'category': category,
+            },
+          );
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                categoryColor.withOpacity(0.8),
+                categoryColor.withOpacity(0.6),
+              ],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // أيقونة الفئة
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: categoryColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      _getIconFromString(category.icon),
-                      color: categoryColor,
-                      size: 24,
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(width: 12),
-                
-                // تفاصيل الفئة
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      if (category.description != null && category.description.isNotEmpty)
-                        Text(
-                          category.description,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                ),
-                
-                // سهم الانتقال
                 Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey[400],
+                  _getIconFromString(category.icon),
+                  color: Colors.white,
+                  size: 32,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  category.name,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),

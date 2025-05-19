@@ -1,16 +1,18 @@
 // lib/features/athkar/presentation/screens/athkar_details_screen.dart
-import 'package:athkar_app/features/widgets/common/loading_widget.dart';
+import 'package:athkar_app/features/athkar/presentation/screens/athkar_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../app/di/service_locator.dart';
 
-import '../../data/models/athkar_model.dart';
 import '../../data/datasources/athkar_service.dart';
+import '../../data/models/athkar_model.dart';
+import '../../domain/entities/athkar.dart';
+import '../../../widgets/common/loading_widget.dart';
 
 class AthkarDetailsScreen extends StatefulWidget {
-  final AthkarCategory category;
+  final AthkarScreen category;
 
   const AthkarDetailsScreen({
     Key? key,
@@ -31,8 +33,8 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   final Map<int, bool> _hiddenThikrs = {}; // لتتبع الأذكار المخفية مؤقتًا
   bool _isLoading = true;
   bool _showCompletionMessage = false; // لإظهار رسالة الإتمام
-  late AthkarCategory _loadedCategory;
-  ScrollController _scrollController = ScrollController();
+  late AthkarScreen _loadedCategory;
+  final ScrollController _scrollController = ScrollController();
   
   // متغيرات للتأثيرات البصرية
   late AnimationController _animationController;
@@ -171,11 +173,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     // إظهار رسالة للمستخدم
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
+        content: const Row(
           children: [
-            const Icon(Icons.refresh, color: Colors.white),
-            const SizedBox(width: 10),
-            const Text('تمت إعادة تهيئة جميع الأذكار'),
+            Icon(Icons.refresh, color: Colors.white),
+            SizedBox(width: 10),
+            Text('تمت إعادة تهيئة جميع الأذكار'),
           ],
         ),
         behavior: SnackBarBehavior.floating,
@@ -216,11 +218,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     if (_favorites[index] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
+          content: const Row(
             children: [
-              const Icon(Icons.favorite, color: Colors.white),
-              const SizedBox(width: 10),
-              const Text('تمت الإضافة إلى المفضلة'),
+              Icon(Icons.favorite, color: Colors.white),
+              SizedBox(width: 10),
+              Text('تمت الإضافة إلى المفضلة'),
             ],
           ),
           behavior: SnackBarBehavior.floating,
@@ -297,11 +299,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         // عرض رسالة للمستخدم
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
+            content: const Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 10),
-                const Text('تم إكمال هذا الذكر'),
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 10),
+                Text('تم إكمال هذا الذكر'),
               ],
             ),
             behavior: SnackBarBehavior.floating,
@@ -329,7 +331,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   }
   
   // عرض فضل الذكر في حوار
-  void _showFadlDialog(Thikr thikr, int index) {
+  void _showFadlDialog(Athkar thikr, int index) {
     setState(() {
       _isFadlPressed = true;
       _pressedIndex = index;
@@ -403,7 +405,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   }
   
   // مشاركة الذكر
-  void _shareThikr(Thikr thikr, int index) async {
+  void _shareThikr(Athkar thikr, int index) async {
     setState(() {
       _isSharePressed = true;
       _pressedIndex = index;
@@ -412,7 +414,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     // تأثير اهتزاز خفيف
     HapticFeedback.lightImpact();
     
-    String text = thikr.text;
+    String text = thikr.content;
     
     if (thikr.source != null) {
       text += '\n\nالمصدر: ${thikr.source}';
@@ -431,7 +433,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   }
   
   // نسخ الذكر
-  void _copyThikr(Thikr thikr, int index) {
+  void _copyThikr(Athkar thikr, int index) {
     setState(() {
       _isCopyPressed = true;
       _pressedIndex = index;
@@ -440,7 +442,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     // تأثير اهتزاز خفيف
     HapticFeedback.lightImpact();
     
-    String text = thikr.text;
+    String text = thikr.content;
     
     if (thikr.source != null) {
       text += '\n\nالمصدر: ${thikr.source}';
@@ -449,11 +451,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     Clipboard.setData(ClipboardData(text: text)).then((_) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
+          content: const Row(
             children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 10),
-              const Text('تم نسخ الذكر إلى الحافظة'),
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 10),
+              Text('تم نسخ الذكر إلى الحافظة'),
             ],
           ),
           behavior: SnackBarBehavior.floating,
@@ -647,7 +649,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
       case 'quran':
         return const Color(0xFF9575CD); // بنفسجي فاتح للقرآن
       default:
-        return _loadedCategory.color;
+        return Colors.teal; // لون افتراضي
     }
   }
   
@@ -768,7 +770,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
           elevation: 0,
           centerTitle: true,
           title: Text(
-            widget.category.title,
+            widget.category.name,
             style: TextStyle(
               color: colorScheme.primary,
               fontWeight: FontWeight.bold,
@@ -811,7 +813,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         elevation: 0,
         centerTitle: true,
         title: Text(
-          _loadedCategory.title,
+          _loadedCategory.name,
           style: TextStyle(
             color: colorScheme.primary,
             fontWeight: FontWeight.bold,
@@ -949,7 +951,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   }
   
   // بطاقة الذكر المحسنة
-  Widget _buildThikrCard(Thikr thikr, int index, bool isFavorite, int counter, bool isCompleted) {
+  Widget _buildThikrCard(Athkar thikr, int index, bool isFavorite, int counter, bool isCompleted) {
     final bool isPressed = _isPressed && _pressedIndex == index;
     final bool isHiding = isCompleted; // هذا المتغير يستخدم لحالات الإخفاء التدريجي
     
@@ -992,18 +994,10 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                     top: 20,
                     child: Opacity(
                       opacity: 0.08,
-                      child: Image.asset(
-                        'assets/images/islamic_pattern.png', // يمكن استبدالها بمسار الصورة المناسب في مشروعك
-                        width: 120,
-                        height: 120,
-                        errorBuilder: (context, error, stackTrace) {
-                          // إذا لم يتم العثور على الصورة، استخدم أيقونة بديلة
-                          return Icon(
-                            Icons.format_quote,
-                            size: 100,
-                            color: Colors.white.withOpacity(0.1),
-                          );
-                        },
+                      child: Icon(
+                        Icons.format_quote,
+                        size: 100,
+                        color: Colors.white.withOpacity(0.1),
                       ),
                     ),
                   ),
@@ -1031,7 +1025,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    _loadedCategory.icon,
+                                    _getIconFromString(_loadedCategory.icon),
                                     color: Colors.white,
                                     size: 16,
                                   ),
@@ -1113,7 +1107,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                               Column(
                                 children: [
                                   Text(
-                                    thikr.text,
+                                    thikr.content,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       height: 2.0,
@@ -1223,5 +1217,34 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         ),
       ),
     );
+  }
+  
+  // تحويل نص الأيقونة إلى IconData
+  IconData _getIconFromString(String iconString) {
+    // تعيين نصوص الأيقونة إلى كائنات IconData
+    Map<String, IconData> iconMap = {
+      'Icons.wb_sunny': Icons.wb_sunny,
+      'Icons.nightlight_round': Icons.nightlight_round,
+      'Icons.bedtime': Icons.bedtime,
+      'Icons.alarm': Icons.alarm,
+      'Icons.mosque': Icons.mosque,
+      'Icons.home': Icons.home,
+      'Icons.restaurant': Icons.restaurant,
+      'Icons.menu_book': Icons.menu_book,
+      'Icons.favorite': Icons.favorite,
+      'Icons.star': Icons.star,
+      'Icons.water_drop': Icons.water_drop,
+      'Icons.insights': Icons.insights,
+      'Icons.travel_explore': Icons.travel_explore,
+      'Icons.healing': Icons.healing,
+      'Icons.family_restroom': Icons.family_restroom,
+      'Icons.school': Icons.school,
+      'Icons.work': Icons.work,
+      'Icons.emoji_events': Icons.emoji_events,
+      'Icons.auto_awesome': Icons.auto_awesome,
+      'Icons.label_important': Icons.label_important,
+    };
+    
+    return iconMap[iconString] ?? Icons.label_important;
   }
 }
