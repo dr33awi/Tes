@@ -7,9 +7,10 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../app/di/service_locator.dart';
 
 import '../../data/datasources/athkar_service.dart';
-import '../../data/models/athkar_model.dart';
+import '../../data/utils/icon_helper.dart';
 import '../../domain/entities/athkar.dart';
 import '../../../widgets/common/loading_widget.dart';
+import '../theme/athkar_theme_manager.dart';
 
 class AthkarDetailsScreen extends StatefulWidget {
   final AthkarScreen category;
@@ -39,16 +40,15 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   // متغيرات للتأثيرات البصرية
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
-  int? _tappedIndex;
-  bool _isPressed = false;
   int? _pressedIndex;
+  bool _isPressed = false;
   
   // متغيرات للأزرار
   bool _isCopyPressed = false;
   bool _isSharePressed = false;
   bool _isFavoritePressed = false;
-  bool _isReadAgainPressed = false; // إضافة متغير لزر القراءة مرة أخرى
-  bool _isFadlPressed = false; // إضافة متغير لزر فضل الذكر
+  bool _isReadAgainPressed = false;
+  bool _isFadlPressed = false;
   
   @override
   void initState() {
@@ -104,7 +104,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         }
       }
     } catch (e) {
-      print('خطأ في تحميل البيانات: $e');
+      debugPrint('خطأ في تحميل البيانات: $e');
       if (mounted) {
         setState(() {
           _loadedCategory = widget.category;
@@ -171,21 +171,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     }
     
     // إظهار رسالة للمستخدم
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.refresh, color: Colors.white),
-            SizedBox(width: 10),
-            Text('تمت إعادة تهيئة جميع الأذكار'),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _getCategoryColor(),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 2),
-      ),
+    _showSnackBar(
+      message: 'تمت إعادة تهيئة جميع الأذكار',
+      icon: Icons.refresh,
     );
     
     // إعادة تعيين حالة الضغط بعد فترة وجيزة
@@ -194,6 +182,26 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         setState(() => _isReadAgainPressed = false);
       }
     });
+  }
+  
+  // عرض رسالة في أسفل الشاشة
+  void _showSnackBar({required String message, required IconData icon}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(message),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: IconHelper.getCategoryColor(_loadedCategory.id),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
   
   // تبديل حالة المفضلة
@@ -216,21 +224,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     
     // إظهار رسالة للمستخدم
     if (_favorites[index] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.favorite, color: Colors.white),
-              SizedBox(width: 10),
-              Text('تمت الإضافة إلى المفضلة'),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _getCategoryColor(),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 2),
-        ),
+      _showSnackBar(
+        message: 'تمت الإضافة إلى المفضلة',
+        icon: Icons.favorite,
       );
     }
     
@@ -297,21 +293,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         });
         
         // عرض رسالة للمستخدم
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 10),
-                Text('تم إكمال هذا الذكر'),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: _getCategoryColor(),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 2),
-          ),
+        _showSnackBar(
+          message: 'تم إكمال هذا الذكر',
+          icon: Icons.check_circle,
         );
         
         // التحقق إذا كانت جميع الأذكار مكتملة
@@ -345,7 +329,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.info_outline, color: _getCategoryColor()),
+            Icon(Icons.info_outline, color: IconHelper.getCategoryColor(_loadedCategory.id)),
             const SizedBox(width: 10),
             const Text('فضل الذكر'),
           ],
@@ -367,14 +351,14 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _getCategoryColor().withOpacity(0.1),
+                  color: IconHelper.getCategoryColor(_loadedCategory.id).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   'المصدر: ${thikr.source}',
                   style: TextStyle(
                     fontStyle: FontStyle.italic,
-                    color: _getCategoryColor(),
+                    color: IconHelper.getCategoryColor(_loadedCategory.id),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -387,7 +371,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
             onPressed: () => Navigator.of(context).pop(),
             child: Text(
               'إغلاق',
-              style: TextStyle(color: _getCategoryColor()),
+              style: TextStyle(color: IconHelper.getCategoryColor(_loadedCategory.id)),
             ),
           ),
         ],
@@ -449,21 +433,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     }
     
     Clipboard.setData(ClipboardData(text: text)).then((_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 10),
-              Text('تم نسخ الذكر إلى الحافظة'),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _getCategoryColor(),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 2),
-        ),
+      _showSnackBar(
+        message: 'تم نسخ الذكر إلى الحافظة',
+        icon: Icons.check_circle,
       );
     });
     
@@ -480,7 +452,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   // رسالة إتمام الأذكار مع زر "قراءتها مرة أخرى"
   Widget _buildCompletionMessage() {
     // الحصول على لون القسم الحالي
-    Color categoryColor = _getCategoryColor();
+    Color categoryColor = IconHelper.getCategoryColor(_loadedCategory.id);
     
     return AnimationConfiguration.synchronized(
       duration: const Duration(milliseconds: 800),
@@ -567,7 +539,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                   child: ElevatedButton.icon(
                     icon: const Icon(
                       Icons.replay_rounded,
-                      color: Colors.white, // لون الأيقونة أبيض على خلفية شفافة
+                      color: Colors.white,
                     ),
                     label: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -576,7 +548,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white, // لون النص أبيض
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -598,7 +570,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                 ElevatedButton.icon(
                   icon: Icon(
                     Icons.home_rounded,
-                    color: categoryColor, // لون الأيقونة مطابق للون القسم
+                    color: categoryColor,
                   ),
                   label: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -607,7 +579,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: categoryColor, // لون النص مطابق للون القسم
+                        color: categoryColor,
                       ),
                     ),
                   ),
@@ -629,84 +601,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     );
   }
   
-  // الحصول على لون الفئة حسب نوعها
-  Color _getCategoryColor() {
-    switch (_loadedCategory.id) {
-      case 'morning':
-        return const Color(0xFFFFD54F); // أصفر للصباح
-      case 'evening':
-        return const Color(0xFFAB47BC); // بنفسجي للمساء
-      case 'sleep':
-        return const Color(0xFF5C6BC0); // أزرق للنوم
-      case 'wake':
-        return const Color(0xFFFFB74D); // برتقالي للاستيقاظ
-      case 'prayer':
-        return const Color(0xFF4DB6AC); // أخضر مزرق للصلاة
-      case 'home':
-        return const Color(0xFF66BB6A); // أخضر للمنزل
-      case 'food':
-        return const Color(0xFFE57373); // أحمر للطعام
-      case 'quran':
-        return const Color(0xFF9575CD); // بنفسجي فاتح للقرآن
-      default:
-        return Colors.teal; // لون افتراضي
-    }
-  }
-  
-  // الحصول على تدرج لوني للفئة
-  List<Color> _getCategoryGradient() {
-    Color baseColor = _getCategoryColor();
-    Color darkColor = HSLColor.fromColor(baseColor).withLightness(
-      HSLColor.fromColor(baseColor).lightness * 0.7
-    ).toColor();
-    
-    switch (_loadedCategory.id) {
-      case 'morning':
-        return [
-          const Color(0xFFFFD54F), // أصفر فاتح
-          const Color(0xFFFFA000), // أصفر داكن
-        ];
-      case 'evening':
-        return [
-          const Color(0xFFAB47BC), // بنفسجي فاتح
-          const Color(0xFF7B1FA2), // بنفسجي داكن
-        ];
-      case 'sleep':
-        return [
-          const Color(0xFF5C6BC0), // أزرق فاتح
-          const Color(0xFF3949AB), // أزرق داكن
-        ];
-      case 'wake':
-        return [
-          const Color(0xFFFFB74D), // برتقالي فاتح
-          const Color(0xFFFF9800), // برتقالي داكن
-        ];
-      case 'prayer':
-        return [
-          const Color(0xFF4DB6AC), // أخضر مزرق فاتح
-          const Color(0xFF00695C), // أخضر مزرق داكن
-        ];
-      case 'home':
-        return [
-          const Color(0xFF66BB6A), // أخضر فاتح
-          const Color(0xFF2E7D32), // أخضر داكن
-        ];
-      case 'food':
-        return [
-          const Color(0xFFE57373), // أحمر فاتح
-          const Color(0xFFC62828), // أحمر داكن
-        ];
-      case 'quran':
-        return [
-          const Color(0xFF9575CD), // بنفسجي فاتح
-          const Color(0xFF512DA8), // بنفسجي داكن
-        ];
-      default:
-        return [baseColor, darkColor];
-    }
-  }
-  
-  // زر الإجراء محدث بنفس نمط favorites_screen
+  // زر الإجراء محدث
   Widget _buildActionButton({
     required IconData icon,
     required String label,
@@ -885,7 +780,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                 Icon(
                   Icons.format_quote,
                   size: 80,
-                  color: _getCategoryColor().withOpacity(0.5),
+                  color: IconHelper.getCategoryColor(_loadedCategory.id).withOpacity(0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -893,7 +788,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: _getCategoryColor(),
+                    color: IconHelper.getCategoryColor(_loadedCategory.id),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -957,7 +852,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     
     return Card(
       elevation: 15,
-      shadowColor: _getCategoryColor().withOpacity(0.3),
+      shadowColor: IconHelper.getCategoryColor(_loadedCategory.id).withOpacity(0.3),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
       ),
@@ -971,14 +866,14 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         },
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 300),
-          opacity: isHiding ? 0.0 : 1.0,  // استخدام AnimatedOpacity بدلاً من الخاصية opacity في AnimatedContainer
+          opacity: isHiding ? 0.0 : 1.0,
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               gradient: LinearGradient(
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
-                colors: _getCategoryGradient(),
+                colors: IconHelper.getCategoryGradient(_loadedCategory.id),
                 stops: const [0.3, 1.0],
               ),
             ),
@@ -1025,7 +920,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    _getIconFromString(_loadedCategory.icon),
+                                    IconHelper.getIconFromString(_loadedCategory.icon),
                                     color: Colors.white,
                                     size: 16,
                                   ),
@@ -1109,14 +1004,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                                   Text(
                                     thikr.content,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      height: 2.0,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      fontFamily: 'Amiri-Bold',
-                                      letterSpacing: 0.5,
-                                    ),
+                                    style: AthkarThemeManager.getThikrTextStyle(),
                                   ),
                                 ],
                               ),
@@ -1217,34 +1105,5 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
         ),
       ),
     );
-  }
-  
-  // تحويل نص الأيقونة إلى IconData
-  IconData _getIconFromString(String iconString) {
-    // تعيين نصوص الأيقونة إلى كائنات IconData
-    Map<String, IconData> iconMap = {
-      'Icons.wb_sunny': Icons.wb_sunny,
-      'Icons.nightlight_round': Icons.nightlight_round,
-      'Icons.bedtime': Icons.bedtime,
-      'Icons.alarm': Icons.alarm,
-      'Icons.mosque': Icons.mosque,
-      'Icons.home': Icons.home,
-      'Icons.restaurant': Icons.restaurant,
-      'Icons.menu_book': Icons.menu_book,
-      'Icons.favorite': Icons.favorite,
-      'Icons.star': Icons.star,
-      'Icons.water_drop': Icons.water_drop,
-      'Icons.insights': Icons.insights,
-      'Icons.travel_explore': Icons.travel_explore,
-      'Icons.healing': Icons.healing,
-      'Icons.family_restroom': Icons.family_restroom,
-      'Icons.school': Icons.school,
-      'Icons.work': Icons.work,
-      'Icons.emoji_events': Icons.emoji_events,
-      'Icons.auto_awesome': Icons.auto_awesome,
-      'Icons.label_important': Icons.label_important,
-    };
-    
-    return iconMap[iconString] ?? Icons.label_important;
   }
 }

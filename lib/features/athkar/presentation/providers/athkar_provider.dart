@@ -1,3 +1,4 @@
+// lib/features/athkar/presentation/providers/athkar_provider.dart
 import 'package:flutter/material.dart';
 import '../../domain/entities/athkar.dart';
 import '../../domain/usecases/get_athkar_by_category.dart';
@@ -31,8 +32,11 @@ class AthkarProvider extends ChangeNotifier {
   String? get error => _error;
   bool get hasError => _error != null;
   bool get hasInitialDataLoaded => _hasInitialDataLoaded;
+  bool get hasCategories => _categories != null && _categories!.isNotEmpty;
   
   bool isCategoryLoading(String categoryId) => _loadingStatus[categoryId] ?? false;
+  bool hasCategoryData(String categoryId) => _athkarByCategory.containsKey(categoryId) && 
+                                             _athkarByCategory[categoryId]!.isNotEmpty;
   
   // تحميل فئات الأذكار بتحسين الأداء
   Future<void> loadCategories() async {
@@ -107,6 +111,31 @@ class AthkarProvider extends ChangeNotifier {
     _isLoading = false;
     _error = errorMessage;
     if (!_isDisposed) notifyListeners();
+  }
+  
+  void clearError() {
+    _error = null;
+    if (!_isDisposed) notifyListeners();
+  }
+  
+  // الحصول على فئة بواسطة المعرف
+  AthkarCategory? getCategoryById(String categoryId) {
+    if (_categories == null) return null;
+    try {
+      return _categories!.firstWhere((category) => category.id == categoryId);
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  // الحصول على ذكر معين
+  Athkar? getAthkarById(String categoryId, String athkarId) {
+    if (!_athkarByCategory.containsKey(categoryId)) return null;
+    try {
+      return _athkarByCategory[categoryId]!.firstWhere((athkar) => athkar.id == athkarId);
+    } catch (e) {
+      return null;
+    }
   }
   
   // تحميل البيانات الشائعة مسبقاً

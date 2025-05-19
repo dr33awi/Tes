@@ -1,6 +1,7 @@
 // lib/features/athkar/data/models/athkar_model.dart
 import 'package:flutter/material.dart';
 import '../../domain/entities/athkar.dart';
+import '../utils/icon_helper.dart'; // سنقوم بإنشاء هذا الملف لاحقًا
 
 // نموذج لفئة الأذكار مع دعم التحويل من JSON وإلى JSON
 class AthkarCategoryModel {
@@ -35,10 +36,10 @@ class AthkarCategoryModel {
   // من JSON إلى موديل
   factory AthkarCategoryModel.fromJson(Map<String, dynamic> json) {
     // تحويل IconData من النص
-    IconData icon = _getIconFromString(json['icon'] as String? ?? 'Icons.label_important');
+    IconData icon = IconHelper.getIconFromString(json['icon'] as String? ?? 'Icons.label_important');
     
     // تحويل اللون من النص
-    Color color = _getColorFromHex(json['color'] as String? ?? '#447055');
+    Color color = IconHelper.getColorFromHex(json['color'] as String? ?? '#447055');
     
     List<ThikrModel> athkarList = [];
     
@@ -70,8 +71,8 @@ class AthkarCategoryModel {
     return {
       'id': id,
       'title': title,
-      'icon': _iconToString(icon),
-      'color': _colorToHex(color),
+      'icon': IconHelper.iconToString(icon),
+      'color': IconHelper.colorToHex(color),
       'description': description,
       'athkar': athkar.map((thikr) => thikr.toJson()).toList(),
       'notify_time': notifyTime,
@@ -88,7 +89,7 @@ class AthkarCategoryModel {
       id: id,
       name: title,
       description: description ?? '',
-      icon: _iconToString(icon),
+      icon: IconHelper.iconToString(icon),
     );
   }
   
@@ -119,54 +120,6 @@ class AthkarCategoryModel {
       hasMultipleReminders: hasMultipleReminders ?? this.hasMultipleReminders,
       additionalNotifyTimes: additionalNotifyTimes ?? this.additionalNotifyTimes,
     );
-  }
-  
-  // دوال مساعدة لتحويل IconData إلى نص والعكس
-  static String _iconToString(IconData icon) {
-    if (icon == Icons.wb_sunny) return 'Icons.wb_sunny';
-    if (icon == Icons.nightlight_round) return 'Icons.nightlight_round';
-    if (icon == Icons.bedtime) return 'Icons.bedtime';
-    if (icon == Icons.alarm) return 'Icons.alarm';
-    if (icon == Icons.mosque) return 'Icons.mosque';
-    if (icon == Icons.home) return 'Icons.home';
-    if (icon == Icons.restaurant) return 'Icons.restaurant';
-    if (icon == Icons.menu_book) return 'Icons.menu_book';
-    return 'Icons.label_important';
-  }
-  
-  static IconData _getIconFromString(String iconString) {
-    Map<String, IconData> iconMap = {
-      'Icons.wb_sunny': Icons.wb_sunny,
-      'Icons.nightlight_round': Icons.nightlight_round,
-      'Icons.bedtime': Icons.bedtime,
-      'Icons.alarm': Icons.alarm,
-      'Icons.mosque': Icons.mosque,
-      'Icons.home': Icons.home,
-      'Icons.restaurant': Icons.restaurant,
-      'Icons.menu_book': Icons.menu_book,
-      'Icons.favorite': Icons.favorite,
-      'Icons.star': Icons.star,
-      'Icons.auto_awesome': Icons.auto_awesome,
-    };
-    
-    return iconMap[iconString] ?? Icons.label_important;
-  }
-  
-  // تحويل اللون من/إلى هيكس
-  static String _colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
-  }
-  
-  static Color _getColorFromHex(String hexColor) {
-    try {
-      hexColor = hexColor.replaceAll('#', '');
-      if (hexColor.length == 6) {
-        hexColor = 'FF' + hexColor;
-      }
-      return Color(int.parse('0x$hexColor'));
-    } catch (e) {
-      return const Color(0xFF447055); // لون افتراضي
-    }
   }
 }
 
@@ -231,7 +184,7 @@ class ThikrModel {
       title: surahName ?? 'ذكر',
       content: text,
       count: count,
-      categoryId: '', // سيتم تعيينه لاحقاً
+      categoryId: '', // سيتم تعيينه لاحقًا
       source: source,
       notes: null,
       fadl: fadl,

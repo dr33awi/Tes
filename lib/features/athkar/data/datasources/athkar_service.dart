@@ -1,4 +1,4 @@
-// lib/data/datasources/local/athkar_service.dart
+// lib/features/athkar/data/datasources/athkar_service.dart
 import 'dart:convert';
 import 'package:athkar_app/features/athkar/presentation/screens/athkar_screen.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +9,7 @@ import '../../../../core/services/interfaces/notification_service.dart';
 import '../../../../core/services/utils/notification_scheduler.dart';
 import '../../domain/entities/athkar.dart';
 import '../models/athkar_model.dart';
+import '../utils/icon_helper.dart';
 
 class AthkarService {
   // Singleton implementation
@@ -29,11 +30,16 @@ class AthkarService {
   }
 
   // ذاكرة التخزين المؤقت للأذكار لتجنب القراءة المتكررة من الملفات
-  Map<String, AthkarScreen> _athkarCache = {};
+  final Map<String, AthkarScreen> _athkarCache = {};
 
   // تحميل الأذكار من ملف JSON
   Future<List<AthkarScreen>> loadAllAthkarCategories() async {
     try {
+      // استخدام الكاش إذا كان موجودًا بالفعل
+      if (_athkarCache.isNotEmpty) {
+        return _athkarCache.values.toList();
+      }
+      
       // قراءة ملف JSON من الأصول
       final String jsonString = await rootBundle.loadString('assets/data/athkar.json');
       final Map<String, dynamic> jsonData = json.decode(jsonString);
@@ -66,12 +72,13 @@ class AthkarService {
     try {
       // إذا لم تكن موجودة في ذاكرة التخزين المؤقت، قم بتحميل جميع الفئات ثم إرجاع الفئة المحددة
       final categories = await loadAllAthkarCategories();
-      final category = categories.firstWhere(
-        (cat) => cat.id == categoryId,
-        orElse: () => throw Exception('Category not found: $categoryId'),
-      );
+      for (var category in categories) {
+        if (category.id == categoryId) {
+          return category;
+        }
+      }
       
-      return category;
+      return null;
     } catch (e) {
       debugPrint('Error getting category $categoryId: $e');
       return null;
@@ -82,11 +89,11 @@ class AthkarService {
   AthkarScreen _parseAthkarCategory(Map<String, dynamic> data) {
     // تحليل نص الأيقونة إلى IconData
     final iconString = data['icon'] as String;
-    final IconData iconData = _getIconFromString(iconString);
+    final IconData iconData = IconHelper.getIconFromString(iconString);
     
     // تحليل نص اللون إلى Color
     final colorString = data['color'] as String? ?? '#447055';
-    final Color color = Color(_getColorFromHex(colorString));
+    final Color color = IconHelper.getColorFromHex(colorString);
     
     // تحليل قائمة الأذكار
     List<Athkar> athkarList = [];
@@ -111,48 +118,8 @@ class AthkarService {
       name: data['title'],
       description: data['description'] ?? '',
       icon: iconString,
+      athkar: athkarList,
     );
-  }
-  
-  // تحويل نص لون هيكس إلى قيمة لون رقمية مع تحسين معالجة الخطأ
-  int _getColorFromHex(String hexColor) {
-    try {
-      hexColor = hexColor.replaceAll('#', '');
-      if (hexColor.length == 6) {
-        hexColor = 'FF' + hexColor;
-      }
-      return int.parse('0x$hexColor');
-    } catch (e) {
-      debugPrint('Error parsing color: $e');
-      return 0xFF447055; // العودة إلى لون أساسي للتطبيق في حالة حدوث خطأ
-    }
-  }
-  
-  // تحسين تعيين الأيقونة مع المزيد من الخيارات
-  IconData _getIconFromString(String iconString) {
-    // تعيين نصوص الأيقونة إلى كائنات IconData
-    Map<String, IconData> iconMap = {
-      'Icons.wb_sunny': Icons.wb_sunny,
-      'Icons.nightlight_round': Icons.nightlight_round,
-      'Icons.bedtime': Icons.bedtime,
-      'Icons.alarm': Icons.alarm,
-      'Icons.mosque': Icons.mosque,
-      'Icons.home': Icons.home,
-      'Icons.restaurant': Icons.restaurant,
-      'Icons.menu_book': Icons.menu_book,
-      'Icons.favorite': Icons.favorite,
-      'Icons.star': Icons.star,
-      'Icons.water_drop': Icons.water_drop,
-      'Icons.insights': Icons.insights,
-      'Icons.travel_explore': Icons.travel_explore,
-      'Icons.healing': Icons.healing,
-      'Icons.family_restroom': Icons.family_restroom,
-      'Icons.school': Icons.school,
-      'Icons.work': Icons.work,
-      'Icons.emoji_events': Icons.emoji_events,
-    };
-    
-    return iconMap[iconString] ?? Icons.label_important;
   }
   
   // طرق للمفضلة/العدادات
@@ -512,7 +479,7 @@ class AthkarService {
       
       if (times.isEmpty) {
         // وقت افتراضي
-        times.add(_getDefaultTimeForCategory(categoryId));
+        times.add(IconHelper.getDefaultTimeForCategory(categoryId));
       }
       
       // دمج مع نظام الإشعارات الموحد
@@ -558,28 +525,6 @@ class AthkarService {
       await setNotificationEnabled(categoryId, false);
     } catch (e) {
       debugPrint('Error canceling category notifications: $e');
-    }
-  }
-  
-  // الحصول على الوقت الافتراضي لكل فئة
-  TimeOfDay _getDefaultTimeForCategory(String categoryId) {
-    switch (categoryId) {
-      case 'morning':
-        return const TimeOfDay(hour: 6, minute: 0);
-      case 'evening':
-        return const TimeOfDay(hour: 18, minute: 0);
-      case 'sleep':
-        return const TimeOfDay(hour: 22, minute: 0);
-      case 'wakeup':
-        return const TimeOfDay(hour: 5, minute: 30);
-      case 'prayer':
-        return const TimeOfDay(hour: 12, minute: 0);
-      case 'home':
-        return const TimeOfDay(hour: 18, minute: 0);
-      case 'food':
-        return const TimeOfDay(hour: 13, minute: 0);
-      default:
-        return const TimeOfDay(hour: 8, minute: 0);
     }
   }
   
@@ -814,37 +759,7 @@ class AthkarService {
   }
 }
 
-// فئة تمثل إعدادات إشعارات الأذكار
-class AthkarNotificationSettings {
-  final bool isEnabled;
-  final String? customTime;
-  final bool vibrate;
-  final int? importance;
-  
-  AthkarNotificationSettings({
-    this.isEnabled = true,
-    this.customTime,
-    this.vibrate = true,
-    this.importance = 4,
-  });
-  
-  // نسخة معدلة من الإعدادات
-  AthkarNotificationSettings copyWith({
-    bool? isEnabled,
-    String? customTime,
-    bool? vibrate,
-    int? importance,
-  }) {
-    return AthkarNotificationSettings(
-      isEnabled: isEnabled ?? this.isEnabled,
-      customTime: customTime ?? this.customTime,
-      vibrate: vibrate ?? this.vibrate,
-      importance: importance ?? this.importance,
-    );
-  }
-}
-
-// فئة لتمثيل ذكر مفضل مع فئته
+// فئة تمثل ذكر مفضل مع فئته
 class FavoriteThikr {
   final AthkarScreen category;
   final Athkar thikr;
