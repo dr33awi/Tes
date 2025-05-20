@@ -5,7 +5,7 @@ import '../../../../app/routes/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../prayers/presentation/screens/prayer_times_screen.dart';
 import '../../../athkar/presentation/screens/athkar_screen.dart';
-
+import '../../../home/favorites/presentation/screens/favorites_screen.dart';
 class CategoryGrid extends StatefulWidget {
   const CategoryGrid({Key? key}) : super(key: key);
 
@@ -75,6 +75,13 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       icon: Icons.menu_book_rounded,
       color: Color(0xFF00695C),
       gradientColors: [Color(0xFF00695C), Color(0xFF4DB6AC)],
+    ),
+        Category(
+      title: 'المفضلة',
+      icon: Icons.menu_book_rounded,
+      color: Color(0xFF2E7D32),
+      gradientColors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
+      routeName: 'FavoritesScreen',
     ),
     Category(
       title: 'الدعاء',

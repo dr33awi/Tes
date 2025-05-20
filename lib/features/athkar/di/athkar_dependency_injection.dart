@@ -1,5 +1,4 @@
 // lib/features/athkar/di/athkar_dependency_injection.dart
-import 'package:athkar_app/features/athkar/domain/entities/athkar.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter/material.dart';
 
@@ -129,7 +128,7 @@ class AthkarDependencyInjection {
         () => AthkarProvider(
           getAthkarCategories: getIt<GetAthkarCategories>(),
           getAthkarByCategory: getIt<GetAthkarByCategory>(),
-          getAthkarById: getIt<GetAthkarById>(),
+          getAthkarById: getIt<GetAthkarById>(),  // إضافة هذه المعلمة المفقودة
           saveFavorite: getIt<SaveAthkarFavorite>(),
           getFavorites: getIt<GetFavoriteAthkar>(),
           searchAthkar: getIt<SearchAthkar>(),
@@ -174,49 +173,5 @@ class AthkarDependencyInjection {
     } catch (e) {
       debugPrint('❌ خطأ في إعادة تعيين البيانات: $e');
     }
-  }
-}
-
-/// حالة استخدام: الحصول على ذكر محدد
-class GetAthkarById {
-  final AthkarRepository repository;
-
-  GetAthkarById(this.repository);
-
-  Future<Athkar?> call(String id) async {
-    return await repository.getAthkarById(id);
-  }
-}
-
-/// حالة استخدام: حفظ ذكر في المفضلة
-class SaveAthkarFavorite {
-  final AthkarRepository repository;
-
-  SaveAthkarFavorite(this.repository);
-
-  Future<void> call(String id, bool isFavorite) async {
-    return await repository.saveAthkarFavorite(id, isFavorite);
-  }
-}
-
-/// حالة استخدام: الحصول على الأذكار المفضلة
-class GetFavoriteAthkar {
-  final AthkarRepository repository;
-
-  GetFavoriteAthkar(this.repository);
-
-  Future<List<Athkar>> call() async {
-    return await repository.getFavoriteAthkar();
-  }
-}
-
-/// حالة استخدام: البحث في الأذكار
-class SearchAthkar {
-  final AthkarRepository repository;
-
-  SearchAthkar(this.repository);
-
-  Future<List<Athkar>> call(String query) async {
-    return await repository.searchAthkar(query);
   }
 }

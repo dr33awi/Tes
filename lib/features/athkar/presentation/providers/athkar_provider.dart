@@ -1,5 +1,4 @@
 // lib/features/athkar/presentation/providers/athkar_provider.dart
-import 'package:athkar_app/features/athkar/di/athkar_dependency_injection.dart';
 import 'package:flutter/material.dart';
 import '../../domain/entities/athkar.dart';
 import '../../domain/usecases/get_athkar_by_category.dart';
@@ -136,7 +135,7 @@ class AthkarProvider extends ChangeNotifier {
       _hasInitialDataLoaded = true;
       _setLoading(false);
     } catch (e) {
-      _setError(e.toString());
+      _setError('حدث خطأ أثناء تحميل فئات الأذكار: ${e.toString()}');
     }
   }
   
@@ -165,7 +164,7 @@ class AthkarProvider extends ChangeNotifier {
       _loadingStatus[categoryId] = false;
       _setLoading(false);
     } catch (e) {
-      _setError(e.toString());
+      _setError('حدث خطأ أثناء تحميل الأذكار للفئة $categoryId: ${e.toString()}');
     }
   }
   
@@ -178,7 +177,7 @@ class AthkarProvider extends ChangeNotifier {
     try {
       return await _getAthkarById(id);
     } catch (e) {
-      _setError(e.toString());
+      _setError('حدث خطأ أثناء الحصول على الذكر $id: ${e.toString()}');
       return null;
     }
   }
@@ -210,14 +209,14 @@ class AthkarProvider extends ChangeNotifier {
           await loadFavorites();
         } else {
           // إذا تمت الإزالة من المفضلة، قم بإزالة الذكر من قائمة المفضلة
-          _favorites = _favorites!.where((athkar) => athkar.id != id).toList();
+          _favorites = _favorites?.where((athkar) => athkar.id != id).toList();
         }
       }
       
       // إشعار المستمعين بالتغييرات
       if (!_isDisposed) notifyListeners();
     } catch (e) {
-      _setError(e.toString());
+      _setError('حدث خطأ أثناء تغيير حالة المفضلة للذكر $id: ${e.toString()}');
     }
   }
   
@@ -237,7 +236,7 @@ class AthkarProvider extends ChangeNotifier {
     } catch (e) {
       _favorites = [];
       _isFavoritesLoading = false;
-      _setError(e.toString());
+      _setError('حدث خطأ أثناء تحميل الأذكار المفضلة: ${e.toString()}');
     }
   }
   
@@ -247,9 +246,7 @@ class AthkarProvider extends ChangeNotifier {
   /// @param query استعلام البحث
   Future<void> search(String query) async {
     if (query.isEmpty) {
-      _searchResults = [];
-      _searchQuery = '';
-      if (!_isDisposed) notifyListeners();
+      clearSearch();
       return;
     }
     
@@ -266,7 +263,7 @@ class AthkarProvider extends ChangeNotifier {
     } catch (e) {
       _searchResults = [];
       _isSearching = false;
-      _setError(e.toString());
+      _setError('حدث خطأ أثناء البحث: ${e.toString()}');
     }
   }
   
@@ -276,6 +273,7 @@ class AthkarProvider extends ChangeNotifier {
   void clearSearch() {
     _searchResults = [];
     _searchQuery = '';
+    _isSearching = false;
     if (!_isDisposed) notifyListeners();
   }
   
@@ -378,10 +376,16 @@ class AthkarProvider extends ChangeNotifier {
     await loadCategories();
     
     if (_categories != null && _categories!.isNotEmpty) {
-      for (final category in _categories!) {
-        if (['morning', 'evening', 'sleep'].contains(category.id)) {
-          await loadAthkarByCategory(category.id);
-        }
+      // استخدام Future.wait للتحميل المتوازي للتحسين الأداء
+      final commonCategories = _categories!
+        .where((category) => ['morning', 'evening', 'sleep'].contains(category.id))
+        .map((category) => category.id)
+        .toList();
+      
+      if (commonCategories.isNotEmpty) {
+        await Future.wait(
+          commonCategories.map((categoryId) => loadAthkarByCategory(categoryId))
+        );
       }
     }
   }

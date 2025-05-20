@@ -21,6 +21,10 @@ import 'features/prayers/presentation/providers/prayer_times_provider.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
 import 'features/athkar/domain/usecases/get_athkar_by_category.dart';
 import 'features/athkar/domain/usecases/get_athkar_categories.dart';
+import 'features/athkar/domain/usecases/get_athkar_by_id.dart';
+import 'features/athkar/domain/usecases/save_athkar_favorite.dart';
+import 'features/athkar/domain/usecases/get_favorite_athkar.dart';
+import 'features/athkar/domain/usecases/search_athkar.dart';
 import 'features/prayers/domain/usecases/get_prayer_times.dart';
 import 'features/prayers/domain/usecases/get_qibla_direction.dart';
 import 'app/themes/app_theme.dart';
@@ -61,6 +65,10 @@ Future<void> main() async {
           create: (_) => AthkarProvider(
             getAthkarCategories: getIt<GetAthkarCategories>(),
             getAthkarByCategory: getIt<GetAthkarByCategory>(),
+            getAthkarById: getIt<GetAthkarById>(),
+            saveFavorite: getIt<SaveAthkarFavorite>(),
+            getFavorites: getIt<GetFavoriteAthkar>(),
+            searchAthkar: getIt<SearchAthkar>(),
           )..loadCategories(),
         ),
         ChangeNotifierProvider(

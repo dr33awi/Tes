@@ -1,4 +1,7 @@
 // lib/app/routes/app_router.dart
+import 'package:athkar_app/features/home/favorites/presentation/screens/favorites_screen.dart';
+import 'package:athkar_app/features/home/models/daily_quote_model.dart';
+import 'package:athkar_app/features/home/presentation/quotes/screens/quote_details_screen.dart';
 import 'package:flutter/material.dart';
 import '../../features/prayers/presentation/screens/prayer_times_screen.dart';
 import '../../features/prayers/presentation/screens/qibla_screen.dart';
@@ -20,7 +23,10 @@ class AppRouter {
   static const String settingsRoute = '/settings';
   static const String permissionsOnboarding = '/permissions-onboarding';
   static const String athkarScreen = '/athkar';
-  
+  static const String favorites = '/favorites';
+  static const String quoteDetails = '/quote-details';
+
+
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final routeName = settings.name;
     
@@ -38,7 +44,20 @@ class AppRouter {
           settings: settings,
           builder: (_) => const PrayerTimesScreen(),
         );
-        
+
+        case favorites:
+  final args = settings.arguments as HighlightItem?;
+  return MaterialPageRoute(
+    settings: settings,
+    builder: (_) => FavoritesScreen(newFavoriteQuote: args),
+  );
+
+  case quoteDetails:
+  final quoteItem = settings.arguments as HighlightItem;
+  return MaterialPageRoute(
+    settings: settings,
+    builder: (_) => QuoteDetailsScreen(quoteItem: quoteItem),
+  );
       case athkarCategories:
         return MaterialPageRoute(
           settings: settings,

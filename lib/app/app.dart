@@ -13,6 +13,10 @@ import '../features/prayers/presentation/providers/prayer_times_provider.dart';
 import '../features/settings/presentation/providers/settings_provider.dart';
 import '../features/athkar/domain/usecases/get_athkar_by_category.dart';
 import '../features/athkar/domain/usecases/get_athkar_categories.dart';
+import '../features/athkar/domain/usecases/get_athkar_by_id.dart';
+import '../features/athkar/domain/usecases/save_athkar_favorite.dart';
+import '../features/athkar/domain/usecases/get_favorite_athkar.dart';
+import '../features/athkar/domain/usecases/search_athkar.dart';
 import '../features/prayers/domain/usecases/get_prayer_times.dart';
 import '../features/prayers/domain/usecases/get_qibla_direction.dart';
 import '../features/settings/domain/usecases/get_settings.dart';
@@ -35,6 +39,10 @@ class AthkarApp extends StatelessWidget {
           create: (_) => AthkarProvider(
             getAthkarCategories: di.getIt<GetAthkarCategories>(),
             getAthkarByCategory: di.getIt<GetAthkarByCategory>(),
+            getAthkarById: di.getIt<GetAthkarById>(),
+            saveFavorite: di.getIt<SaveAthkarFavorite>(),
+            getFavorites: di.getIt<GetFavoriteAthkar>(),
+            searchAthkar: di.getIt<SearchAthkar>(),
           )..loadCategories(),
         ),
         ChangeNotifierProvider(
