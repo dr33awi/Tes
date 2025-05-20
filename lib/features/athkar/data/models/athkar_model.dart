@@ -1,9 +1,12 @@
 // lib/features/athkar/data/models/athkar_model.dart
 import 'package:flutter/material.dart';
 import '../../domain/entities/athkar.dart';
-import '../utils/icon_helper.dart'; // سنقوم بإنشاء هذا الملف لاحقًا
+import '../utils/icon_helper.dart';
 
-// نموذج لفئة الأذكار مع دعم التحويل من JSON وإلى JSON
+/// نموذج لفئة الأذكار مع دعم التحويل من JSON وإلى JSON
+///
+/// يستخدم هذا النموذج لتمثيل فئة من فئات الأذكار ويحتوي على قائمة من الأذكار
+/// يدعم التحويل من JSON وإلى JSON لسهولة التخزين والتحميل
 class AthkarCategoryModel {
   final String id;
   final String title;
@@ -19,7 +22,7 @@ class AthkarCategoryModel {
   final bool hasMultipleReminders;
   final List<String>? additionalNotifyTimes;
 
-  AthkarCategoryModel({
+  const AthkarCategoryModel({
     required this.id,
     required this.title,
     required this.icon,
@@ -33,7 +36,11 @@ class AthkarCategoryModel {
     this.additionalNotifyTimes,
   });
 
-  // من JSON إلى موديل
+  /// من JSON إلى موديل
+  /// 
+  /// تحويل بيانات JSON إلى كائن [AthkarCategoryModel]
+  /// @param json بيانات JSON المراد تحويلها
+  /// @return كائن [AthkarCategoryModel] جديد
   factory AthkarCategoryModel.fromJson(Map<String, dynamic> json) {
     // تحويل IconData من النص
     IconData icon = IconHelper.getIconFromString(json['icon'] as String? ?? 'Icons.label_important');
@@ -41,32 +48,41 @@ class AthkarCategoryModel {
     // تحويل اللون من النص
     Color color = IconHelper.getColorFromHex(json['color'] as String? ?? '#447055');
     
+    // تحويل قائمة الأذكار
     List<ThikrModel> athkarList = [];
     
     if (json['athkar'] != null) {
-      for (var thikrData in json['athkar']) {
-        athkarList.add(ThikrModel.fromJson(thikrData));
-      }
+      final athkarJson = json['athkar'] as List;
+      athkarList = athkarJson
+          .map((thikrData) => ThikrModel.fromJson(thikrData as Map<String, dynamic>))
+          .toList();
+    }
+    
+    // قائمة الأوقات الإضافية
+    List<String>? additionalTimes;
+    if (json['additional_notify_times'] != null) {
+      additionalTimes = List<String>.from(json['additional_notify_times'] as List);
     }
     
     return AthkarCategoryModel(
-      id: json['id'],
-      title: json['title'],
+      id: json['id'] as String,
+      title: json['title'] as String,
       icon: icon,
       color: color,
-      description: json['description'],
+      description: json['description'] as String?,
       athkar: athkarList,
-      notifyTime: json['notify_time'],
-      notifyTitle: json['notify_title'],
-      notifyBody: json['notify_body'],
-      hasMultipleReminders: json['has_multiple_reminders'] ?? false,
-      additionalNotifyTimes: json['additional_notify_times'] != null
-          ? List<String>.from(json['additional_notify_times'])
-          : null,
+      notifyTime: json['notify_time'] as String?,
+      notifyTitle: json['notify_title'] as String?,
+      notifyBody: json['notify_body'] as String?,
+      hasMultipleReminders: json['has_multiple_reminders'] as bool? ?? false,
+      additionalNotifyTimes: additionalTimes,
     );
   }
 
-  // تحويل الموديل إلى JSON
+  /// تحويل الموديل إلى JSON
+  /// 
+  /// تحويل كائن [AthkarCategoryModel] إلى Map قابلة للتحويل إلى JSON
+  /// @return Map تمثل الكائن
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -83,7 +99,10 @@ class AthkarCategoryModel {
     };
   }
   
-  // تحويل النموذج إلى كيان
+  /// تحويل النموذج إلى كيان
+  /// 
+  /// تحويل النموذج [AthkarCategoryModel] إلى كيان [AthkarCategory]
+  /// @return كائن [AthkarCategory] جديد
   AthkarCategory toEntity() {
     return AthkarCategory(
       id: id,
@@ -93,7 +112,21 @@ class AthkarCategoryModel {
     );
   }
   
-  // اختصار نسخة معدلة
+  /// إنشاء نسخة جديدة من النموذج مع تعديلات
+  /// 
+  /// تُستخدم هذه الطريقة لإنشاء نسخة جديدة من النموذج مع تعديل بعض الخصائص
+  /// @param id المعرف الجديد (اختياري)
+  /// @param title العنوان الجديد (اختياري)
+  /// @param icon الأيقونة الجديدة (اختياري)
+  /// @param color اللون الجديد (اختياري)
+  /// @param description الوصف الجديد (اختياري)
+  /// @param athkar قائمة الأذكار الجديدة (اختياري)
+  /// @param notifyTime وقت الإشعار الجديد (اختياري)
+  /// @param notifyTitle عنوان الإشعار الجديد (اختياري)
+  /// @param notifyBody نص الإشعار الجديد (اختياري)
+  /// @param hasMultipleReminders هل لديه إشعارات متعددة (اختياري)
+  /// @param additionalNotifyTimes قائمة الأوقات الإضافية الجديدة (اختياري)
+  /// @return نسخة جديدة من النموذج مع التعديلات
   AthkarCategoryModel copyWith({
     String? id,
     String? title,
@@ -121,9 +154,60 @@ class AthkarCategoryModel {
       additionalNotifyTimes: additionalNotifyTimes ?? this.additionalNotifyTimes,
     );
   }
+  
+  /// التحقق من تساوي كائنين
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    
+    return other is AthkarCategoryModel &&
+      other.id == id &&
+      other.title == title &&
+      other.icon == icon &&
+      other.color == color &&
+      other.description == description &&
+      other.notifyTime == notifyTime &&
+      other.notifyTitle == notifyTitle &&
+      other.notifyBody == notifyBody &&
+      other.hasMultipleReminders == hasMultipleReminders &&
+      _listEquals(other.additionalNotifyTimes, additionalNotifyTimes) &&
+      _listEquals(other.athkar, athkar);
+  }
+  
+  /// حساب قيمة الهاش للكائن
+  @override
+  int get hashCode {
+    return id.hashCode ^
+      title.hashCode ^
+      icon.hashCode ^
+      color.hashCode ^
+      description.hashCode ^
+      notifyTime.hashCode ^
+      notifyTitle.hashCode ^
+      notifyBody.hashCode ^
+      hasMultipleReminders.hashCode ^
+      (additionalNotifyTimes?.hashCode ?? 0) ^
+      (athkar.hashCode);
+  }
+  
+  /// طريقة مساعدة للتحقق من تساوي قائمتين
+  bool _listEquals<T>(List<T>? a, List<T>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    
+    return true;
+  }
 }
 
-// نموذج للذكر الواحد
+/// نموذج للذكر الواحد
+///
+/// يستخدم هذا النموذج لتمثيل ذكر واحد ويحتوي على نص الذكر وعدد التكرار والمصدر
+/// يدعم التحويل من JSON وإلى JSON لسهولة التخزين والتحميل
 class ThikrModel {
   final int id;
   final String text;
@@ -135,7 +219,7 @@ class ThikrModel {
   final String? verseNumbers;
   final String? audioUrl;
 
-  ThikrModel({
+  const ThikrModel({
     required this.id,
     required this.text,
     required this.count,
@@ -147,22 +231,36 @@ class ThikrModel {
     this.audioUrl,
   });
   
-  // من JSON إلى نموذج
+  /// من JSON إلى نموذج
+  /// 
+  /// تحويل بيانات JSON إلى كائن [ThikrModel]
+  /// @param json بيانات JSON المراد تحويلها
+  /// @return كائن [ThikrModel] جديد
   factory ThikrModel.fromJson(Map<String, dynamic> json) {
+    // التعامل مع المعرف الذي قد يكون نصًا أو رقمًا
+    final dynamic rawId = json['id'];
+    final int id = rawId is String ? int.parse(rawId) : rawId as int;
+    
+    // التعامل مع نص الذكر الذي قد يكون بمفتاح 'text' أو 'content'
+    final String text = (json['text'] ?? json['content']) as String? ?? '';
+    
     return ThikrModel(
-      id: json['id'] is String ? int.parse(json['id']) : json['id'],
-      text: json['text'] ?? json['content'] ?? '', // دعم اسمين مختلفين
-      count: json['count'] ?? 1,
-      fadl: json['fadl'],
-      source: json['source'],
-      isQuranVerse: json['is_quran_verse'] ?? false,
-      surahName: json['surah_name'],
-      verseNumbers: json['verse_numbers'],
-      audioUrl: json['audio_url'],
+      id: id,
+      text: text,
+      count: json['count'] as int? ?? 1,
+      fadl: json['fadl'] as String?,
+      source: json['source'] as String?,
+      isQuranVerse: json['is_quran_verse'] as bool? ?? false,
+      surahName: json['surah_name'] as String?,
+      verseNumbers: json['verse_numbers'] as String?,
+      audioUrl: json['audio_url'] as String?,
     );
   }
   
-  // تحويل النموذج إلى JSON
+  /// تحويل النموذج إلى JSON
+  /// 
+  /// تحويل كائن [ThikrModel] إلى Map قابلة للتحويل إلى JSON
+  /// @return Map تمثل الكائن
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -177,21 +275,36 @@ class ThikrModel {
     };
   }
   
-  // تحويل النموذج إلى كيان
-  Athkar toEntity() {
+  /// تحويل النموذج إلى كيان
+  /// 
+  /// تحويل النموذج [ThikrModel] إلى كيان [Athkar]
+  /// @return كائن [Athkar] جديد
+  Athkar toEntity({String categoryId = ''}) {
     return Athkar(
       id: id.toString(),
       title: surahName ?? 'ذكر',
       content: text,
       count: count,
-      categoryId: '', // سيتم تعيينه لاحقًا
+      categoryId: categoryId,
       source: source,
       notes: null,
       fadl: fadl,
     );
   }
   
-  // اختصار نسخة معدلة
+  /// إنشاء نسخة جديدة من النموذج مع تعديلات
+  /// 
+  /// تُستخدم هذه الطريقة لإنشاء نسخة جديدة من النموذج مع تعديل بعض الخصائص
+  /// @param id المعرف الجديد (اختياري)
+  /// @param text النص الجديد (اختياري)
+  /// @param count العدد الجديد (اختياري)
+  /// @param fadl الفضل الجديد (اختياري)
+  /// @param source المصدر الجديد (اختياري)
+  /// @param isQuranVerse هل هو آية قرآنية (اختياري)
+  /// @param surahName اسم السورة الجديد (اختياري)
+  /// @param verseNumbers أرقام الآيات الجديدة (اختياري)
+  /// @param audioUrl عنوان الصوت الجديد (اختياري)
+  /// @return نسخة جديدة من النموذج مع التعديلات
   ThikrModel copyWith({
     int? id,
     String? text,
@@ -215,33 +328,90 @@ class ThikrModel {
       audioUrl: audioUrl ?? this.audioUrl,
     );
   }
+  
+  /// التحقق من تساوي كائنين
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+  
+    return other is ThikrModel &&
+      other.id == id &&
+      other.text == text &&
+      other.count == count &&
+      other.fadl == fadl &&
+      other.source == source &&
+      other.isQuranVerse == isQuranVerse &&
+      other.surahName == surahName &&
+      other.verseNumbers == verseNumbers &&
+      other.audioUrl == audioUrl;
+  }
+
+  /// حساب قيمة الهاش للكائن
+  @override
+  int get hashCode {
+    return id.hashCode ^
+      text.hashCode ^
+      count.hashCode ^
+      fadl.hashCode ^
+      source.hashCode ^
+      isQuranVerse.hashCode ^
+      surahName.hashCode ^
+      verseNumbers.hashCode ^
+      audioUrl.hashCode;
+  }
 }
 
-// نموذج إعدادات الإشعارات
+/// نموذج إعدادات الإشعارات
+///
+/// يستخدم هذا النموذج لتمثيل إعدادات الإشعارات لفئة من فئات الأذكار
+/// يدعم التحويل من JSON وإلى JSON لسهولة التخزين والتحميل
 class AthkarNotificationSettings {
   final bool isEnabled;
   final String? customTime;
   final bool vibrate;
   final int? importance;
 
-  AthkarNotificationSettings({
+  const AthkarNotificationSettings({
     this.isEnabled = true,
     this.customTime,
     this.vibrate = true,
     this.importance = 4,
   });
   
-  // من JSON إلى نموذج
+  /// من JSON إلى نموذج
+  /// 
+  /// تحويل بيانات JSON إلى كائن [AthkarNotificationSettings]
+  /// @param json بيانات JSON المراد تحويلها
+  /// @return كائن [AthkarNotificationSettings] جديد
   factory AthkarNotificationSettings.fromJson(Map<String, dynamic> json) {
     return AthkarNotificationSettings(
-      isEnabled: json['is_enabled'] ?? true,
-      customTime: json['custom_time'],
-      vibrate: json['vibrate'] ?? true,
-      importance: json['importance'] ?? 4,
+      isEnabled: json['is_enabled'] as bool? ?? true,
+      customTime: json['custom_time'] as String?,
+      vibrate: json['vibrate'] as bool? ?? true,
+      importance: json['importance'] as int? ?? 4,
     );
   }
   
-  // تحويل النموذج إلى JSON
+  /// قيم افتراضية جاهزة للإشعارات المعطلة
+  static AthkarNotificationSettings get disabled => const AthkarNotificationSettings(
+    isEnabled: false,
+    customTime: null,
+    vibrate: true,
+    importance: 4,
+  );
+  
+  /// قيم افتراضية جاهزة للإشعارات المفعلة
+  static AthkarNotificationSettings get enabled => const AthkarNotificationSettings(
+    isEnabled: true,
+    customTime: null,
+    vibrate: true,
+    importance: 4,
+  );
+  
+  /// تحويل النموذج إلى JSON
+  /// 
+  /// تحويل كائن [AthkarNotificationSettings] إلى Map قابلة للتحويل إلى JSON
+  /// @return Map تمثل الكائن
   Map<String, dynamic> toJson() {
     return {
       'is_enabled': isEnabled,
@@ -251,7 +421,14 @@ class AthkarNotificationSettings {
     };
   }
   
-  // اختصار نسخة معدلة
+  /// إنشاء نسخة جديدة من النموذج مع تعديلات
+  /// 
+  /// تُستخدم هذه الطريقة لإنشاء نسخة جديدة من النموذج مع تعديل بعض الخصائص
+  /// @param isEnabled حالة التفعيل الجديدة (اختياري)
+  /// @param customTime الوقت المخصص الجديد (اختياري)
+  /// @param vibrate حالة الاهتزاز الجديدة (اختياري)
+  /// @param importance الأهمية الجديدة (اختياري)
+  /// @return نسخة جديدة من النموذج مع التعديلات
   AthkarNotificationSettings copyWith({
     bool? isEnabled,
     String? customTime,
@@ -264,5 +441,32 @@ class AthkarNotificationSettings {
       vibrate: vibrate ?? this.vibrate,
       importance: importance ?? this.importance,
     );
+  }
+  
+  /// التحقق من تساوي كائنين
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+  
+    return other is AthkarNotificationSettings &&
+      other.isEnabled == isEnabled &&
+      other.customTime == customTime &&
+      other.vibrate == vibrate &&
+      other.importance == importance;
+  }
+
+  /// حساب قيمة الهاش للكائن
+  @override
+  int get hashCode {
+    return isEnabled.hashCode ^
+      customTime.hashCode ^
+      vibrate.hashCode ^
+      (importance?.hashCode ?? 0);
+  }
+  
+  /// تحويل النموذج إلى نص مقروء
+  @override
+  String toString() {
+    return 'AthkarNotificationSettings(isEnabled: $isEnabled, customTime: $customTime, vibrate: $vibrate, importance: $importance)';
   }
 }
