@@ -76,12 +76,12 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       color: Color(0xFF00695C),
       gradientColors: [Color(0xFF00695C), Color(0xFF4DB6AC)],
     ),
-        Category(
+    Category(
       title: 'المفضلة',
-      icon: Icons.menu_book_rounded,
-      color: Color(0xFF2E7D32),
-      gradientColors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
-      routeName: 'FavoritesScreen',
+      icon: Icons.favorite,  // تم تغيير الأيقونة للمفضلة
+      color: Color(0xFFC62828),  // تم تغيير اللون ليناسب المفضلة
+      gradientColors: [Color(0xFFC62828), Color(0xFFE57373)],  // تم تغيير التدرج اللوني ليناسب المفضلة
+      routeName: AppRouter.favorites,  // تصحيح المسار باستخدام الثابت AppRouter.favorites
     ),
     Category(
       title: 'الدعاء',

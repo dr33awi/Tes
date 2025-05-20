@@ -154,7 +154,7 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
             ],
           ),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: ThemeColors.primary,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           duration: const Duration(seconds: 2),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
@@ -348,8 +348,16 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
 
   @override
   Widget build(BuildContext context) {
+    // تحديد ما إذا كان التطبيق في الوضع المظلم
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // تحديد ألوان الخلفية والنص حسب الوضع
+    final backgroundColor = isDark ? Colors.grey[900] : ThemeColors.surface;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    
     return Scaffold(
-      backgroundColor: ThemeColors.surface,
+      backgroundColor: backgroundColor,
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
@@ -375,7 +383,9 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                             child: Center(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: isDark 
+                                      ? Colors.black54 
+                                      : Colors.black.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
@@ -422,7 +432,7 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                           child: FadeInAnimation(
                             child: Card(
                               elevation: 15,
-                              shadowColor: ThemeColors.primary.withOpacity(0.3),
+                              shadowColor: primaryColor.withOpacity(0.3),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(24),
                               ),
@@ -432,10 +442,15 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                                   gradient: LinearGradient(
                                     begin: Alignment.topRight,
                                     end: Alignment.bottomLeft,
-                                    colors: [
-                                      ThemeColors.primary,
-                                      Color(0xFF2D6852) // لون غامق لمزيد من العمق
-                                    ],
+                                    colors: isDark
+                                      ? [
+                                          primaryColor,
+                                          Color.lerp(primaryColor, Colors.black, 0.3) ?? const Color(0xFF2D6852)
+                                        ]
+                                      : [
+                                          ThemeColors.primary,
+                                          const Color(0xFF2D6852) // لون غامق لمزيد من العمق
+                                        ],
                                     stops: const [0.3, 1.0],
                                   ),
                                 ),
@@ -653,7 +668,7 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
                           padding: const EdgeInsets.all(10.0),
                           child: Icon(
                             Icons.arrow_back,
-                            color: ThemeColors.primary,
+                            color: Theme.of(context).colorScheme.primary,
                             size: 24,
                           ),
                         ),
@@ -681,30 +696,44 @@ class _QuoteDetailsScreenState extends State<QuoteDetailsScreen>
     bool useOriginalColor = false,
     bool useActiveColor = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     // تحديد لون الزر
     List<Color> gradientColors;
     
     if (useActiveColor && isActive) {
       // استخدام اللون الأحمر فقط عند التفعيل
-      gradientColors = [color, color.withOpacity(0.7)];
+      gradientColors = isDark 
+          ? [color, color.withOpacity(0.6)]
+          : [color, color.withOpacity(0.7)];
     } else if (useOriginalColor) {
       // استخدام اللون الأصلي دائمًا
-      gradientColors = [color, color.withOpacity(0.7)];
+      gradientColors = isDark 
+          ? [color, color.withOpacity(0.6)]
+          : [color, color.withOpacity(0.7)];
     } else {
       // استخدام لون الكارد الأخضر
-      gradientColors = [
-        const Color(0xFF447055).withOpacity(0.9),
-        const Color(0xFF2D6852).withOpacity(0.7),
-      ];
+      final primaryColor = Theme.of(context).colorScheme.primary;
+      gradientColors = isDark 
+          ? [
+              primaryColor,
+              primaryColor.withOpacity(0.7),
+            ]
+          : [
+              const Color(0xFF447055).withOpacity(0.9),
+              const Color(0xFF2D6852).withOpacity(0.7),
+            ];
     }
     
     return Transform.scale(
       scale: isPressed ? 0.95 : (isActive ? _pulseAnimation.value : 1.0),
       child: Card(
         elevation: 8,
-        shadowColor: (useActiveColor && isActive) || useOriginalColor
-            ? color.withOpacity(0.3)
-            : Colors.black.withOpacity(0.1),
+        shadowColor: isDark 
+            ? Colors.black45
+            : ((useActiveColor && isActive) || useOriginalColor
+                ? color.withOpacity(0.3)
+                : Colors.black.withOpacity(0.1)),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),

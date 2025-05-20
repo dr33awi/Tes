@@ -6,9 +6,6 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import 'quote_card.dart';
 
-
-const Color kSourceTextColor = Colors.white;
-
 class QuoteCarousel extends StatelessWidget {
   final List<HighlightItem> highlights;
   final PageController pageController;
@@ -26,21 +23,32 @@ class QuoteCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    // تحديد ألوان النص حسب الوضع
+    final sourceTextColor = Colors.white;
     
     return Card(
       elevation: 8,
-      shadowColor: ThemeColors.primary.withOpacity(0.4),
+      shadowColor: isDark 
+          ? Colors.black54 
+          : ThemeColors.primary.withOpacity(0.4),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
       ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
-            colors: [ThemeColors.primary, ThemeColors.primaryLight],
+          gradient: LinearGradient(
+            colors: isDark
+              ? [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.primary.withOpacity(0.7)
+                ]
+              : [ThemeColors.primary, ThemeColors.primaryLight],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
-            stops: [0.3, 1.0],
+            stops: const [0.3, 1.0],
           ),
         ),
         child: Column(
@@ -65,14 +73,14 @@ class QuoteCarousel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            _buildCarouselFooter(theme),
+            _buildCarouselFooter(theme, isDark, sourceTextColor),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCarouselFooter(ThemeData theme) {
+  Widget _buildCarouselFooter(ThemeData theme, bool isDark, Color sourceTextColor) {
     return ValueListenableBuilder<int>(
       valueListenable: pageIndex,
       builder: (_, idx, __) {
@@ -93,12 +101,12 @@ class QuoteCarousel extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(item.headerIcon, size: 18, color: kSourceTextColor),
+                        Icon(item.headerIcon, size: 18, color: sourceTextColor),
                         const SizedBox(width: 6),
                         Text(
                           item.headerTitle,
                           style: theme.textTheme.labelLarge?.copyWith(
-                            color: kSourceTextColor,
+                            color: sourceTextColor,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -126,7 +134,7 @@ class QuoteCarousel extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             
-            // مؤشر الصفحات البسيط (بدون حاوية)
+            // مؤشر الصفحات
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: SmoothPageIndicator(

@@ -5,9 +5,6 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
-
-const Color kQuoteTextColor = Color(0xFF2F5943);
-
 class QuoteCard extends StatelessWidget {
   final String text;
   final VoidCallback? onTap;
@@ -24,6 +21,12 @@ class QuoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // تحديد الألوان حسب الوضع الليلي/النهاري
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final quoteTextColor = isDark ? Colors.white : const Color(0xFF2F5943);
+    final cardColor = isDark ? Colors.grey[850] : ThemeColors.surface;
+    final shadowColor = isDark ? Colors.black54 : Colors.black.withOpacity(onTap == null ? .06 : .1);
+    
     return AnimationConfiguration.staggeredList(
       position: index,
       duration: const Duration(milliseconds: 400),
@@ -34,11 +37,11 @@ class QuoteCard extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             width: double.infinity,
             decoration: BoxDecoration(
-              color: ThemeColors.surface,
+              color: cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(onTap == null ? .06 : .1),
+                  color: shadowColor,
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -48,12 +51,12 @@ class QuoteCard extends StatelessWidget {
               builder: (context, constraints) {
                 final textSpan = TextSpan(
                   text: text,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Amiri-Bold',
                     fontSize: 14,
                     height: 1.9,
                     fontWeight: FontWeight.w700,
-                    color: kQuoteTextColor,
+                    color: quoteTextColor,
                   ),
                 );
                 final textPainter = TextPainter(
@@ -68,7 +71,7 @@ class QuoteCard extends StatelessWidget {
                     padding: const EdgeInsets.all(24),
                     child: ScrollbarTheme(
                       data: ScrollbarThemeData(
-                        thumbColor: MaterialStateProperty.all(kQuoteTextColor.withOpacity(0.5)),
+                        thumbColor: MaterialStateProperty.all(quoteTextColor.withOpacity(0.5)),
                         thickness: MaterialStateProperty.all(4),
                         radius: const Radius.circular(8),
                       ),
@@ -78,12 +81,12 @@ class QuoteCard extends StatelessWidget {
                           child: Text(
                             text,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Amiri-Bold',
                               fontSize: 14,
                               height: 1.9,
                               fontWeight: FontWeight.w700,
-                              color: kQuoteTextColor,
+                              color: quoteTextColor,
                             ),
                           ),
                         ),
@@ -97,12 +100,12 @@ class QuoteCard extends StatelessWidget {
                       child: AutoSizeText(
                         text,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Amiri-Bold',
                           fontSize: 14,
                           height: 1.9,
                           fontWeight: FontWeight.w700,
-                          color: kQuoteTextColor,
+                          color: quoteTextColor,
                         ),
                         maxLines: 5,
                         wrapWords: true,

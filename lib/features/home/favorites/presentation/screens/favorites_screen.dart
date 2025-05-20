@@ -314,7 +314,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             ],
           ),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: ThemeColors.primary,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           duration: const Duration(seconds: 2),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
@@ -387,31 +387,58 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
   }
   
-  // الحصول على لون الفئة
+  // الحصول على لون الفئة - تم تعديله ليأخذ بالاعتبار الوضع الليلي
   List<Color> _getCategoryGradient(String categoryId) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     switch (categoryId) {
       case 'quran':
-        return [
-          const Color(0xFF2E7D32), // أخضر داكن
-          const Color(0xFF66BB6A), // أخضر فاتح
-        ];
+        return isDark 
+          ? [
+            const Color(0xFF1B5E20), // أخضر داكن للوضع المظلم
+            const Color(0xFF388E3C), // أخضر فاتح للوضع المظلم
+          ]
+          : [
+            const Color(0xFF2E7D32), // أخضر داكن
+            const Color(0xFF66BB6A), // أخضر فاتح
+          ];
       case 'hadith':
-        return [
-          const Color(0xFF1565C0), // أزرق داكن
-          const Color(0xFF42A5F5), // أزرق فاتح
-        ];
+        return isDark
+          ? [
+            const Color(0xFF0D47A1), // أزرق داكن للوضع المظلم
+            const Color(0xFF1976D2), // أزرق فاتح للوضع المظلم
+          ]
+          : [
+            const Color(0xFF1565C0), // أزرق داكن
+            const Color(0xFF42A5F5), // أزرق فاتح
+          ];
       case 'prayer':
-        return [
-          const Color(0xFF6A1B9A), // بنفسجي داكن
-          const Color(0xFFAB47BC), // بنفسجي فاتح
-        ];
+        return isDark
+          ? [
+            const Color(0xFF4A148C), // بنفسجي داكن للوضع المظلم
+            const Color(0xFF7B1FA2), // بنفسجي فاتح للوضع المظلم
+          ]
+          : [
+            const Color(0xFF6A1B9A), // بنفسجي داكن
+            const Color(0xFFAB47BC), // بنفسجي فاتح
+          ];
       case 'thikr':
-        return [
-          const Color(0xFFC62828), // أحمر داكن
-          const Color(0xFFE57373), // أحمر فاتح
-        ];
+        return isDark
+          ? [
+            const Color(0xFFB71C1C), // أحمر داكن للوضع المظلم
+            const Color(0xFFD32F2F), // أحمر فاتح للوضع المظلم
+          ]
+          : [
+            const Color(0xFFC62828), // أحمر داكن
+            const Color(0xFFE57373), // أحمر فاتح
+          ];
       default:
-        return [ThemeColors.primary, ThemeColors.primaryLight];
+        return isDark
+          ? [
+            Theme.of(context).colorScheme.primary.withOpacity(0.7),
+            Theme.of(context).colorScheme.primary,
+          ]
+          : [ThemeColors.primary, ThemeColors.primaryLight];
     }
   }
   
@@ -446,8 +473,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // تحديد ما إذا كان التطبيق في الوضع المظلم
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // تحديد ألوان الخلفية حسب الوضع
+    final backgroundColor = isDark ? Colors.grey[900] : ThemeColors.surface;
+    final cardBackgroundColor = isDark ? Colors.grey[850] : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black;
+    
     return Scaffold(
-      backgroundColor: ThemeColors.surface,
+      backgroundColor: backgroundColor,
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
@@ -462,7 +497,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     ? _buildCategoriesGrid()
                     : _buildCategoryContent(),
               
-              // زر الرجوع - تم تعديله هنا لإزالة الظل
+              // زر الرجوع - تم تعديله هنا للتوافق مع الوضع الليلي
               Positioned(
                 top: 16,
                 right: 16,
@@ -489,7 +524,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           padding: const EdgeInsets.all(10.0),
                           child: Icon(
                             Icons.arrow_back,
-                            color: ThemeColors.primary,
+                            color: Theme.of(context).colorScheme.primary,
                             size: 24,
                           ),
                         ),
@@ -507,6 +542,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   
   // بناء شبكة الفئات
   Widget _buildCategoriesGrid() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : ThemeColors.primary;
+    
     // إعداد قائمة بالفئات التي تحتوي على عناصر
     List<Map<String, dynamic>> categories = [];
     
@@ -556,12 +594,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // عنوان الصفحة
-          const Text(
+          Text(
             'المفضلة',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: ThemeColors.primary,
+              color: titleColor,
             ),
           ),
           const SizedBox(height: 20),
@@ -611,9 +649,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     required int count,
     required List<Color> gradient,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final shadowColor = isDark ? Colors.black54 : Colors.black26;
+    
     return Material(
       borderRadius: BorderRadius.circular(20),
       elevation: 4,
+      shadowColor: shadowColor,
       child: InkWell(
         onTap: () {
           setState(() {
@@ -773,19 +815,22 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   
   // مؤشر التحميل
   Widget _buildLoadingIndicator() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final loadingColor = isDark ? Colors.white : ThemeColors.primary;
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            color: ThemeColors.primary,
+            color: loadingColor,
             strokeWidth: 3,
           ),
           const SizedBox(height: 16),
           Text(
             'جاري تحميل المفضلة...',
             style: TextStyle(
-              color: ThemeColors.primary,
+              color: loadingColor,
               fontWeight: FontWeight.bold,
               fontSize: 16,
             ),
@@ -801,6 +846,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     required String type,
     required List<Color> gradientColors,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     if (items.isEmpty) {
       return Center(
         child: Text(
@@ -830,7 +877,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: FadeInAnimation(
                 child: Card(
                   elevation: 8,
-                  shadowColor: gradientColors[0].withOpacity(0.3),
+                  shadowColor: isDark ? Colors.black54 : gradientColors[0].withOpacity(0.3),
                   margin: const EdgeInsets.only(bottom: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -1037,6 +1084,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   
   // عرض رسالة عند عدم وجود عناصر
   Widget _buildEmptyView() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : ThemeColors.primary;
+    final subtitleColor = isDark ? Colors.grey[400] : Colors.grey[600];
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1046,7 +1097,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: ThemeColors.primary,
+              color: titleColor,
             ),
             textAlign: TextAlign.center,
           ),
@@ -1057,7 +1108,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               'استعرض الاقتباسات وأضفها للمفضلة للعودة إليها لاحقًا',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey.shade600,
+                color: subtitleColor,
               ),
               textAlign: TextAlign.center,
             ),
