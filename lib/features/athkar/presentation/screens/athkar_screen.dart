@@ -3,13 +3,13 @@ import 'package:athkar_app/features/athkar/data/datasources/di_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import '../screens/notification_settings_screen.dart';
 
-import '../../../../app/di/service_locator.dart';
 import '../../../../core/services/utils/notification_scheduler.dart';
 import '../../data/datasources/athkar_service.dart';
 import '../../domain/entities/athkar.dart';
 import '../../../widgets/common/loading_widget.dart';
-import 'athkar_details_screen.dart';
+
 
 class AthkarScreen extends StatefulWidget {
   final String id;
@@ -214,10 +214,15 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
   }
 
   // التنقل إلى شاشة إعدادات الإشعارات
-  void _navigateToNotificationSettings() async {
-    // فتح صفحة إعدادات الإشعارات
-    await Navigator.pushNamed(context, '/notification_settings');
-  }
+void _navigateToNotificationSettings() async {
+  // فتح صفحة إعدادات الإشعارات
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const NotificationSettingsScreen(),
+    ),
+  );
+}
   
   // بناء بطاقة المعلومات في الأعلى
   Widget _buildHeaderCard(BuildContext context, ColorScheme colorScheme) {
