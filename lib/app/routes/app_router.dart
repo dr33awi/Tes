@@ -3,6 +3,8 @@ import 'package:athkar_app/features/home/favorites/presentation/screens/favorite
 import 'package:athkar_app/features/home/models/daily_quote_model.dart';
 import 'package:athkar_app/features/home/presentation/quotes/screens/quote_details_screen.dart';
 import 'package:flutter/material.dart';
+
+// Bestehende Importe
 import '../../features/prayers/presentation/screens/prayer_times_screen.dart';
 import '../../features/prayers/presentation/screens/qibla_screen.dart';
 import '../../features/athkar/presentation/screens/athkar_details_screen.dart';
@@ -12,8 +14,15 @@ import '../../features/onboarding/presentation/screens/permissions_onboarding_sc
 import '../../features/athkar/presentation/screens/athkar_screen.dart';
 import '../../features/athkar/presentation/screens/athkar_categories_screen.dart';
 
+// Neue Importe für die verbesserten Gebetszeiten-Funktionen
+import '../../features/prayers/presentation/screens/prayer_dashboard_screen.dart';
+import '../../features/prayers/presentation/screens/prayer_times_screen.dart';
+import '../../features/prayers/presentation/screens/qibla_screen.dart';
+import '../../features/prayers/presentation/screens/prayer_settings_screen.dart';
+import '../../features/prayers/presentation/screens/prayer_notification_settings_screen.dart';
+
 class AppRouter {
-  // تعريف مسارات التطبيق
+  // Bestehende Routen
   static const String initialRoute = '/';
   static const String home = '/';
   static const String prayerTimes = '/prayer-times';
@@ -26,6 +35,12 @@ class AppRouter {
   static const String favorites = '/favorites';
   static const String quoteDetails = '/quote-details';
 
+  // Neue Routen für die verbesserten Gebetszeiten-Funktionen
+  static const String prayerDashboard = '/prayer-dashboard';
+  static const String enhancedPrayerTimes = '/enhanced-prayer-times';
+  static const String enhancedQibla = '/enhanced-qibla';
+  static const String prayerSettings = '/prayer-settings';
+  static const String prayerNotifications = '/prayer-notifications';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final routeName = settings.name;
@@ -33,6 +48,7 @@ class AppRouter {
     debugPrint('توليد مسار لـ: $routeName');
     
     switch (routeName) {
+      // Bestehende Route-Handler
       case home:
         return MaterialPageRoute(
           settings: settings, 
@@ -42,22 +58,23 @@ class AppRouter {
       case prayerTimes:
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const PrayerTimesScreen(),
+          builder: (_) => const EnhancedPrayerTimesScreen(),
         );
 
-        case favorites:
-  final args = settings.arguments as HighlightItem?;
-  return MaterialPageRoute(
-    settings: settings,
-    builder: (_) => FavoritesScreen(newFavoriteQuote: args),
-  );
+      case favorites:
+        final args = settings.arguments as HighlightItem?;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => FavoritesScreen(newFavoriteQuote: args),
+        );
 
-  case quoteDetails:
-  final quoteItem = settings.arguments as HighlightItem;
-  return MaterialPageRoute(
-    settings: settings,
-    builder: (_) => QuoteDetailsScreen(quoteItem: quoteItem),
-  );
+      case quoteDetails:
+        final quoteItem = settings.arguments as HighlightItem;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => QuoteDetailsScreen(quoteItem: quoteItem),
+        );
+      
       case athkarCategories:
         return MaterialPageRoute(
           settings: settings,
@@ -110,7 +127,7 @@ class AppRouter {
       case qibla:
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const QiblaScreen(),
+          builder: (_) => const EnhancedQiblaScreen(),
         );
         
       case settingsRoute:
@@ -123,6 +140,37 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => const PermissionsOnboardingScreen(),
+        );
+        
+      // Neue Route-Handler für die verbesserten Gebetszeiten-Funktionen
+      case prayerDashboard:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const PrayerDashboardScreen(),
+        );
+        
+      case enhancedPrayerTimes:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const EnhancedPrayerTimesScreen(),
+        );
+        
+      case enhancedQibla:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const EnhancedQiblaScreen(),
+        );
+        
+      case prayerSettings:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const PrayerSettingsScreen(),
+        );
+        
+      case prayerNotifications:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const PrayerNotificationSettingsScreen(),
         );
         
       default:

@@ -88,9 +88,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
     },
   ];
   
-  // للتحكم في حالة التحميل
-  bool _isLoading = true;
-  
   // متغيرات للتأثيرات البصرية
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
@@ -111,9 +108,9 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
       // Provide fallback if service locator is not available in testing
     }
     
-    // إعداد الأنيميشن
+    // إعداد الأنيميشن - تم تسريع الأنيميشن
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
     
@@ -126,19 +123,6 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
         curve: const Interval(0.3, 0.7),
       ),
     );
-    
-    // Simulate data loading
-    _loadData();
-  }
-  
-  Future<void> _loadData() async {
-    // Simulate loading
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
   
   @override
@@ -185,49 +169,47 @@ class _AthkarScreenState extends State<AthkarScreen> with SingleTickerProviderSt
           ),
         ],
       ),
-      body: _isLoading
-          ? _buildLoadingIndicator(context)
-          : Directionality(
-              textDirection: TextDirection.rtl,
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    
-                    // شرح وبيان أهمية الأذكار
-                    _buildHeaderCard(context, colorScheme),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // عرض قائمة الأذكار
-                    _buildAthkarList(context),
-                    
-                    // مساحة إضافية في النهاية
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              
+              // شرح وبيان أهمية الأذكار
+              _buildHeaderCard(context, colorScheme),
+              
+              const SizedBox(height: 12),
+              
+              // عرض قائمة الأذكار
+              _buildAthkarList(context),
+              
+              // مساحة إضافية في النهاية
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   // التنقل إلى شاشة إعدادات الإشعارات
-void _navigateToNotificationSettings() async {
-  // فتح صفحة إعدادات الإشعارات
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const NotificationSettingsScreen(),
-    ),
-  );
-}
+  void _navigateToNotificationSettings() async {
+    // فتح صفحة إعدادات الإشعارات
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NotificationSettingsScreen(),
+      ),
+    );
+  }
   
   // بناء بطاقة المعلومات في الأعلى
   Widget _buildHeaderCard(BuildContext context, ColorScheme colorScheme) {
     return AnimationConfiguration.synchronized(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
       child: SlideAnimation(
         verticalOffset: 30.0,
         child: FadeInAnimation(
@@ -410,7 +392,7 @@ void _navigateToNotificationSettings() async {
             
             return AnimationConfiguration.staggeredGrid(
               position: index,
-              duration: const Duration(milliseconds: 500),
+              duration: const Duration(milliseconds: 350),
               columnCount: 2,
               child: ScaleAnimation(
                 scale: 0.9,
@@ -585,7 +567,7 @@ void _navigateToNotificationSettings() async {
     }
     
     // إعادة ضبط حالة الضغط بعد فترة قصيرة
-    Future.delayed(const Duration(milliseconds: 200), () {
+    Future.delayed(const Duration(milliseconds: 150), () {
       if (mounted) {
         setState(() {
           _isPressed = false;
@@ -605,30 +587,6 @@ void _navigateToNotificationSettings() async {
     if (iconData == Icons.home) return 'Icons.home';
     if (iconData == Icons.restaurant) return 'Icons.restaurant';
     return 'Icons.auto_awesome';
-  }
-
-  // مؤشر التحميل
-  Widget _buildLoadingIndicator(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const LoadingWidget(),
-          const SizedBox(height: 20),
-          Text(
-            'جاري تحميل الأذكار...',
-            style: TextStyle(
-              color: colorScheme.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
   }
   
   // تحويل نص الأيقونة إلى IconData
