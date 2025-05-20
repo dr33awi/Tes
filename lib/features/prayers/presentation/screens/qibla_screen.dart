@@ -787,4 +787,93 @@ class _EnhancedQiblaScreenState extends State<EnhancedQiblaScreen> with SingleTi
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'لضبط
+                        'لضبط البوصلة بشكل صحيح، قم بتحريك الهاتف في شكل رقم 8 في الهواء',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _startCalibration,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('بدء المعايرة'),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: primaryColor,
+                          backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // إضافة الدالة المفقودة _getDirectionLabel
+  String _getDirectionLabel(double angle) {
+    if (angle == 0) return 'ش';
+    if (angle == 90) return 'ش';
+    if (angle == 180) return 'ج';
+    if (angle == 270) return 'غ';
+    return '';
+  }
+  
+  // إضافة الدالة المفقودة _showQiblaInfo
+  void _showQiblaInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('معلومات عن القبلة'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'القبلة هي الاتجاه الذي يتوجه إليه المسلمون في صلاتهم، وهي تشير إلى الكعبة المشرفة في مكة المكرمة.',
+                style: TextStyle(fontSize: 14),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'استخدم هذه البوصلة لتحديد اتجاه القبلة بناءً على موقعك الحالي.',
+                style: TextStyle(fontSize: 14),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'للحصول على أفضل دقة:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              SizedBox(height: 8),
+              Text('• ضع الهاتف على سطح مستوٍ', style: TextStyle(fontSize: 14)),
+              Text('• ابتعد عن المعادن والأجهزة الإلكترونية', style: TextStyle(fontSize: 14)),
+              Text('• قم بمعايرة البوصلة بانتظام', style: TextStyle(fontSize: 14)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('حسناً، فهمت'),
+          ),
+        ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+}
