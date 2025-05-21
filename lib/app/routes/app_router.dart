@@ -56,7 +56,7 @@ class AppRouter {
       case home:
         return MaterialPageRoute(
           settings: settings, 
-          builder: (_) => const HomeScreen(),
+          builder: (_) => const EnhancedHomeScreen(),
         );
       
       case settingsRoute:

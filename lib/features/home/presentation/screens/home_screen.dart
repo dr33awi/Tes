@@ -1,7 +1,13 @@
+// lib/features/home/presentation/screens/enhanced_home_screen.dart
+import 'package:athkar_app/app/themes/glassmorphism_widgets.dart';
+import 'package:athkar_app/app/themes/reusable_components.dart';
+import 'package:athkar_app/app/themes/screen_template.dart';
+import 'package:athkar_app/app/themes/theme_constants.dart';
 import 'package:athkar_app/features/home/models/daily_quote_model.dart';
 import 'package:athkar_app/features/home/presentation/quotes/services/daily_quote_service.dart';
 import 'package:athkar_app/features/home/presentation/quotes/widgets/quote_carousel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../app/routes/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -12,15 +18,14 @@ import '../../../../app/themes/loading_widget.dart';
 import '../../../prayers/presentation/widgets/prayer_times_section.dart';
 import '../widgets/category_grid.dart';
 
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class EnhancedHomeScreen extends StatefulWidget {
+  const EnhancedHomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<EnhancedHomeScreen> createState() => _EnhancedHomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
   // متحكمات العرض
   final PageController _pageController = PageController();
   final ValueNotifier<int> _pageIndex = ValueNotifier<int>(0);
@@ -110,34 +115,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppConstants.appName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite),
-            tooltip: 'المفضلة',
-            onPressed: () {
-              Navigator.pushNamed(context, AppRouter.favorites);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'الإعدادات',
-            onPressed: () {
-              Navigator.pushNamed(context, AppRouter.settingsRoute);
-            },
-          ),
-        ],
-      ),
+    return ScreenTemplate(
+      title: AppConstants.appName,
+      showBackButton: false,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.favorite, color: Colors.white),
+          tooltip: 'المفضلة',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.pushNamed(context, AppRouter.favorites);
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings, color: Colors.white),
+          tooltip: 'الإعدادات',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.pushNamed(context, AppRouter.settingsRoute);
+          },
+        ),
+      ],
       body: Consumer<SettingsProvider>(
         builder: (context, settingsProvider, child) {
           if (settingsProvider.isLoading) {
-            return const LoadingWidget();
+            return const LoadingWidget(color: Colors.white);
           }
 
           return RefreshIndicator(
             onRefresh: () async {
+              // تأثير اهتزاز عند السحب للتحديث
+              HapticFeedback.mediumImpact();
+              
               // تحديث كل من البيانات
               setState(() {
                 _isRefreshing = true;
@@ -161,50 +170,108 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               });
             },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // قسم مواقيت الصلاة
-                  const PrayerTimesSection(),
-                  const SizedBox(height: 20),
-                  
-                  // قسم الاقتباسات اليومية
-                  _buildDailyQuotesSection(context),
-                  const SizedBox(height: 20),
-                  
-                  // عنوان قسم الفئات
-                  Text(
-                    'الأقسام',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // قسم شبكة الفئات
-                  CustomScrollView(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    slivers: [
-                      const CategoryGrid(),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // معلومات إضافية
-                  Center(
-                    child: Text(
-                      '${AppConstants.appName} - ${AppConstants.appVersion}',
-                      style: Theme.of(context).textTheme.bodySmall,
+            color: Colors.white,
+            backgroundColor: ThemeColors.primary,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // قسم مواقيت الصلاة
+                _buildPrayerTimesSection(),
+                const SizedBox(height: 20),
+                
+                // قسم الاقتباسات اليومية
+                _buildDailyQuotesSection(context),
+                const SizedBox(height: 20),
+                
+                // قسم الفئات
+                _buildCategoriesSection(context),
+                
+                // معلومات إضافية
+                Center(
+                  child: GlassmorphicContainer(
+                    width: 200,
+                    height: 40,
+                    borderRadius: ThemeSizes.borderRadiusLarge,
+                    blur: 5,
+                    opacity: 0.1,
+                    padding: const EdgeInsets.all(8),
+                    child: Center(
+                      child: Text(
+                        '${AppConstants.appName} - ${AppConstants.appVersion}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ),
           );
         },
+      ),
+    );
+  }
+  
+  // قسم مواقيت الصلاة المحسن
+  Widget _buildPrayerTimesSection() {
+    return AdvancedGlassmorphicCard(
+      opacity: 0.1,
+      borderRadius: ThemeSizes.borderRadiusLarge,
+      borderColor: Colors.white.withOpacity(0.5),
+      elevation: 5,
+      padding: const EdgeInsets.all(ThemeSizes.marginMedium),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
+                    ),
+                    child: const Icon(
+                      Icons.access_time_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: ThemeSizes.marginSmall),
+                  const Text(
+                    'مواقيت الصلاة',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              ThemedActionButton(
+                text: 'عرض الكل',
+                icon: Icons.arrow_forward,
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.pushNamed(context, AppRouter.prayerTimes);
+                },
+                isOutlined: true,
+                isFullWidth: false,
+              ),
+            ],
+          ),
+          const SizedBox(height: ThemeSizes.marginSmall),
+          const Divider(color: Colors.white24),
+          const SizedBox(height: ThemeSizes.marginSmall),
+          const PrayerTimesSection(),
+        ],
       ),
     );
   }
@@ -214,23 +281,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // عنوان القسم
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
-          child: Row(
-            children: [
-              Icon(
-                Icons.auto_awesome,
-                color: Theme.of(context).primaryColor,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'اقتباسات اليوم',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
+        ThemedSectionHeader(
+          title: 'اقتباسات اليوم',
+          icon: Icons.auto_awesome,
+          actionIcon: Icons.refresh_rounded,
+          onActionPressed: () {
+            HapticFeedback.lightImpact();
+            _quoteService.refreshDailyHighlights().then((highlights) {
+              if (mounted) {
+                setState(() {
+                  _highlights = highlights;
+                });
+              }
+            });
+          },
         ),
         
         // عرض الاقتباسات أو مؤشر التحميل
@@ -240,43 +304,63 @@ class _HomeScreenState extends State<HomeScreen> {
               highlights: _highlights,
               pageController: _pageController,
               pageIndex: _pageIndex,
-              onQuoteTap: (quoteItem) => Navigator.pushNamed(
-                context,
-                AppRouter.quoteDetails,
-                arguments: quoteItem,
-              ),
+              onQuoteTap: (quoteItem) {
+                HapticFeedback.mediumImpact();
+                Navigator.pushNamed(
+                  context,
+                  AppRouter.quoteDetails,
+                  arguments: quoteItem,
+                );
+              },
             ),
       ],
     );
   }
   
-  // مؤشر التحميل
-  Widget _buildLoadingHighlightsCard(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Container(
-        height: 200,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            colors: [
-              theme.primaryColor,
-              theme.primaryColor.withOpacity(0.7),
+  // قسم الفئات المحسن
+  Widget _buildCategoriesSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ThemedSectionHeader(
+          title: 'الأقسام',
+          icon: Icons.grid_view_rounded,
+        ),
+        const SizedBox(height: ThemeSizes.marginSmall),
+        
+        // قسم شبكة الفئات
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxHeight: 300, // تحديد ارتفاع أقصى للقائمة
+          ),
+          child: CustomScrollView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            slivers: [
+              const CategoryGrid(),
             ],
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            stops: const [0.3, 1.0],
           ),
         ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+  
+  // مؤشر التحميل المحسن
+  Widget _buildLoadingHighlightsCard(BuildContext context) {
+    return AdvancedGlassmorphicCard(
+      opacity: 0.1,
+      borderRadius: ThemeSizes.borderRadiusLarge,
+      elevation: 8,
+      child: Container(
+        height: 200,
+        width: double.infinity,
+        padding: const EdgeInsets.all(ThemeSizes.marginMedium),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(
+              const CircularProgressIndicator(
                 color: Colors.white,
                 strokeWidth: 3,
               ),
@@ -285,9 +369,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 _isRefreshing 
                     ? 'جاري تحديث المقتبسات...' 
                     : 'جاري تحميل المقتبسات...',
-                style: theme.textTheme.bodyLarge!.copyWith(
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
               ),
             ],
