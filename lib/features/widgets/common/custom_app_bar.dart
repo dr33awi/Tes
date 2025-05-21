@@ -1,39 +1,57 @@
-// lib/presentation/widgets/common/custom_app_bar.dart
+// lib/features/widgets/common/custom_app_bar.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
-  final bool centerTitle;
-  final PreferredSizeWidget? bottom;
   final Widget? leading;
-  final bool automaticallyImplyLeading;
+  final bool centerTitle;
+  final Color? backgroundColor;
+  final bool transparent; // Hinzugefügter Parameter
+  final double elevation;
+  final SystemUiOverlayStyle? systemOverlayStyle;
 
   const CustomAppBar({
-    super.key,
+    Key? key,
     required this.title,
     this.actions,
-    this.centerTitle = true,
-    this.bottom,
     this.leading,
-    this.automaticallyImplyLeading = true,
-  });
+    this.centerTitle = true,
+    this.backgroundColor,
+    this.transparent = false, // Standard: nicht transparent
+    this.elevation = 0,
+    this.systemOverlayStyle,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: Text(title),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       centerTitle: centerTitle,
       actions: actions,
-      bottom: bottom,
       leading: leading,
-      automaticallyImplyLeading: automaticallyImplyLeading,
-      elevation: 0,
+      elevation: elevation,
+      backgroundColor: transparent 
+          ? Colors.transparent 
+          : (backgroundColor ?? Theme.of(context).primaryColor),
+      systemOverlayStyle: systemOverlayStyle ?? 
+        (transparent
+          ? SystemUiOverlayStyle.light.copyWith(
+              statusBarColor: Colors.transparent,
+            )
+          : SystemUiOverlayStyle(
+              statusBarColor: backgroundColor ?? Theme.of(context).primaryColor,
+              statusBarIconBrightness: Brightness.light,
+            )),
     );
   }
 
   @override
-  Size get preferredSize => Size.fromHeight(
-    kToolbarHeight + (bottom?.preferredSize.height ?? 0),
-  );
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }

@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../app/routes/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
+
+/// تم تعديل استيراد EnhancedPrayerTimesScreen بدلاً من PrayerTimesScreen
+/// حيث أن الملف الجديد يستخدم هذا الاسم 
 import '../../../prayers/presentation/screens/prayer_times_screen.dart';
 import '../../../athkar/presentation/screens/athkar_screen.dart';
 import '../../../home/favorites/presentation/screens/favorites_screen.dart';
+
 class CategoryGrid extends StatefulWidget {
   const CategoryGrid({Key? key}) : super(key: key);
 
@@ -61,7 +65,8 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       icon: Icons.access_time,
       color: Color(0xFF00BCD4),
       gradientColors: [Color(0xFF00BCD4), Color(0xFF80DEEA)],
-      screen: PrayerTimesScreen(),
+      screen: PrayerTimesScreen(), // تم تغيير الكلاس ليتوافق مع الملف
+      routeName: AppRouter.prayerTimes, // تم إضافة مسار ثابت
     ),
     Category(
       title: 'الأذكار',

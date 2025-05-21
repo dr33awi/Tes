@@ -1,4 +1,4 @@
-// lib/features/prayers/presentation/screens/enhanced_prayer_times_screen.dart
+// lib/features/prayers/presentation/screens/prayer_times_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,14 +14,14 @@ import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../widgets/common/custom_app_bar.dart';
 
-class EnhancedPrayerTimesScreen extends StatefulWidget {
-  const EnhancedPrayerTimesScreen({Key? key}) : super(key: key);
+class PrayerTimesScreen extends StatefulWidget {
+  const PrayerTimesScreen({Key? key}) : super(key: key);
   
   @override
-  State<EnhancedPrayerTimesScreen> createState() => _EnhancedPrayerTimesScreenState();
+  State<PrayerTimesScreen> createState() => _PrayerTimesScreenState();
 }
 
-class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> with SingleTickerProviderStateMixin {
+class _PrayerTimesScreenState extends State<PrayerTimesScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   PrayerTimes? _prayerTimes;
   bool _isLoading = true;
@@ -35,6 +35,9 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
     'maghrib': const Color(0xFFAB47BC),
     'isha': const Color(0xFF4DB6AC),
   };
+  
+  // لون الخلفية الأخضر (تم تغييره ليطابق خلفية صفحة القبلة)
+  final Color _backgroundColor = const Color(0xFF2D6852);
   
   // أسماء الصلوات بالترتيب
   final List<Map<String, dynamic>> _prayerInfo = [
@@ -137,8 +140,8 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Theme.of(context).primaryColor.withOpacity(0.8),
-            Theme.of(context).primaryColor.withOpacity(0.5),
+            _backgroundColor.withOpacity(0.8),
+            _backgroundColor.withOpacity(0.5),
           ],
         ),
       ),
@@ -170,8 +173,8 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Theme.of(context).primaryColor.withOpacity(0.8),
-            Theme.of(context).primaryColor.withOpacity(0.5),
+            _backgroundColor.withOpacity(0.8),
+            _backgroundColor.withOpacity(0.5),
           ],
         ),
       ),
@@ -187,9 +190,9 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                 color: Colors.white,
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'حدث خطأ',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -217,7 +220,7 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                 icon: const Icon(Icons.refresh),
                 label: const Text('إعادة المحاولة'),
                 style: ElevatedButton.styleFrom(
-                  foregroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: _backgroundColor,
                   backgroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -240,8 +243,8 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Theme.of(context).primaryColor.withOpacity(0.8),
-            Theme.of(context).primaryColor.withOpacity(0.5),
+            _backgroundColor.withOpacity(0.8),
+            _backgroundColor.withOpacity(0.5),
           ],
         ),
       ),
@@ -293,7 +296,7 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                 icon: const Icon(Icons.download),
                 label: const Text('تحميل مواقيت الصلاة'),
                 style: ElevatedButton.styleFrom(
-                  foregroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: _backgroundColor,
                   backgroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -322,21 +325,14 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
     final currentPrayerName = _getPrayerName(currentPrayer);
     final nextPrayerName = _getPrayerName(nextPrayer);
     
-    // لون خلفية الصفحة بناءً على الصلاة الحالية
-    Color backgroundColor = Theme.of(context).primaryColor;
-    String currentPrayerKey = _getPrayerKey(currentPrayer);
-    if (_prayerColors.containsKey(currentPrayerKey)) {
-      backgroundColor = _prayerColors[currentPrayerKey]!;
-    }
-    
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            backgroundColor.withOpacity(0.7),
-            backgroundColor.withOpacity(0.4),
+            _backgroundColor.withOpacity(0.8),
+            _backgroundColor.withOpacity(0.5),
           ],
         ),
       ),
@@ -350,14 +346,14 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
               // التاريخ الهجري والميلادي
               _buildDateHeader(now, dateFormat),
               
-              // الوقت الحالي والصلاة الحالية
+              // الوقت الحالي والصلاة الحالية (تم تصغير البطاقة)
               _buildCurrentTimeSection(currentPrayerName, nextPrayerName, nextPrayer, prayerTimes),
               
               // قائمة مواقيت الصلوات
               _buildPrayerTimesList(prayerTimes, now, timeFormat, currentPrayer),
               
-              // التذكير باتجاه القبلة
-              _buildQiblaReminder(),
+              // تم إزالة قسم اتجاه القبلة
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -416,7 +412,7 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
     );
   }
   
-  // قسم الوقت الحالي والصلاة القادمة
+  // قسم الوقت الحالي والصلاة القادمة (تم تصغير البطاقة)
   Widget _buildCurrentTimeSection(
     String currentPrayerName,
     String nextPrayerName,
@@ -451,10 +447,10 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
         child: FadeInAnimation(
           child: Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16), // تقليل الـ padding
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: Colors.white.withOpacity(0.3),
                 width: 1.5,
@@ -479,15 +475,15 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                         const Text(
                           'الصلاة الحالية',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 14, // تصغير الخط
                             color: Colors.white70,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2), // تقليل المسافة
                         Text(
                           currentPrayerName,
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 18, // تصغير الخط
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -500,15 +496,15 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                         const Text(
                           'الصلاة القادمة',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 14, // تصغير الخط
                             color: Colors.white70,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2), // تقليل المسافة
                         Text(
                           nextPrayerName,
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 18, // تصغير الخط
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -518,18 +514,18 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                   ],
                 ),
                 
-                const SizedBox(height: 20),
+                const SizedBox(height: 12), // تقليل المسافة
                 const Divider(color: Colors.white30, thickness: 1),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12), // تقليل المسافة
                 
                 const Text(
                   'متبقي حتى الصلاة القادمة',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14, // تصغير الخط
                     color: Colors.white70,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8), // تقليل المسافة
                 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -537,13 +533,13 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                     const Icon(
                       Icons.timer_outlined,
                       color: Colors.white,
-                      size: 28,
+                      size: 22, // تصغير الأيقونة
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Text(
                       remainingText,
                       style: const TextStyle(
-                        fontSize: 28,
+                        fontSize: 22, // تصغير الخط
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -551,18 +547,18 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                   ],
                 ),
                 
-                const SizedBox(height: 20),
+                const SizedBox(height: 12), // تقليل المسافة
                 
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // تقليل الـ padding
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
                     DateFormat.jm().format(nextPrayerTime),
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 20, // تصغير الخط
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -660,7 +656,7 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
                   bool isCurrentPrayer = _isPrayerCurrent(currentPrayer, prayerKey);
                   
                   // تحديد لون الصلاة
-                  Color prayerColor = _prayerColors[prayerKey] ?? Theme.of(context).primaryColor;
+                  Color prayerColor = _prayerColors[prayerKey] ?? _backgroundColor;
                   
                   return AnimationConfiguration.staggeredList(
                     position: index,
@@ -790,122 +786,28 @@ class _EnhancedPrayerTimesScreenState extends State<EnhancedPrayerTimesScreen> w
     );
   }
   
-  // التذكير باتجاه القبلة
-  Widget _buildQiblaReminder() {
-    return AnimationConfiguration.staggeredList(
-      position: 9,
-      duration: const Duration(milliseconds: 700),
-      child: SlideAnimation(
-        verticalOffset: 50.0,
-        child: FadeInAnimation(
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            child: Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.pushNamed(context, '/qibla');
-                },
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.2),
-                        Colors.white.withOpacity(0.1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.explore,
-                          color: _prayerColors['maghrib'],
-                          size: 30,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'اتجاه القبلة',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'اضغط للتحقق من اتجاه القبلة الصحيح',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  
   // تحويل نوع الصلاة إلى الاسم
   String _getPrayerName(adhan.Prayer prayer) {
-    switch (prayer.toString()) {
-      case 'Prayer.fajr': return 'الفجر';
-      case 'Prayer.sunrise': return 'الشروق';
-      case 'Prayer.dhuhr': return 'الظهر';
-      case 'Prayer.asr': return 'العصر';
-      case 'Prayer.maghrib': return 'المغرب';
-      case 'Prayer.isha': return 'العشاء';
-      case 'Prayer.none': return 'غير محدد';
-      default: return '';
+    switch (prayer) {
+      case adhan.Prayer.fajr: return 'الفجر';
+      case adhan.Prayer.sunrise: return 'الشروق';
+      case adhan.Prayer.dhuhr: return 'الظهر';
+      case adhan.Prayer.asr: return 'العصر';
+      case adhan.Prayer.maghrib: return 'المغرب';
+      case adhan.Prayer.isha: return 'العشاء';
+      default: return 'غير محدد';
     }
   }
   
   // تحويل نوع الصلاة إلى المفتاح
   String _getPrayerKey(adhan.Prayer prayer) {
-    switch (prayer.toString()) {
-      case 'Prayer.fajr': return 'fajr';
-      case 'Prayer.sunrise': return 'sunrise';
-      case 'Prayer.dhuhr': return 'dhuhr';
-      case 'Prayer.asr': return 'asr';
-      case 'Prayer.maghrib': return 'maghrib';
-      case 'Prayer.isha': return 'isha';
+    switch (prayer) {
+      case adhan.Prayer.fajr: return 'fajr';
+      case adhan.Prayer.sunrise: return 'sunrise';
+      case adhan.Prayer.dhuhr: return 'dhuhr';
+      case adhan.Prayer.asr: return 'asr';
+      case adhan.Prayer.maghrib: return 'maghrib';
+      case adhan.Prayer.isha: return 'isha';
       default: return 'isha'; // افتراضي
     }
   }

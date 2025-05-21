@@ -1,46 +1,50 @@
 // lib/app/routes/app_router.dart
-import 'package:athkar_app/features/home/favorites/presentation/screens/favorites_screen.dart';
-import 'package:athkar_app/features/home/models/daily_quote_model.dart';
-import 'package:athkar_app/features/home/presentation/quotes/screens/quote_details_screen.dart';
 import 'package:flutter/material.dart';
 
-// Bestehende Importe
-import '../../features/prayers/presentation/screens/prayer_times_screen.dart';
-import '../../features/prayers/presentation/screens/qibla_screen.dart';
-import '../../features/athkar/presentation/screens/athkar_details_screen.dart';
-import '../../features/settings/presentation/screens/settings_screen.dart';
+// Feature-Imports
+import '../../features/home/favorites/presentation/screens/favorites_screen.dart';
+import '../../features/home/models/daily_quote_model.dart';
+import '../../features/home/presentation/quotes/screens/quote_details_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/onboarding/presentation/screens/permissions_onboarding_screen.dart';
-import '../../features/athkar/presentation/screens/athkar_screen.dart';
-import '../../features/athkar/presentation/screens/athkar_categories_screen.dart';
 
-// Neue Importe für die verbesserten Gebetszeiten-Funktionen
+// Gebetszeiten-Feature-Imports
 import '../../features/prayers/presentation/screens/prayer_dashboard_screen.dart';
 import '../../features/prayers/presentation/screens/prayer_times_screen.dart';
 import '../../features/prayers/presentation/screens/qibla_screen.dart';
 import '../../features/prayers/presentation/screens/prayer_settings_screen.dart';
 import '../../features/prayers/presentation/screens/prayer_notification_settings_screen.dart';
 
+// Athkar-Feature-Imports
+import '../../features/athkar/presentation/screens/athkar_details_screen.dart';
+import '../../features/athkar/presentation/screens/athkar_screen.dart';
+import '../../features/athkar/presentation/screens/athkar_categories_screen.dart';
+
+// Andere Features
+import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/onboarding/presentation/screens/permissions_onboarding_screen.dart';
+
 class AppRouter {
-  // Bestehende Routen
+  // Allgemeine Routen
   static const String initialRoute = '/';
   static const String home = '/';
-  static const String prayerTimes = '/prayer-times';
-  static const String athkarCategories = '/athkar-categories';
-  static const String athkarDetails = '/athkar-details';
-  static const String qibla = '/qibla';
   static const String settingsRoute = '/settings';
   static const String permissionsOnboarding = '/permissions-onboarding';
-  static const String athkarScreen = '/athkar';
-  static const String favorites = '/favorites';
-  static const String quoteDetails = '/quote-details';
-
-  // Neue Routen für die verbesserten Gebetszeiten-Funktionen
+  
+  // Gebetszeiten-Routen
   static const String prayerDashboard = '/prayer-dashboard';
-  static const String enhancedPrayerTimes = '/enhanced-prayer-times';
-  static const String enhancedQibla = '/enhanced-qibla';
+  static const String prayerTimes = '/prayer-times';
+  static const String qibla = '/qibla';
   static const String prayerSettings = '/prayer-settings';
   static const String prayerNotifications = '/prayer-notifications';
+  
+  // Athkar-Routen
+  static const String athkarCategories = '/athkar-categories';
+  static const String athkarScreen = '/athkar';
+  static const String athkarDetails = '/athkar-details';
+  
+  // Home-Feature-Routen
+  static const String favorites = '/favorites';
+  static const String quoteDetails = '/quote-details';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final routeName = settings.name;
@@ -48,33 +52,57 @@ class AppRouter {
     debugPrint('توليد مسار لـ: $routeName');
     
     switch (routeName) {
-      // Bestehende Route-Handler
+      // Allgemeine Routen
       case home:
         return MaterialPageRoute(
           settings: settings, 
           builder: (_) => const HomeScreen(),
         );
+      
+      case settingsRoute:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const SettingsScreen(),
+        );
+      
+      case permissionsOnboarding:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const PermissionsOnboardingScreen(),
+        );
+      
+      // Gebetszeiten-Routen
+      case prayerDashboard:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const PrayerDashboardScreen(),
+        );
         
       case prayerTimes:
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const EnhancedPrayerTimesScreen(),
+          builder: (_) => const PrayerTimesScreen(),
         );
-
-      case favorites:
-        final args = settings.arguments as HighlightItem?;
+        
+      case qibla:
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => FavoritesScreen(newFavoriteQuote: args),
+          builder: (_) => const EnhancedQiblaScreen(),
         );
-
-      case quoteDetails:
-        final quoteItem = settings.arguments as HighlightItem;
+        
+      case prayerSettings:
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => QuoteDetailsScreen(quoteItem: quoteItem),
+          builder: (_) => const PrayerSettingsScreen(),
+        );
+        
+      case prayerNotifications:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const PrayerNotificationSettingsScreen(),
         );
       
+      // Athkar-Routen
       case athkarCategories:
         return MaterialPageRoute(
           settings: settings,
@@ -123,54 +151,20 @@ class AppRouter {
             builder: (_) => AthkarDetailsScreen(category: category),
           );
         }
-        
-      case qibla:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const EnhancedQiblaScreen(),
-        );
-        
-      case settingsRoute:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const SettingsScreen(),
-        );
       
-      case permissionsOnboarding:
+      // Home-Feature-Routen
+      case favorites:
+        final args = settings.arguments as HighlightItem?;
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const PermissionsOnboardingScreen(),
+          builder: (_) => FavoritesScreen(newFavoriteQuote: args),
         );
-        
-      // Neue Route-Handler für die verbesserten Gebetszeiten-Funktionen
-      case prayerDashboard:
+
+      case quoteDetails:
+        final quoteItem = settings.arguments as HighlightItem;
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const PrayerDashboardScreen(),
-        );
-        
-      case enhancedPrayerTimes:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const EnhancedPrayerTimesScreen(),
-        );
-        
-      case enhancedQibla:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const EnhancedQiblaScreen(),
-        );
-        
-      case prayerSettings:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const PrayerSettingsScreen(),
-        );
-        
-      case prayerNotifications:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const PrayerNotificationSettingsScreen(),
+          builder: (_) => QuoteDetailsScreen(quoteItem: quoteItem),
         );
         
       default:

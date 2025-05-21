@@ -380,13 +380,13 @@ class _PrayerDashboardScreenState extends State<PrayerDashboardScreen> with Sing
         'title': 'مواقيت الصلاة',
         'icon': Icons.access_time_filled,
         'color': const Color(0xFF5C6BC0),
-        'route': '/enhanced-prayer-times',
+        'route': AppRouter.prayerTimes, // تم تغيير المسار ليستخدم الثابت
       },
       {
         'title': 'اتجاه القبلة',
         'icon': Icons.explore,
         'color': const Color(0xFFFF8A65),
-        'route': '/enhanced-qibla',
+        'route': AppRouter.qibla, // تم تغيير المسار ليستخدم الثابت
       },
       {
         'title': 'إشعارات الصلاة',
@@ -524,6 +524,8 @@ class _PrayerDashboardScreenState extends State<PrayerDashboardScreen> with Sing
             
             // التحقق ما إذا كانت الصلاة الحالية
             bool isCurrentPrayer = false;
+            
+            // تحسين طريقة مقارنة الصلاة الحالية مع الاسم
             if (currentPrayer == adhan.Prayer.fajr && name == 'الفجر') {
               isCurrentPrayer = true;
             } else if (currentPrayer == adhan.Prayer.sunrise && name == 'الشروق') {
@@ -709,15 +711,14 @@ class _PrayerDashboardScreenState extends State<PrayerDashboardScreen> with Sing
   
   // تحويل نوع الصلاة إلى الاسم
   String _getPrayerName(adhan.Prayer prayer) {
-    switch (prayer.toString()) {
-      case 'Prayer.fajr': return 'الفجر';
-      case 'Prayer.sunrise': return 'الشروق';
-      case 'Prayer.dhuhr': return 'الظهر';
-      case 'Prayer.asr': return 'العصر';
-      case 'Prayer.maghrib': return 'المغرب';
-      case 'Prayer.isha': return 'العشاء';
-      case 'Prayer.none': return 'غير محدد';
-      default: return '';
+    switch (prayer) {
+      case adhan.Prayer.fajr: return 'الفجر';
+      case adhan.Prayer.sunrise: return 'الشروق';
+      case adhan.Prayer.dhuhr: return 'الظهر';
+      case adhan.Prayer.asr: return 'العصر';
+      case adhan.Prayer.maghrib: return 'المغرب';
+      case adhan.Prayer.isha: return 'العشاء';
+      default: return 'غير محدد';
     }
   }
 }

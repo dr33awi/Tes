@@ -135,7 +135,7 @@ class _EnhancedQiblaScreenState extends State<EnhancedQiblaScreen> with SingleTi
               ],
             ),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF4CAF50),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 2),
@@ -146,6 +146,7 @@ class _EnhancedQiblaScreenState extends State<EnhancedQiblaScreen> with SingleTi
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
     
@@ -153,7 +154,7 @@ class _EnhancedQiblaScreenState extends State<EnhancedQiblaScreen> with SingleTi
       extendBodyBehindAppBar: true,
       appBar: CustomAppBar(
         title: 'اتجاه القبلة',
-        transparent: true,
+        transparent: true, // Der Parameter ist jetzt in CustomAppBar definiert
         actions: [
           // زر المعايرة
           IconButton(

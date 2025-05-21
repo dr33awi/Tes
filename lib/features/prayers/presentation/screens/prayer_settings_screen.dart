@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/services/interfaces/prayer_times_service.dart';
 import '../../../settings/domain/entities/settings.dart';
@@ -124,20 +125,36 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> with Single
       _isLoading = true;
     });
     
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    final settings = settingsProvider.settings;
-    
-    if (settings != null) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
       setState(() {
-        _selectedCalculationMethod = settings.calculationMethod;
-        _selectedAsrMethod = settings.asrMethod;
-        _adjustForDst = settings.adjustForDst;
+        _selectedCalculationMethod = prefs.getInt('calculationMethod') ?? 2;
+        _selectedAsrMethod = prefs.getInt('asrMethod') ?? 0;
+        _adjustForDst = prefs.getBool('adjustForDst') ?? true;
         _isLoading = false;
       });
-    } else {
+    } catch (e) {
       setState(() {
         _isLoading = false;
       });
+      
+      // رسالة خطأ
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 10),
+              Text('حدث خطأ: ${e.toString()}'),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
     }
   }
 
@@ -148,19 +165,23 @@ class _PrayerSettingsScreenState extends State<PrayerSettingsScreen> with Single
     });
     
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final prefs = await SharedPreferences.getInstance();
       final prayerProvider = Provider.of<PrayerTimesProvider>(context, listen: false);
       
-      // تحديث الإعدادات
-      await settingsProvider.updateSettings(
+      // حفظ الإعدادات في SharedPreferences
+      await prefs.setInt('calculationMethod', _selectedCalculationMethod);
+      await prefs.setInt('asrMethod', _selectedAsrMethod);
+      await prefs.setBool('adjustForDst', _adjustForDst);
+      
+      // إعادة تحميل مواقيت الصلاة - Erstellen einer minimalen Settings-Instanz
+      final updatedSettings = Settings(
         calculationMethod: _selectedCalculationMethod,
         asrMethod: _selectedAsrMethod,
-        adjustForDst: _adjustForDst,
       );
       
-      // إعادة تحميل مواقيت الصلاة بناءً على الإعدادات الجديدة
-      if (settingsProvider.settings != null) {
-        await prayerProvider.refreshData(settingsProvider.settings!);
+      // Einfach die aktuellen Einstellungen verwenden
+      if (prayerProvider.hasLocation) {
+        await prayerProvider.refreshData(updatedSettings);
       }
       
       // تأثير اهتزاز خفيف
