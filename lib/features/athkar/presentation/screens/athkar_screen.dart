@@ -8,7 +8,7 @@ import '../screens/notification_settings_screen.dart';
 import '../../../../core/services/utils/notification_scheduler.dart';
 import '../../data/datasources/athkar_service.dart';
 import '../../domain/entities/athkar.dart';
-import '../../../widgets/common/loading_widget.dart';
+import '../../../../app/themes/loading_widget.dart';
 
 
 class AthkarScreen extends StatefulWidget {

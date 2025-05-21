@@ -10,8 +10,8 @@ import '../../../../core/services/interfaces/permission_service.dart';
 import '../../../../core/services/permission_manager.dart';
 import '../../../prayers/presentation/providers/prayer_times_provider.dart';
 import '../providers/settings_provider.dart';
-import '../../../widgets/common/custom_app_bar.dart';
-import '../../../widgets/common/loading_widget.dart';
+import '../../../../app/themes/custom_app_bar.dart';
+import '../../../../app/themes/loading_widget.dart';
 
 // Define the enums directly in this file to avoid import issues
 enum LocalPermissionType {

@@ -9,8 +9,8 @@ import '../../../../core/services/interfaces/prayer_times_service.dart';
 import '../../../settings/domain/entities/settings.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../providers/prayer_times_provider.dart';
-import '../../../widgets/common/loading_widget.dart';
-import '../../../widgets/common/custom_app_bar.dart';
+import '../../../../app/themes/loading_widget.dart';
+import '../../../../app/themes/custom_app_bar.dart';
 
 class PrayerSettingsScreen extends StatefulWidget {
   const PrayerSettingsScreen({Key? key}) : super(key: key);

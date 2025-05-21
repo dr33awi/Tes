@@ -8,7 +8,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../athkar/presentation/providers/athkar_provider.dart';
 import '../../../prayers/presentation/providers/prayer_times_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
-import '../../../widgets/common/loading_widget.dart';
+import '../../../../app/themes/loading_widget.dart';
 import '../../../prayers/presentation/widgets/prayer_times_section.dart';
 import '../widgets/category_grid.dart';
 

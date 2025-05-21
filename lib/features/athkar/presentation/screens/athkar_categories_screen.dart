@@ -6,7 +6,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../app/di/service_locator.dart';
 import '../../data/datasources/athkar_service.dart';
 import '../../domain/entities/athkar.dart';
-import '../../../widgets/common/loading_widget.dart';
+import '../../../../app/themes/loading_widget.dart';
 import 'athkar_details_screen.dart';
 
 class AthkarCategoriesScreen extends StatefulWidget {

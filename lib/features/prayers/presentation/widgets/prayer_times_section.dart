@@ -7,7 +7,7 @@ import '../../../../app/routes/app_router.dart';
 import '../../../../core/services/interfaces/prayer_times_service.dart';
 import '../providers/prayer_times_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
-import '../../../widgets/common/loading_widget.dart';
+import '../../../../app/themes/loading_widget.dart';
 
 class PrayerTimesSection extends StatelessWidget {
   const PrayerTimesSection({super.key});

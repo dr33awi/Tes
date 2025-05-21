@@ -1,15 +1,16 @@
 // lib/app/themes/light_theme.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'theme_constants.dart';
 
 class LightTheme {
   static ThemeData get theme {
     return ThemeData(
-      brightness: Brightness.light,
+      brightness: Brightness.dark, // تغيير سطوع الثيم للداكن لأن الخلفية داكنة
       primaryColor: ThemeColors.primary,
       scaffoldBackgroundColor: ThemeColors.lightBackground,
-      colorScheme: const ColorScheme.light(
-        primary: ThemeColors.primary,
+      colorScheme: const ColorScheme.dark(
+        primary: ThemeColors.primaryLight,
         secondary: ThemeColors.primaryLight,
         tertiary: ThemeColors.surface,
         error: ThemeColors.error,
@@ -20,20 +21,22 @@ class LightTheme {
         onPrimary: Colors.white,
         onSecondary: Colors.white,
       ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: ThemeColors.primary,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent, // شريط تطبيق شفاف
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
-      cardTheme: const CardThemeData(
-        color: ThemeColors.lightCardBackground,
+      cardTheme: CardThemeData(
+        color: Colors.white.withOpacity(0.15), // بطاقات شبه شفافة
+        shadowColor: Colors.black.withOpacity(0.1),
         elevation: ThemeSizes.cardElevation,
-        margin: EdgeInsets.symmetric(
+        margin: const EdgeInsets.symmetric(
           vertical: ThemeSizes.marginSmall,
           horizontal: 0,
         ),
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(
             Radius.circular(ThemeSizes.borderRadiusMedium),
           ),
@@ -41,7 +44,7 @@ class LightTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: ThemeColors.primary,
+          backgroundColor: Colors.white.withOpacity(0.2), // أزرار شبه شفافة
           foregroundColor: Colors.white,
           textStyle: const TextStyle(
             fontFamily: 'Cairo',
@@ -49,6 +52,10 @@ class LightTheme {
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
+            side: BorderSide(
+              color: Colors.white.withOpacity(0.3),
+              width: 1,
+            ),
           ),
           padding: const EdgeInsets.symmetric(
             horizontal: ThemeSizes.marginMedium,
@@ -59,7 +66,7 @@ class LightTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: ThemeColors.primary,
+          foregroundColor: Colors.white,
           textStyle: const TextStyle(
             fontFamily: 'Cairo',
             fontWeight: FontWeight.bold,
@@ -68,8 +75,8 @@ class LightTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: ThemeColors.primary,
-          side: const BorderSide(color: ThemeColors.primary),
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withOpacity(0.5)),
           textStyle: const TextStyle(
             fontFamily: 'Cairo',
             fontWeight: FontWeight.bold,
@@ -88,65 +95,65 @@ class LightTheme {
           fontFamily: 'Cairo',
           fontSize: 26,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         displayMedium: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 24,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         displaySmall: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 22,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         headlineLarge: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         headlineMedium: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         headlineSmall: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         titleLarge: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         titleMedium: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         titleSmall: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         bodyLarge: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 16,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         bodyMedium: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 14,
-          color: ThemeColors.lightTextPrimary,
+          color: Colors.white,
         ),
         bodySmall: TextStyle(
           fontFamily: 'Cairo',
@@ -155,16 +162,26 @@ class LightTheme {
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        fillColor: ThemeColors.surface.withOpacity(0.5),
+        fillColor: Colors.white.withOpacity(0.1), // حقول إدخال شبه شفافة
         filled: true,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.3),
+            width: 1,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
           borderSide: const BorderSide(
-            color: ThemeColors.primary,
+            color: Colors.white,
             width: ThemeSizes.borderWidthThick,
           ),
         ),
@@ -173,18 +190,18 @@ class LightTheme {
           vertical: ThemeSizes.marginMedium,
         ),
         hintStyle: TextStyle(
-          color: ThemeColors.lightTextSecondary.withOpacity(0.7),
+          color: Colors.white.withOpacity(0.5),
         ),
       ),
       dividerTheme: DividerThemeData(
-        color: Colors.grey[300],
+        color: Colors.white.withOpacity(0.2),
         thickness: ThemeSizes.borderWidthNormal,
         space: ThemeSizes.marginMedium,
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Colors.white,
-        selectedItemColor: ThemeColors.primary,
-        unselectedItemColor: ThemeColors.lightTextSecondary,
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: ThemeColors.primary,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white.withOpacity(0.6),
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
@@ -204,11 +221,12 @@ class LightTheme {
       checkboxTheme: CheckboxThemeData(
         fillColor: MaterialStateProperty.resolveWith<Color>((states) {
           if (states.contains(MaterialState.selected)) {
-            return ThemeColors.primary;
+            return Colors.white;
           }
           return Colors.transparent;
         }),
-        side: const BorderSide(color: ThemeColors.primary),
+        checkColor: MaterialStateProperty.all(ThemeColors.primary),
+        side: BorderSide(color: Colors.white.withOpacity(0.7)),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusSmall),
         ),
@@ -216,46 +234,50 @@ class LightTheme {
       switchTheme: SwitchThemeData(
         thumbColor: MaterialStateProperty.resolveWith<Color>((states) {
           if (states.contains(MaterialState.selected)) {
-            return ThemeColors.primary;
+            return Colors.white;
           }
           return Colors.grey;
         }),
         trackColor: MaterialStateProperty.resolveWith<Color>((states) {
           if (states.contains(MaterialState.selected)) {
-            return ThemeColors.primary.withOpacity(0.5);
+            return Colors.white.withOpacity(0.5);
           }
-          return Colors.grey.withOpacity(0.5);
+          return Colors.white.withOpacity(0.2);
         }),
       ),
       sliderTheme: SliderThemeData(
-        activeTrackColor: ThemeColors.primary,
-        inactiveTrackColor: ThemeColors.primary.withOpacity(0.3),
-        thumbColor: ThemeColors.primary,
-        overlayColor: ThemeColors.primary.withOpacity(0.2),
+        activeTrackColor: Colors.white,
+        inactiveTrackColor: Colors.white.withOpacity(0.3),
+        thumbColor: Colors.white,
+        overlayColor: Colors.white.withOpacity(0.2),
         valueIndicatorColor: ThemeColors.primary,
         valueIndicatorTextStyle: const TextStyle(
           color: Colors.white,
           fontFamily: 'Cairo',
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: ThemeColors.primary,
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: Colors.white.withOpacity(0.2),
         foregroundColor: Colors.white,
+        extendedPadding: const EdgeInsets.symmetric(
+          horizontal: ThemeSizes.marginMedium,
+          vertical: ThemeSizes.marginSmall,
+        ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: ThemeColors.primary,
         elevation: 24,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusLarge),
         ),
       ),
-      snackBarTheme: const SnackBarThemeData(
-        backgroundColor: ThemeColors.primary,
-        contentTextStyle: TextStyle(
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: Colors.white.withOpacity(0.2),
+        contentTextStyle: const TextStyle(
           color: Colors.white,
           fontFamily: 'Cairo',
         ),
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(ThemeSizes.borderRadiusMedium),
             topRight: Radius.circular(ThemeSizes.borderRadiusMedium),

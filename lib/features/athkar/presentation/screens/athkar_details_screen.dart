@@ -9,7 +9,7 @@ import '../../../../app/di/service_locator.dart';
 import '../../data/datasources/athkar_service.dart';
 import '../../data/utils/icon_helper.dart';
 import '../../domain/entities/athkar.dart';
-import '../../../widgets/common/loading_widget.dart';
+import '../../../../app/themes/loading_widget.dart';
 import '../theme/athkar_theme_manager.dart';
 
 class AthkarDetailsScreen extends StatefulWidget {

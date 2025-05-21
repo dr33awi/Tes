@@ -3,18 +3,18 @@ import 'package:flutter/material.dart';
 
 /// ثوابت الألوان المستخدمة في التطبيق
 class ThemeColors {
-  // الألوان الأساسية
-  static const Color primary = Color(0xFF0B8457); // أخضر غامق
-  static const Color primaryLight = Color(0xFF27B376); // أخضر فاتح
+  // الألوان الأساسية - تم تعديل اللون الأخضر ليتناسب مع الصورة
+  static const Color primary = Color(0xFF1D483C); // أخضر داكن مثل الصورة
+  static const Color primaryLight = Color(0xFF2A5E4F); // أخضر داكن فاتح قليلاً
   static const Color surface = Color(0xFFE7E8E3); // رمادي فاتح بلمسة خضراء
   
   // ألوان الخلفية
-  static const Color lightBackground = Colors.white;
-  static const Color darkBackground = Color(0xFF121212);
+  static const Color lightBackground = Color(0xFF1D483C); // تم تعديل لون الخلفية للوضع الفاتح
+  static const Color darkBackground = Color(0xFF1A3C32); // تم تعديل لون الخلفية للوضع الداكن
   
-  // ألوان البطاقات
-  static const Color lightCardBackground = Colors.white;
-  static const Color darkCardBackground = Color(0xFF2A2A2A);
+  // ألوان البطاقات - شبه شفافة للتأثير الزجاجي
+  static const Color lightCardBackground = Color(0x40FFFFFF); // أبيض شبه شفاف
+  static const Color darkCardBackground = Color(0x40263F36); // أخضر داكن شبه شفاف
   
   // ألوان الحالة
   static const Color error = Color(0xFFD32F2F);
@@ -24,19 +24,24 @@ class ThemeColors {
   
   // ألوان وظيفية أخرى
   static const Color disabledButton = Colors.grey;
-  static const Color highlightColor = Color(0xFFE0F2EC); // هالة خضراء فاتحة
-  static const Color darkHighlightColor = Color(0xFF0F5E3D); // أخضر غامق للوضع الداكن
+  static const Color highlightColor = Color(0x33FFFFFF); // هالة بيضاء شبه شفافة
+  static const Color darkHighlightColor = Color(0xFF2A5E4F); // أخضر فاتح قليلاً للوضع الداكن
   
   // ألوان النصوص
-  static const Color lightTextPrimary = Color(0xFF212121);
-  static const Color lightTextSecondary = Color(0xFF757575);
+  static const Color lightTextPrimary = Colors.white; // تم تعديل لون النص الأساسي للوضع الفاتح
+  static const Color lightTextSecondary = Color(0xCCFFFFFF); // أبيض شبه شفاف
   static const Color darkTextPrimary = Colors.white;
-  static const Color darkTextSecondary = Color(0xFFBDBDBD);
+  static const Color darkTextSecondary = Color(0xBBFFFFFF); // أبيض شبه شفاف
   
   // ألوان مخصصة للتطبيق الإسلامي
-  static const Color prayerTimeHighlight = Color(0xFF27B376); // الأخضر الفاتح للصلاة الحالية
-  static const Color athkarCardBackground = Color(0xFFF5F5F5); // خلفية فاتحة لبطاقات الأذكار
-  static const Color qiblaColor = Color(0xFF0B8457); // لون اتجاه القبلة
+  static const Color prayerTimeHighlight = Color(0xFF2A5E4F); // تم تعديل لون تمييز الصلاة الحالية
+  static const Color athkarCardBackground = Color(0x25FFFFFF); // خلفية شبه شفافة لبطاقات الأذكار
+  static const Color qiblaColor = Color(0xFF2A5E4F); // تم تعديل لون اتجاه القبلة
+  
+  // ألوان جديدة للتأثير الزجاجي
+  static const Color glassMorphismLight = Color(0x15FFFFFF); // تأثير زجاجي خفيف
+  static const Color glassMorphismMedium = Color(0x25FFFFFF); // تأثير زجاجي متوسط
+  static const Color glassMorphismDark = Color(0x40FFFFFF); // تأثير زجاجي غامق
 }
 
 /// قياسات ثابتة للتباعد والحجم
@@ -86,4 +91,38 @@ class ThemeEffects {
       offset: Offset(0, 4),
     ),
   ];
+  
+  // تأثيرات جديدة للتصميم الزجاجي
+  static BoxDecoration getGlassMorphismDecoration({
+    double opacity = 0.15,
+    double borderRadius = ThemeSizes.borderRadiusMedium,
+    Color borderColor = Colors.white,
+    double borderWidth = 0.5,
+  }) {
+    return BoxDecoration(
+      color: Colors.white.withOpacity(opacity),
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(
+        color: borderColor.withOpacity(0.3),
+        width: borderWidth,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 10,
+          spreadRadius: 0.5,
+        ),
+      ],
+    );
+  }
+  
+  // تدرج لوني للخلفية
+  static LinearGradient get backgroundGradient => const LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFF1D483C), // نفس لون الخلفية في الصورة 
+      Color(0xFF163229), // قاتم أكثر قليلاً
+    ],
+  );
 }

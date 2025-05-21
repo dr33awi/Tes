@@ -1,9 +1,11 @@
-// lib/main.dart - Modificado para resolver el error de NotificationService
+// lib/main.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart'; // أضفت هذا الاستيراد لتهيئة بيانات اللغة
+
 import 'app/app.dart';
 import 'app/di/service_locator.dart';
 import 'app/routes/app_router.dart';
@@ -28,9 +30,13 @@ import 'features/athkar/domain/usecases/search_athkar.dart';
 import 'features/prayers/domain/usecases/get_prayer_times.dart';
 import 'features/prayers/domain/usecases/get_qibla_direction.dart';
 import 'app/themes/app_theme.dart';
+
 Future<void> main() async {
   // تهيئة ربط Flutter
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // تهيئة بيانات اللغة المحلية للتواريخ (أضفت هذا السطر لحل المشكلة)
+  await initializeDateFormatting('ar', null);
   
   // تعيين اتجاه التطبيق
   await SystemChrome.setPreferredOrientations([
@@ -45,14 +51,14 @@ Future<void> main() async {
     // تسجيل Observer لمراقبة دورة حياة التطبيق
     WidgetsBinding.instance.addObserver(AppLifecycleObserver());
     
-    // IMPORTANTE: Inicializar TODOS los servicios antes de crear los proveedores
+    // تهيئة جميع الخدمات قبل إنشاء providers
     await _initAllServices();
     
     // التحقق من أول تشغيل للتطبيق
     final storageService = getIt<StorageService>();
     final isFirstRun = storageService.getBool('isFirstRun') ?? true;
     
-    // Create all providers at the application root level
+    // إنشاء جميع providers على مستوى جذر التطبيق
     final providers = MultiProvider(
       providers: [
         ChangeNotifierProvider(
@@ -174,13 +180,13 @@ class OnboardingApp extends StatelessWidget {
   }
 }
 
-// Implementación actualizada para AthkarApp
+// تنفيذ محدث لـ AthkarApp
 class AthkarApp extends StatelessWidget {
   const AthkarApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Acceder al SettingsProvider ya disponible globalmente
+    // الوصول إلى SettingsProvider المتاح عالميًا
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final isDarkMode = settingsProvider.settings?.enableDarkMode ?? false;
     final language = settingsProvider.settings?.language ?? AppConstants.defaultLanguage;
@@ -262,7 +268,7 @@ class AppShutdownManager {
   }
 }
 
-/// Observador de navegación para depuración
+/// مراقب التنقل للتصحيح
 class _NavigationObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {

@@ -9,6 +9,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../prayers/presentation/screens/prayer_times_screen.dart';
 import '../../../athkar/presentation/screens/athkar_screen.dart';
 import '../../../home/favorites/presentation/screens/favorites_screen.dart';
+import '../../../prayers/presentation/screens/qibla_screen.dart'; // إضافة استيراد شاشة القبلة
 
 class CategoryGrid extends StatefulWidget {
   const CategoryGrid({Key? key}) : super(key: key);
@@ -58,7 +59,7 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
     super.dispose();
   }
 
-  // Updated category list - now with Athkar button
+  // Updated category list - now with Qibla button
   final List<Category> _categories = const [
     Category(
       title: 'مواقيت الصلاة',
@@ -80,6 +81,13 @@ class _CategoryGridState extends State<CategoryGrid> with SingleTickerProviderSt
       icon: Icons.menu_book_rounded,
       color: Color(0xFF00695C),
       gradientColors: [Color(0xFF00695C), Color(0xFF4DB6AC)],
+    ),
+    Category(
+      title: 'اتجاه القبلة',
+      icon: Icons.explore,
+      color: Color(0xFF0277BD),
+      gradientColors: [Color(0xFF0277BD), Color(0xFF4FC3F7)],
+      routeName: AppRouter.qibla, // استخدام المسار الثابت للقبلة
     ),
     Category(
       title: 'المفضلة',

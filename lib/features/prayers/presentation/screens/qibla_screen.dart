@@ -7,8 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../../../../core/services/interfaces/qibla_service.dart';
 import '../providers/prayer_times_provider.dart';
-import '../../../widgets/common/custom_app_bar.dart';
-import '../../../widgets/common/loading_widget.dart';
+import '../../../../app/themes/custom_app_bar.dart';
+import '../../../../app/themes/loading_widget.dart';
 
 class EnhancedQiblaScreen extends StatefulWidget {
   const EnhancedQiblaScreen({super.key});
