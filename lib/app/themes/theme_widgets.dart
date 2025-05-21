@@ -3,66 +3,6 @@ import 'package:athkar_app/app/themes/theme_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-
-/// بطاقة ذات خلفية زجاجية (Glassmorphism) مخصصة للتطبيق
-class GlassmorphicCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final double borderRadius;
-  final double opacity;
-  final Color borderColor;
-  final double elevation;
-  final VoidCallback? onTap;
-  final bool withBorder;
-
-  const GlassmorphicCard({
-    Key? key,
-    required this.child,
-    this.padding = const EdgeInsets.all(16.0),
-    this.borderRadius = ThemeSizes.borderRadiusMedium,
-    this.opacity = 0.15,
-    this.borderColor = Colors.white,
-    this.elevation = 0,
-    this.onTap,
-    this.withBorder = true,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: elevation,
-      margin: EdgeInsets.zero,
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(borderRadius),
-      ),
-      child: InkWell(
-        onTap: onTap != null ? () {
-          HapticFeedback.lightImpact(); // تأثير اهتزاز خفيف عند الضغط
-          onTap!();
-        } : null,
-        borderRadius: BorderRadius.circular(borderRadius),
-        splashColor: Colors.white.withOpacity(0.1),
-        highlightColor: Colors.white.withOpacity(0.05),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(opacity),
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: withBorder ? Border.all(
-              color: borderColor.withOpacity(0.3),
-              width: ThemeSizes.borderWidthNormal,
-            ) : null,
-          ),
-          child: Padding(
-            padding: padding,
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// حاوية خلفية متدرجة للشاشات
 class GradientBackground extends StatelessWidget {
   final Widget child;
