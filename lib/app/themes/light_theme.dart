@@ -6,11 +6,13 @@ import 'theme_constants.dart';
 class LightTheme {
   static ThemeData get theme {
     return ThemeData(
-      brightness: Brightness.dark, // تغيير سطوع الثيم للداكن لأن الخلفية داكنة
+      // تصحيح: تغيير السطوع للوضع الفاتح رغم استخدام خلفية داكنة
+      // وهذا لأن الواجهة تستخدم خلفية داكنة ولكن بنمط الثيم الفاتح
+      brightness: Brightness.light,
       primaryColor: ThemeColors.primary,
       scaffoldBackgroundColor: ThemeColors.lightBackground,
-      colorScheme: const ColorScheme.dark(
-        primary: ThemeColors.primaryLight,
+      colorScheme: ColorScheme.light(
+        primary: ThemeColors.primary,
         secondary: ThemeColors.primaryLight,
         tertiary: ThemeColors.surface,
         error: ThemeColors.error,
@@ -21,15 +23,27 @@ class LightTheme {
         onPrimary: Colors.white,
         onSecondary: Colors.white,
       ),
+      useMaterial3: true, // استخدام Material 3 للحصول على تصميم أفضل
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent, // شريط تطبيق شفاف
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: ThemeColors.primary,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white.withOpacity(0.15), // بطاقات شبه شفافة
+        color: Colors.white.withOpacity(0.15),
         shadowColor: Colors.black.withOpacity(0.1),
         elevation: ThemeSizes.cardElevation,
         margin: const EdgeInsets.symmetric(
@@ -44,7 +58,7 @@ class LightTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.2), // أزرار شبه شفافة
+          backgroundColor: Colors.white.withOpacity(0.2),
           foregroundColor: Colors.white,
           textStyle: const TextStyle(
             fontFamily: 'Cairo',
@@ -149,20 +163,23 @@ class LightTheme {
           fontFamily: 'Cairo',
           fontSize: 16,
           color: Colors.white,
+          height: 1.5, // تحسين ارتفاع النص للعربية
         ),
         bodyMedium: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 14,
           color: Colors.white,
+          height: 1.5,
         ),
         bodySmall: TextStyle(
           fontFamily: 'Cairo',
           fontSize: 12,
           color: ThemeColors.lightTextSecondary,
+          height: 1.5,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        fillColor: Colors.white.withOpacity(0.1), // حقول إدخال شبه شفافة
+        fillColor: Colors.white.withOpacity(0.1),
         filled: true,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
@@ -191,7 +208,11 @@ class LightTheme {
         ),
         hintStyle: TextStyle(
           color: Colors.white.withOpacity(0.5),
+          fontFamily: 'Cairo',
         ),
+        // تحسينات للغة العربية
+        alignLabelWithHint: true,
+        floatingLabelAlignment: FloatingLabelAlignment.start,
       ),
       dividerTheme: DividerThemeData(
         color: Colors.white.withOpacity(0.2),
@@ -204,6 +225,16 @@ class LightTheme {
         unselectedItemColor: Colors.white.withOpacity(0.6),
         type: BottomNavigationBarType.fixed,
         elevation: 8,
+        // تحسين التباين وقابلية القراءة
+        selectedLabelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 12,
+        ),
       ),
       tabBarTheme: const TabBarThemeData(
         labelColor: Colors.white,
@@ -216,6 +247,14 @@ class LightTheme {
               width: 3.0,
             ),
           ),
+        ),
+        // إضافة نمط كتابة للعلامات
+        labelStyle: TextStyle(
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.bold,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontFamily: 'Cairo',
         ),
       ),
       checkboxTheme: CheckboxThemeData(
@@ -269,6 +308,18 @@ class LightTheme {
         elevation: 24,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusLarge),
+        ),
+        // تحسين النصوص داخل مربعات الحوار
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        contentTextStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 14,
+          color: Colors.white,
         ),
       ),
       snackBarTheme: SnackBarThemeData(
