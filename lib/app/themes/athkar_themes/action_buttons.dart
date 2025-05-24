@@ -1,46 +1,40 @@
 // lib/app/themes/athkar_themes/action_buttons.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import '../theme_constants.dart';
 import '../app_theme.dart';
 
-/// زر إجراء قابل لإعادة الاستخدام مع خلفية شفافة
-class ActionButton extends StatefulWidget {
+/// زر إجراء دائري بأيقونة فقط
+class IconActionButton extends StatefulWidget {
   final IconData icon;
-  final String label;
   final VoidCallback onPressed;
   final Color? color;
   final Color? backgroundColor;
-  final bool isGradientBackground;
-  final double iconSize;
-  final double fontSize;
-  final EdgeInsetsGeometry? padding;
-  final double borderRadius;
+  final double size;
+  final String? tooltip;
   final bool showBorder;
   final double borderOpacity;
+  final bool isGradientBackground;
 
-  const ActionButton({
+  const IconActionButton({
     Key? key,
     required this.icon,
-    required this.label,
     required this.onPressed,
     this.color,
     this.backgroundColor,
-    this.isGradientBackground = false,
-    this.iconSize = 18,
-    this.fontSize = 13,
-    this.padding,
-    this.borderRadius = ThemeSizes.borderRadiusCircular,
+    this.size = 40,
+    this.tooltip,
     this.showBorder = true,
     this.borderOpacity = 0.2,
+    this.isGradientBackground = false,
   }) : super(key: key);
 
   @override
-  State<ActionButton> createState() => _ActionButtonState();
+  State<IconActionButton> createState() => _IconActionButtonState();
 }
 
-class _ActionButtonState extends State<ActionButton> with SingleTickerProviderStateMixin {
-  bool _isPressed = false;
+class _IconActionButtonState extends State<IconActionButton> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
@@ -53,7 +47,7 @@ class _ActionButtonState extends State<ActionButton> with SingleTickerProviderSt
     );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 0.95,
+      end: 0.9,
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
@@ -67,13 +61,11 @@ class _ActionButtonState extends State<ActionButton> with SingleTickerProviderSt
   }
 
   void _handleTap() {
-    setState(() => _isPressed = true);
     HapticFeedback.lightImpact();
+    widget.onPressed();
     _animationController.forward().then((_) {
       _animationController.reverse();
-      setState(() => _isPressed = false);
     });
-    widget.onPressed();
   }
 
   @override
@@ -84,53 +76,44 @@ class _ActionButtonState extends State<ActionButton> with SingleTickerProviderSt
     
     final Color effectiveBackgroundColor = widget.backgroundColor ??
         (widget.isGradientBackground 
-            ? Colors.white.withOpacity(0.15) 
+            ? Colors.white.withOpacity(0.1) 
             : (isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)));
 
-    return AnimatedBuilder(
+    Widget button = AnimatedBuilder(
       animation: _scaleAnimation,
       builder: (context, child) {
         return Transform.scale(
           scale: _scaleAnimation.value,
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            child: InkWell(
-              onTap: _handleTap,
-              borderRadius: BorderRadius.circular(widget.borderRadius),
-              splashColor: effectiveColor.withOpacity(0.2),
-              highlightColor: effectiveColor.withOpacity(0.1),
-              child: Container(
-                padding: widget.padding ?? const EdgeInsets.symmetric(
-                  horizontal: ThemeSizes.marginMedium,
-                  vertical: ThemeSizes.marginSmall,
-                ),
-                decoration: BoxDecoration(
-                  color: effectiveBackgroundColor,
-                  borderRadius: BorderRadius.circular(widget.borderRadius),
-                  border: widget.showBorder ? Border.all(
-                    color: effectiveColor.withOpacity(widget.borderOpacity),
-                    width: 1,
-                  ) : null,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      widget.icon,
-                      size: widget.iconSize,
-                      color: effectiveColor,
-                    ),
-                    const SizedBox(width: ThemeSizes.marginSmall),
-                    Text(
-                      widget.label,
-                      style: TextStyle(
+          child: Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              color: effectiveBackgroundColor,
+              shape: BoxShape.circle,
+              border: widget.showBorder ? Border.all(
+                color: effectiveColor.withOpacity(widget.borderOpacity),
+                width: 1.5,
+              ) : null,
+            ),
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: _handleTap,
+                    customBorder: const CircleBorder(),
+                    splashColor: effectiveColor.withOpacity(0.3),
+                    highlightColor: effectiveColor.withOpacity(0.1),
+                    child: Center(
+                      child: Icon(
+                        widget.icon,
                         color: effectiveColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: widget.fontSize,
+                        size: widget.size * 0.5,
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -138,10 +121,19 @@ class _ActionButtonState extends State<ActionButton> with SingleTickerProviderSt
         );
       },
     );
+
+    if (widget.tooltip != null) {
+      return Tooltip(
+        message: widget.tooltip!,
+        child: button,
+      );
+    }
+
+    return button;
   }
 }
 
-/// مجموعة أزرار الإجراءات الخاصة بالأذكار
+/// مجموعة أزرار الإجراءات الخاصة بالأذكار (أيقونات فقط)
 class AthkarActionButtons extends StatelessWidget {
   final VoidCallback? onCopy;
   final VoidCallback? onShare;
@@ -150,6 +142,7 @@ class AthkarActionButtons extends StatelessWidget {
   final bool isGradientBackground;
   final MainAxisAlignment alignment;
   final double spacing;
+  final double buttonSize;
 
   const AthkarActionButtons({
     Key? key,
@@ -160,6 +153,7 @@ class AthkarActionButtons extends StatelessWidget {
     this.isGradientBackground = false,
     this.alignment = MainAxisAlignment.center,
     this.spacing = ThemeSizes.marginMedium,
+    this.buttonSize = 40,
   }) : super(key: key);
 
   @override
@@ -168,12 +162,13 @@ class AthkarActionButtons extends StatelessWidget {
 
     if (onCopy != null) {
       buttons.add(
-        ActionButton(
-          icon: Icons.copy,
-          label: 'نسخ',
+        IconActionButton(
+          icon: Icons.copy_rounded,
           onPressed: onCopy!,
           color: color,
           isGradientBackground: isGradientBackground,
+          size: buttonSize,
+          tooltip: 'نسخ',
         ),
       );
     }
@@ -183,12 +178,13 @@ class AthkarActionButtons extends StatelessWidget {
         buttons.add(SizedBox(width: spacing));
       }
       buttons.add(
-        ActionButton(
-          icon: Icons.share,
-          label: 'مشاركة',
+        IconActionButton(
+          icon: Icons.share_rounded,
           onPressed: onShare!,
           color: color,
           isGradientBackground: isGradientBackground,
+          size: buttonSize,
+          tooltip: 'مشاركة',
         ),
       );
     }
@@ -198,12 +194,13 @@ class AthkarActionButtons extends StatelessWidget {
         buttons.add(SizedBox(width: spacing));
       }
       buttons.add(
-        ActionButton(
-          icon: Icons.info_outline,
-          label: 'فضل الذكر',
+        IconActionButton(
+          icon: Icons.info_outline_rounded,
           onPressed: onInfo!,
           color: color,
           isGradientBackground: isGradientBackground,
+          size: buttonSize,
+          tooltip: 'فضل الذكر',
         ),
       );
     }

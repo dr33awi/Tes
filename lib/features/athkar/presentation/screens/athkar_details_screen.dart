@@ -8,7 +8,6 @@ import 'package:athkar_app/features/athkar/presentation/screens/athkar_screen.da
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../app/di/service_locator.dart';
 import '../../data/datasources/athkar_service.dart';
@@ -198,8 +197,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
   
   // تبديل حالة المفضلة
   Future<void> _toggleFavorite(int index) async {
+    final bool currentStatus = _favorites[index] ?? false;
+    final bool newStatus = !currentStatus;
+    
     setState(() {
-      _favorites[index] = !(_favorites[index] ?? false);
+      _favorites[index] = newStatus;
     });
     
     await _athkarService.toggleFavorite(_loadedCategory.id, index);
@@ -208,14 +210,19 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     HapticFeedback.mediumImpact();
     
     // تشغيل تأثير النبض للزر
-    if (_favorites[index] == true) {
+    if (newStatus) {
       _animationController.reset();
       _animationController.forward();
     }
     
     // إظهار رسالة للمستخدم
-    if (_favorites[index] == true) {
+    if (newStatus) {
       AthkarSnackBar.showFavoriteAdded(
+        context,
+        backgroundColor: IconHelper.getCategoryColor(_loadedCategory.id),
+      );
+    } else {
+      AthkarSnackBar.showFavoriteRemoved(
         context,
         backgroundColor: IconHelper.getCategoryColor(_loadedCategory.id),
       );
@@ -291,39 +298,6 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
       source: thikr.source,
       accentColor: IconHelper.getCategoryColor(_loadedCategory.id),
     );
-  }
-  
-  // مشاركة الذكر
-  void _shareThikr(Athkar thikr) async {
-    // تأثير اهتزاز خفيف
-    HapticFeedback.lightImpact();
-    
-    String text = thikr.content;
-    
-    if (thikr.source != null) {
-      text += '\n\nالمصدر: ${thikr.source}';
-    }
-    
-    await Share.share(text, subject: 'ذكر من تطبيق الأذكار');
-  }
-  
-  // نسخ الذكر
-  void _copyThikr(Athkar thikr) {
-    // تأثير اهتزاز خفيف
-    HapticFeedback.lightImpact();
-    
-    String text = thikr.content;
-    
-    if (thikr.source != null) {
-      text += '\n\nالمصدر: ${thikr.source}';
-    }
-    
-    Clipboard.setData(ClipboardData(text: text)).then((_) {
-      AthkarSnackBar.showCopied(
-        context,
-        backgroundColor: IconHelper.getCategoryColor(_loadedCategory.id),
-      );
-    });
   }
   
   // رسالة إتمام الأذكار مع زر "قراءتها مرة أخرى"
@@ -423,13 +397,10 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                             primaryColor: IconHelper.getCategoryColor(_loadedCategory.id),
                             onTap: () => _incrementCounter(index),
                             onFavoriteToggle: () => _toggleFavorite(index),
-                            onCopy: () => _copyThikr(thikr),
-                            onShare: () => _shareThikr(thikr),
                             onInfo: thikr.fadl != null ? () => _showFadlDialog(thikr) : null,
                             isCompleted: isCompleted,
                             showActions: true,
                             showCounter: true,
-                            hasGradientBackground: false,
                             margin: EdgeInsets.zero,
                           ),
                         ),
