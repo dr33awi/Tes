@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import '../themes/theme_constants.dart';
-import '../themes/glassmorphism_widgets.dart';
-import '../themes/app_theme.dart';
+import '../theme_constants.dart';
+import '../glassmorphism_widgets.dart';
+import '../app_theme.dart';
 
 /// بطاقة عرض الذكر قابلة لإعادة الاستخدام
 class AthkarCard extends StatefulWidget {
