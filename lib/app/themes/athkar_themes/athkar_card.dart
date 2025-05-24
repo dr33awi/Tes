@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../theme_constants.dart';
 import '../glassmorphism_widgets.dart';
 import '../app_theme.dart';
+import './action_buttons.dart';
 
 /// بطاقة عرض الذكر قابلة لإعادة الاستخدام
 class AthkarCard extends StatefulWidget {
@@ -369,127 +370,12 @@ class _AthkarCardState extends State<AthkarCard> with SingleTickerProviderStateM
   }
 
   Widget _buildActions(BuildContext context, bool isDark, Color cardColor, bool isGradient) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Copy button
-        _ActionButton(
-          icon: Icons.copy,
-          label: 'نسخ',
-          onPressed: _handleCopy,
-          color: isGradient ? Colors.white : cardColor,
-          backgroundColor: isGradient 
-              ? Colors.white.withOpacity(0.2)
-              : AppTheme.getSurfaceColor(context),
-        ),
-        
-        const SizedBox(width: ThemeSizes.marginMedium),
-        
-        // Share button
-        _ActionButton(
-          icon: Icons.share,
-          label: 'مشاركة',
-          onPressed: _handleShare,
-          color: isGradient ? Colors.white : cardColor,
-          backgroundColor: isGradient 
-              ? Colors.white.withOpacity(0.2)
-              : AppTheme.getSurfaceColor(context),
-        ),
-        
-        // Info button
-        if (widget.onInfo != null) ...[
-          const SizedBox(width: ThemeSizes.marginMedium),
-          _ActionButton(
-            icon: Icons.info_outline,
-            label: 'فضل الذكر',
-            onPressed: widget.onInfo!,
-            color: isGradient ? Colors.white : cardColor,
-            backgroundColor: isGradient 
-                ? Colors.white.withOpacity(0.2)
-                : AppTheme.getSurfaceColor(context),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// زر الإجراء الخاص ببطاقة الذكر
-class _ActionButton extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final Color color;
-  final Color backgroundColor;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    required this.color,
-    required this.backgroundColor,
-  });
-
-  @override
-  State<_ActionButton> createState() => _ActionButtonState();
-}
-
-class _ActionButtonState extends State<_ActionButton> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: _isPressed ? 0.95 : 1.0,
-      duration: const Duration(milliseconds: 100),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusCircular),
-        child: InkWell(
-          onTap: () {
-            setState(() => _isPressed = true);
-            HapticFeedback.lightImpact();
-            widget.onPressed();
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (mounted) setState(() => _isPressed = false);
-            });
-          },
-          borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusCircular),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: ThemeSizes.marginMedium,
-              vertical: ThemeSizes.marginSmall,
-            ),
-            decoration: BoxDecoration(
-              color: widget.backgroundColor,
-              borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusCircular),
-              border: Border.all(
-                color: widget.color.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  widget.icon,
-                  size: 18,
-                  color: widget.color,
-                ),
-                const SizedBox(width: ThemeSizes.marginSmall),
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: widget.color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return AthkarActionButtons(
+      onCopy: _handleCopy,
+      onShare: _handleShare,
+      onInfo: widget.onInfo,
+      color: isGradient ? Colors.white : cardColor,
+      isGradientBackground: isGradient,
     );
   }
 }
