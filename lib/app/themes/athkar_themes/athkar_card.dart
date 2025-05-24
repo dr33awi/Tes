@@ -29,6 +29,7 @@ class AthkarCard extends StatefulWidget {
   final double borderRadius;
   final bool hasGradientBackground;
   final List<Color>? gradientColors;
+  final IconData? categoryIcon;
 
   const AthkarCard({
     Key? key,
@@ -48,9 +49,10 @@ class AthkarCard extends StatefulWidget {
     this.isCompleted = false,
     this.width,
     this.margin,
-    this.borderRadius = ThemeSizes.borderRadiusLarge,
+    this.borderRadius = 24,
     this.hasGradientBackground = false,
     this.gradientColors,
+    this.categoryIcon,
   }) : super(key: key);
 
   @override
@@ -60,15 +62,17 @@ class AthkarCard extends StatefulWidget {
 class _AthkarCardState extends State<AthkarCard> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _pulseAnimation;
   bool _isPressed = false;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: 0.98,
@@ -76,6 +80,16 @@ class _AthkarCardState extends State<AthkarCard> with SingleTickerProviderStateM
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
+    
+    _pulseAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0), weight: 1),
+    ]).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.3, 0.7),
+      ),
+    );
   }
 
   @override
@@ -117,7 +131,6 @@ class _AthkarCardState extends State<AthkarCard> with SingleTickerProviderStateM
       }
     });
     
-    // استدعاء callback إذا كان موجود
     widget.onCopy?.call();
   }
 
@@ -128,237 +141,100 @@ class _AthkarCardState extends State<AthkarCard> with SingleTickerProviderStateM
     }
     
     Share.share(textToShare, subject: 'ذكر من تطبيق الأذكار');
-    
-    // استدعاء callback إذا كان موجود
     widget.onShare?.call();
+  }
+
+  // الحصول على تدرج الألوان
+  List<Color> _getGradientColors() {
+    if (widget.gradientColors != null) {
+      return widget.gradientColors!;
+    }
+    
+    Color baseColor = widget.primaryColor ?? AppTheme.getPrimaryColor(context);
+    Color darkColor = HSLColor.fromColor(baseColor)
+        .withLightness(HSLColor.fromColor(baseColor).lightness * 0.7)
+        .toColor();
+    
+    return [baseColor.withOpacity(0.9), darkColor];
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = AppTheme.isDarkMode(context);
-    final Color cardColor = widget.primaryColor ?? AppTheme.getPrimaryColor(context);
     
     return AnimatedBuilder(
-      animation: _scaleAnimation,
+      animation: _pulseAnimation,
       builder: (context, child) {
         return Transform.scale(
-          scale: _scaleAnimation.value,
+          scale: _isPressed ? _scaleAnimation.value : 1.0,
           child: Container(
             width: widget.width,
             margin: widget.margin ?? const EdgeInsets.symmetric(
               horizontal: ThemeSizes.marginMedium,
-              vertical: ThemeSizes.marginSmall,
+              vertical: 10,
             ),
-            child: _buildCardContent(context, isDark, cardColor),
+            child: _buildCardContent(context, isDark),
           ),
         );
       },
     );
   }
 
-  Widget _buildCardContent(BuildContext context, bool isDark, Color cardColor) {
-    // استخدام اللون الأساسي للبطاقة مع gradient
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            cardColor.withOpacity(0.9),
-            cardColor,
-          ],
-        ),
+  Widget _buildCardContent(BuildContext context, bool isDark) {
+    return Card(
+      elevation: 15,
+      shadowColor: (widget.primaryColor ?? AppTheme.getPrimaryColor(context)).withOpacity(0.3),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(widget.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: cardColor.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(widget.borderRadius),
-        child: InkWell(
-          onTap: widget.onTap != null ? _handleTap : null,
+      child: Container(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(widget.borderRadius),
-          splashColor: Colors.white.withOpacity(0.2),
-          child: _buildInnerContent(context, isDark, cardColor),
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: _getGradientColors(),
+            stops: const [0.3, 1.0],
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInnerContent(BuildContext context, bool isDark, Color cardColor) {
-    return Padding(
-      padding: const EdgeInsets.all(ThemeSizes.marginLarge),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header with counter and favorite button
-          if (widget.showCounter || widget.onFavoriteToggle != null)
-            _buildHeader(context, isDark, cardColor),
-          
-          if (widget.showCounter || widget.onFavoriteToggle != null)
-            const SizedBox(height: ThemeSizes.marginLarge),
-          
-          // Content with background
-          _buildContent(context, isDark),
-          
-          // Source
-          if (widget.source != null) ...[
-            const SizedBox(height: ThemeSizes.marginLarge),
-            _buildSource(context, isDark, cardColor),
-          ],
-          
-          // Actions
-          if (widget.showActions) ...[
-            const SizedBox(height: ThemeSizes.marginLarge),
-            _buildActions(context, isDark, cardColor),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, bool isDark, Color cardColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Counter with glassmorphism
-        if (widget.showCounter)
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: ThemeSizes.marginLarge,
-              vertical: ThemeSizes.marginSmall,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusCircular),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusCircular),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.brightness_1,
-                      size: 10,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: ThemeSizes.marginSmall),
-                    Text(
-                      'عدد التكرار ${widget.currentCount}/${widget.totalCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        
-        // Favorite button
-        if (widget.onFavoriteToggle != null)
-          IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              widget.onFavoriteToggle!();
-            },
-            icon: Icon(
-              widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildContent(BuildContext context, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        // Glassmorphism effect
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusLarge),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: -5,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusLarge),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: ThemeSizes.marginLarge,
-              vertical: ThemeSizes.marginXLarge,
-            ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          child: InkWell(
+            onTap: widget.onTap != null ? _handleTap : null,
+            borderRadius: BorderRadius.circular(widget.borderRadius),
             child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                // Opening quote
-                Positioned(
-                  top: -5,
-                  right: -5,
-                  child: Icon(
-                    Icons.format_quote,
-                    size: 40,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                ),
+
                 
-                // Content text
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: ThemeSizes.marginMedium),
-                  child: Text(
-                    widget.content,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      height: 1.8,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                      fontFamily: 'Amiri',
-                      shadows: [
-                        Shadow(
-                          color: Colors.black26,
-                          offset: Offset(0, 1),
-                          blurRadius: 3,
-                        ),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header with counter and favorite button
+                      if (widget.showCounter || widget.onFavoriteToggle != null)
+                        _buildHeader(context, isDark),
+                      
+                      if (widget.showCounter || widget.onFavoriteToggle != null)
+                        const SizedBox(height: 12),
+                      
+                      // Content with background
+                      _buildContent(context, isDark),
+                      
+                      // Source
+                      if (widget.source != null) ...[
+                        const SizedBox(height: 12),
+                        _buildSource(context, isDark),
                       ],
-                    ),
-                  ),
-                ),
-                
-                // Closing quote
-                Positioned(
-                  bottom: -5,
-                  left: -5,
-                  child: Transform.rotate(
-                    angle: 3.14159,
-                    child: Icon(
-                      Icons.format_quote,
-                      size: 40,
-                      color: Colors.white.withOpacity(0.3),
-                    ),
+                      
+                      // Actions
+                      if (widget.showActions) ...[
+                        const SizedBox(height: 16),
+                        _buildActions(context, isDark),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -369,49 +245,252 @@ class _AthkarCardState extends State<AthkarCard> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildSource(BuildContext context, bool isDark, Color cardColor) {
-    return Center(
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusCircular),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
+  Widget _buildHeader(BuildContext context, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Counter
+        if (widget.showCounter)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 4,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.categoryIcon != null) ...[
+                  Icon(
+                    widget.categoryIcon,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  'عدد التكرار ${widget.currentCount}/${widget.totalCount}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
+        
+        // Favorite button
+        if (widget.onFavoriteToggle != null)
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: widget.isFavorite ? _pulseAnimation.value : 1.0,
+                child: Material(
+                  color: Colors.transparent,
+                  child: IconButton(
+                    icon: Icon(
+                      widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      widget.onFavoriteToggle!();
+                      if (widget.isFavorite == false) {
+                        _animationController.reset();
+                        _animationController.forward();
+                      }
+                    },
+                    tooltip: widget.isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
+                    splashRadius: 20,
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildContent(BuildContext context, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 25,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.12),
+          width: 1,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusCircular),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: ThemeSizes.marginXLarge,
-                vertical: ThemeSizes.marginMedium,
-              ),
-              child: Text(
-                widget.source!,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // علامة اقتباس في البداية
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Icon(
+              Icons.format_quote,
+              size: 18,
+              color: Colors.white.withOpacity(0.5),
+            ),
+          ),
+          
+          Column(
+            children: [
+              Text(
+                widget.content,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
+                  height: 2.0,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                   color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
+                  fontFamily: 'Amiri-Bold',
+                  letterSpacing: 0.5,
                 ),
               ),
+            ],
+          ),
+          
+          // علامة اقتباس في النهاية
+          Positioned(
+            bottom: 0,
+            left: 0,
+            child: Transform.rotate(
+              angle: 3.14159, // 180 درجة
+              child: Icon(
+                Icons.format_quote,
+                size: 18,
+                color: Colors.white.withOpacity(0.5),
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSource(BuildContext context, bool isDark) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          widget.source!,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildActions(BuildContext context, bool isDark, Color cardColor) {
-    return AthkarActionButtons(
-      onCopy: _handleCopy,
-      onShare: _handleShare,
-      onInfo: widget.onInfo,
-      color: Colors.white,
-      isGradientBackground: true,
-      buttonSize: 48,
+  Widget _buildActions(BuildContext context, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // زر النسخ
+        _buildActionButton(
+          icon: Icons.copy,
+          label: 'نسخ',
+          onPressed: _handleCopy,
+        ),
+        const SizedBox(width: 12),
+        
+        // زر المشاركة
+        _buildActionButton(
+          icon: Icons.share,
+          label: 'مشاركة',
+          onPressed: _handleShare,
+        ),
+        
+        // زر فضل الذكر
+        if (widget.onInfo != null) ...[
+          const SizedBox(width: 12),
+          _buildActionButton(
+            icon: Icons.info_outline,
+            label: 'فضل الذكر',
+            onPressed: widget.onInfo!,
+          ),
+        ],
+      ],
+    );
+  }
+
+  // زر الإجراء بنفس نمط athkar_details_screen
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
