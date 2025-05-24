@@ -1,8 +1,9 @@
-// lib/features/home/presentation/screens/enhanced_home_screen.dart
+// lib/features/home/presentation/screens/home_screen.dart
 import 'package:athkar_app/app/themes/glassmorphism_widgets.dart';
 import 'package:athkar_app/app/themes/reusable_components.dart';
 import 'package:athkar_app/app/themes/screen_template.dart';
 import 'package:athkar_app/app/themes/theme_constants.dart';
+import 'package:athkar_app/app/themes/app_theme.dart';
 import 'package:athkar_app/features/home/models/daily_quote_model.dart';
 import 'package:athkar_app/features/home/presentation/quotes/services/daily_quote_service.dart';
 import 'package:athkar_app/features/home/presentation/quotes/widgets/quote_carousel.dart';
@@ -115,12 +116,15 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+    
     return ScreenTemplate(
       title: AppConstants.appName,
       showBackButton: false,
+      backgroundColor: isDark ? ThemeColors.darkBackground : ThemeColors.lightBackground,
       actions: [
         IconButton(
-          icon: const Icon(Icons.favorite, color: Colors.white),
+          icon: Icon(Icons.favorite, color: AppTheme.getTextColor(context)),
           tooltip: 'المفضلة',
           onPressed: () {
             HapticFeedback.lightImpact();
@@ -128,7 +132,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.settings, color: Colors.white),
+          icon: Icon(Icons.settings, color: AppTheme.getTextColor(context)),
           tooltip: 'الإعدادات',
           onPressed: () {
             HapticFeedback.lightImpact();
@@ -139,7 +143,9 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
       body: Consumer<SettingsProvider>(
         builder: (context, settingsProvider, child) {
           if (settingsProvider.isLoading) {
-            return const LoadingWidget(color: Colors.white);
+            return Center(
+              child: LoadingWidget(color: AppTheme.getPrimaryColor(context)),
+            );
           }
 
           return RefreshIndicator(
@@ -170,8 +176,8 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
                 }
               });
             },
-            color: Colors.white,
-            backgroundColor: ThemeColors.primary,
+            color: AppTheme.getPrimaryColor(context),
+            backgroundColor: AppTheme.getBackgroundColor(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -188,21 +194,16 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
                 
                 // معلومات إضافية
                 Center(
-                  child: GlassmorphicContainer(
+                  child: SoftContainer(
                     width: 200,
                     height: 40,
                     borderRadius: ThemeSizes.borderRadiusLarge,
-                    blur: 5,
-                    opacity: 0.1,
+                    hasBorder: true,
                     padding: const EdgeInsets.all(8),
                     child: Center(
                       child: Text(
                         '${AppConstants.appName} - ${AppConstants.appVersion}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontWeight: FontWeight.w500,
-                          fontSize: 12,
-                        ),
+                        style: AppTheme.getCaptionStyle(context),
                       ),
                     ),
                   ),
@@ -218,11 +219,10 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
   
   // قسم مواقيت الصلاة المحسن
   Widget _buildPrayerTimesSection() {
-    return AdvancedGlassmorphicCard(
-      opacity: 0.1,
+    return SoftCard(
       borderRadius: ThemeSizes.borderRadiusLarge,
-      borderColor: Colors.white.withOpacity(0.5),
-      elevation: 5,
+      hasBorder: true,
+      elevation: 2,
       padding: const EdgeInsets.all(ThemeSizes.marginMedium),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,27 +235,23 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: AppTheme.getPrimaryColor(context).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.access_time_rounded,
-                      color: Colors.white,
+                      color: AppTheme.getPrimaryColor(context),
                       size: 22,
                     ),
                   ),
                   const SizedBox(width: ThemeSizes.marginSmall),
-                  const Text(
+                  Text(
                     'مواقيت الصلاة',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    style: AppTheme.getHeadingStyle(context, fontSize: 18),
                   ),
                 ],
               ),
-              ThemedActionButton(
+              SoftButton(
                 text: 'عرض الكل',
                 icon: Icons.arrow_forward,
                 onPressed: () {
@@ -264,11 +260,15 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
                 },
                 isOutlined: true,
                 isFullWidth: false,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ThemeSizes.marginMedium,
+                  vertical: ThemeSizes.marginSmall,
+                ),
               ),
             ],
           ),
           const SizedBox(height: ThemeSizes.marginSmall),
-          const Divider(color: Colors.white24),
+          Divider(color: AppTheme.getDividerColor(context)),
           const SizedBox(height: ThemeSizes.marginSmall),
           const PrayerTimesSection(),
         ],
@@ -348,10 +348,10 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
   
   // مؤشر التحميل المحسن
   Widget _buildLoadingHighlightsCard(BuildContext context) {
-    return AdvancedGlassmorphicCard(
-      opacity: 0.1,
+    return SoftCard(
       borderRadius: ThemeSizes.borderRadiusLarge,
-      elevation: 8,
+      hasBorder: true,
+      elevation: 2,
       child: Container(
         height: 200,
         width: double.infinity,
@@ -360,8 +360,8 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(
-                color: Colors.white,
+              CircularProgressIndicator(
+                color: AppTheme.getPrimaryColor(context),
                 strokeWidth: 3,
               ),
               const SizedBox(height: 16),
@@ -369,11 +369,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
                 _isRefreshing 
                     ? 'جاري تحديث المقتبسات...' 
                     : 'جاري تحميل المقتبسات...',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: AppTheme.getBodyStyle(context, fontWeight: FontWeight.w600),
               ),
             ],
           ),

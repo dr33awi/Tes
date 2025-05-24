@@ -2,6 +2,7 @@
 import 'package:athkar_app/app/themes/theme_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:athkar_app/app/themes/glassmorphism_widgets.dart'; // Import glassmorphism widgets
 
 /// حاوية خلفية متدرجة للشاشات
 class GradientBackground extends StatelessWidget {
@@ -10,6 +11,7 @@ class GradientBackground extends StatelessWidget {
   final List<Widget>? actions;
   final String? title;
   final Widget? floatingActionButton;
+  final PreferredSizeWidget? appBar; // Added appBar directly
 
   const GradientBackground({
     Key? key,
@@ -18,21 +20,24 @@ class GradientBackground extends StatelessWidget {
     this.actions,
     this.title,
     this.floatingActionButton,
+    this.appBar, // Initialize appBar
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: useAppBar
+      appBar: appBar ?? (useAppBar
           ? AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
               title: title != null ? Text(title!) : null,
               centerTitle: true,
               actions: actions,
+              foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+              titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle,
             )
-          : null,
+          : null),
       floatingActionButton: floatingActionButton,
       body: Container(
         decoration: BoxDecoration(
@@ -53,6 +58,8 @@ class GlassmorphicButton extends StatelessWidget {
   final double borderRadius;
   final EdgeInsetsGeometry padding;
   final bool isOutlined;
+  final bool isLoading; // Added isLoading
+  final bool isFullWidth; // Added isFullWidth
 
   const GlassmorphicButton({
     Key? key,
@@ -63,52 +70,25 @@ class GlassmorphicButton extends StatelessWidget {
     this.borderRadius = ThemeSizes.borderRadiusMedium,
     this.padding = const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
     this.isOutlined = false,
+    this.isLoading = false,
+    this.isFullWidth = false, // Default to false for better flexibility
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final buttonStyle = isOutlined
-        ? OutlinedButton.styleFrom(
-            foregroundColor: Colors.white,
-            side: BorderSide(color: Colors.white.withOpacity(0.5)),
-            padding: padding,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(borderRadius),
-            ),
-            backgroundColor: Colors.transparent,
-          )
-        : ElevatedButton.styleFrom(
-            foregroundColor: Colors.white,
-            backgroundColor: Colors.white.withOpacity(opacity),
-            padding: padding,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(borderRadius),
-              side: BorderSide(
-                color: Colors.white.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-          );
-
-    return icon != null
-        ? ElevatedButton.icon(
-            onPressed: () {
-              HapticFeedback.mediumImpact(); // تأثير اهتزاز متوسط عند الضغط
-              onPressed();
-            },
-            icon: Icon(icon),
-            label: Text(text),
-            style: buttonStyle,
-          )
-        : ElevatedButton(
-            onPressed: () {
-              HapticFeedback.mediumImpact(); // تأثير اهتزاز متوسط عند الضغط
-              onPressed();
-            },
-            style: buttonStyle,
-            child: Text(text),
-          );
+    return AdvancedGlassmorphicButton(
+      text: text,
+      icon: icon,
+      onPressed: onPressed,
+      opacity: opacity,
+      borderRadius: borderRadius,
+      padding: padding,
+      isOutlined: isOutlined,
+      isLoading: isLoading,
+      isFullWidth: isFullWidth,
+      blur: 5.0, // Consistent blur
+      buttonColor: Theme.of(context).colorScheme.primary, // Use theme primary color
+    );
   }
 }
 
@@ -120,6 +100,7 @@ class GlassmorphicListItem extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final double opacity;
+  final Color? tileColor; // New parameter for list item background
 
   const GlassmorphicListItem({
     Key? key,
@@ -129,227 +110,66 @@ class GlassmorphicListItem extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.opacity = 0.15,
+    this.tileColor, // Initialize tileColor
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        vertical: ThemeSizes.marginSmall / 2,
-        horizontal: ThemeSizes.marginMedium,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(opacity),
-        borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 0.5,
-        ),
-      ),
-      child: ListTile(
-        onTap: onTap != null ? () {
-          HapticFeedback.selectionClick(); // تأثير اهتزاز عند النقر
-          onTap!();
-        } : null,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: ThemeSizes.marginMedium,
-          vertical: ThemeSizes.marginSmall / 2,
-        ),
-        leading: leadingIcon != null
-            ? Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  leadingIcon,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              )
-            : null,
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        subtitle: subtitle != null
-            ? Text(
-                subtitle!,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                ),
-              )
-            : null,
-        trailing: trailing,
-      ),
-    );
-  }
-}
-
-/// قسم مع عنوان
-class SectionWithTitle extends StatelessWidget {
-  final String title;
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final bool withDivider;
-
-  const SectionWithTitle({
-    Key? key,
-    required this.title,
-    required this.child,
-    this.padding = const EdgeInsets.all(ThemeSizes.marginMedium),
-    this.withDivider = true,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ThemeSizes.marginMedium,
-            vertical: ThemeSizes.marginSmall,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (withDivider)
-          Divider(
-            color: Colors.white.withOpacity(0.2),
-            thickness: 1,
-            indent: ThemeSizes.marginMedium,
-            endIndent: ThemeSizes.marginMedium,
-          ),
-        Padding(
-          padding: padding,
-          child: child,
-        ),
-      ],
-    );
-  }
-}
-
-/// بطاقة للصلاة مع تأثيرات خاصة
-class PrayerTimeCard extends StatelessWidget {
-  final String prayerName;
-  final String prayerTime;
-  final bool isCurrentPrayer;
-  final bool isNextPrayer;
-  final IconData icon;
-
-  const PrayerTimeCard({
-    Key? key,
-    required this.prayerName,
-    required this.prayerTime,
-    this.isCurrentPrayer = false,
-    this.isNextPrayer = false,
-    required this.icon,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        vertical: ThemeSizes.marginSmall / 2,
-        horizontal: ThemeSizes.marginMedium,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(isCurrentPrayer ? 0.25 : 0.15),
-        borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
-        border: Border.all(
-          color: Colors.white.withOpacity(isCurrentPrayer ? 0.5 : 0.3),
-          width: isCurrentPrayer ? 1.5 : 0.5,
-        ),
-        boxShadow: isCurrentPrayer
-            ? [
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.1),
-                  blurRadius: 10,
-                  spreadRadius: 1,
-                ),
-              ]
-            : [],
-      ),
+    return AdvancedGlassmorphicCard( // Replaced Container with AdvancedGlassmorphicCard
+      opacity: opacity,
+      borderRadius: ThemeSizes.borderRadiusMedium,
+      elevation: 0, // No elevation, handled by GlassmorphicCard if needed
+      onTap: onTap != null ? () {
+        HapticFeedback.selectionClick();
+        onTap!();
+      } : null,
+      backgroundColor: tileColor, // Pass the background color
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: ThemeSizes.marginMedium,
-          vertical: ThemeSizes.marginMedium,
+          vertical: ThemeSizes.marginSmall / 2,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    icon,
-                    color: Colors.white,
-                    size: 22,
-                  ),
+            if (leadingIcon != null)
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.2), // Consistent surface color
+                  borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusSmall),
                 ),
-                const SizedBox(width: ThemeSizes.marginMedium),
-                Text(
-                  prayerName,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: isCurrentPrayer ? FontWeight.bold : FontWeight.normal,
-                    color: Colors.white,
-                  ),
+                child: Icon(
+                  leadingIcon,
+                  color: Theme.of(context).iconTheme.color,
+                  size: 24,
                 ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: ThemeSizes.marginMedium,
-                vertical: ThemeSizes.marginSmall,
               ),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
-              ),
-              child: Text(
-                prayerTime,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+            if (leadingIcon != null) const SizedBox(width: ThemeSizes.marginMedium),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                ],
               ),
             ),
+            if (trailing != null) ...[
+              const SizedBox(width: ThemeSizes.marginSmall),
+              trailing!,
+            ],
           ],
         ),
       ),

@@ -1,6 +1,7 @@
 // lib/features/common/widgets/loading_widget.dart
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:athkar_app/app/themes/theme_constants.dart'; // Import theme constants
 
 class LoadingWidget extends StatelessWidget {
   final Color color;
@@ -8,20 +9,15 @@ class LoadingWidget extends StatelessWidget {
   
   const LoadingWidget({
     Key? key,
-    this.color = Colors.blue,
-    this.size = 50.0,
+    this.color = ThemeColors.accentLight, // Changed default color
+    this.size = 50,
   }) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
-    // استخدام لون مخصص إذا تم تمريره، وإلا استخدام لون التطبيق الأساسي
-    final Color loadingColor = color == Colors.blue 
-        ? Theme.of(context).primaryColor
-        : color;
-    
     return Center(
-      child: LoadingAnimationWidget.staggeredDotsWave(
-        color: loadingColor,
+      child: LoadingAnimationWidget.inkDrop( // Using a different animation for a modern look
+        color: color,
         size: size,
       ),
     );

@@ -25,33 +25,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return AppBar(
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      centerTitle: centerTitle,
-      actions: actions,
-      leading: leading,
-      elevation: elevation,
-      backgroundColor: transparent 
-          ? Colors.transparent 
-          : (backgroundColor ?? Theme.of(context).primaryColor),
-      systemOverlayStyle: systemOverlayStyle ?? 
-        (transparent
-          ? SystemUiOverlayStyle.light.copyWith(
-              statusBarColor: Colors.transparent,
-            )
-          : SystemUiOverlayStyle(
-              statusBarColor: backgroundColor ?? Theme.of(context).primaryColor,
-              statusBarIconBrightness: Brightness.light,
-            )),
-    );
-  }
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Widget build(BuildContext context) {
+    return AppBar(
+      title: Text(title),
+      actions: actions,
+      leading: leading,
+      centerTitle: centerTitle,
+      backgroundColor: transparent ? Colors.transparent : backgroundColor ?? Theme.of(context).appBarTheme.backgroundColor,
+      elevation: transparent ? 0 : elevation,
+      systemOverlayStyle: systemOverlayStyle ?? Theme.of(context).appBarTheme.systemOverlayStyle,
+    );
+  }
 }

@@ -13,6 +13,7 @@ import '../../../../app/themes/loading_widget.dart';
 import '../../../../app/themes/theme_constants.dart';
 import '../../../../app/themes/glassmorphism_widgets.dart';
 import '../../../../app/themes/screen_template.dart';
+import '../../../../app/themes/app_theme.dart';
 import '../theme/athkar_theme_manager.dart';
 
 class AthkarDetailsScreen extends StatefulWidget {
@@ -63,12 +64,12 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     );
     
     _pulseAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.05), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 1.05, end: 1.0), weight: 1),
     ]).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: ThemeCurves.emphasize,
+        curve: ThemeCurves.smooth,
       ),
     );
     
@@ -204,7 +205,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium)
         ),
         margin: const EdgeInsets.all(ThemeSizes.marginMedium),
-        duration: ThemeDurations.slow,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -469,12 +470,10 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
       child: SlideAnimation(
         verticalOffset: 50.0,
         child: FadeInAnimation(
-          child: AdvancedGlassmorphicCard(
-            blur: 15.0,
-            opacity: 0.2,
+          child: SoftCard(
             borderRadius: ThemeSizes.borderRadiusLarge,
-            borderColor: Colors.white,
-            elevation: ThemeSizes.cardElevationHigh,
+            hasBorder: true,
+            elevation: 4,
             padding: const EdgeInsets.all(ThemeSizes.marginXLarge),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -484,70 +483,57 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: categoryColor.withOpacity(0.1),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.4),
+                      color: categoryColor.withOpacity(0.3),
                       width: 2,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check_circle_outline,
-                    color: Colors.white,
+                    color: categoryColor,
                     size: 50,
                   ),
                 ),
                 const SizedBox(height: ThemeSizes.marginLarge),
-                const Text(
+                Text(
                   'أحسنت!',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                  style: AppTheme.getHeadingStyle(context, fontSize: 26),
                 ),
                 const SizedBox(height: ThemeSizes.marginMedium),
-                const Text(
+                Text(
                   'لقد أتممت جميع الأذكار بحمد الله',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                    height: 1.5,
-                  ),
+                  style: AppTheme.getBodyStyle(context, fontSize: 18),
                 ),
                 const SizedBox(height: ThemeSizes.marginSmall),
-                const Text(
+                Text(
                   'تقبل الله منك، وجزاك الله خيراً',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                    height: 1.5,
-                  ),
+                  style: AppTheme.getBodyStyle(context, fontSize: 18, isSecondary: true),
                 ),
                 const SizedBox(height: ThemeSizes.marginLarge),
                 
                 // زر قراءة الأذكار مرة أخرى
-                AdvancedGlassmorphicButton(
+                SoftButton(
                   text: 'قراءتها مرة أخرى',
                   icon: Icons.replay_rounded,
                   onPressed: _resetAllAthkar,
                   isFullWidth: true,
-                  opacity: 0.2,
+                  backgroundColor: categoryColor,
                   borderRadius: ThemeSizes.borderRadiusMedium,
                 ),
                 
                 const SizedBox(height: ThemeSizes.marginMedium),
                 
                 // زر العودة إلى أقسام الأذكار
-                AdvancedGlassmorphicButton(
+                SoftButton(
                   text: 'العودة إلى أقسام الأذكار',
                   icon: Icons.home_rounded,
                   onPressed: () => Navigator.of(context).pop(),
                   isOutlined: true,
                   isFullWidth: true,
-                  opacity: 0.2,
                   borderRadius: ThemeSizes.borderRadiusMedium,
                 ),
               ],
@@ -580,23 +566,27 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
               vertical: ThemeSizes.marginSmall,
             ),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: AppTheme.getSurfaceColor(context),
               borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
+              border: Border.all(
+                color: AppTheme.getDividerColor(context),
+                width: ThemeSizes.borderWidthThin,
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   icon,
-                  color: Colors.white,
+                  color: AppTheme.getTextColor(context, isSecondary: true),
                   size: 18,
                 ),
                 const SizedBox(width: ThemeSizes.marginSmall),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                  style: TextStyle(
+                    color: AppTheme.getTextColor(context, isSecondary: true),
+                    fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
                 ),
@@ -614,8 +604,10 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     if (_isLoading) {
       return ScreenTemplate(
         title: widget.category.name,
-        body: const Center(
-          child: LoadingWidget(),
+        body: Center(
+          child: LoadingWidget(
+            color: IconHelper.getCategoryColor(widget.category.id),
+          ),
         ),
       );
     }
@@ -669,10 +661,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                 const SizedBox(height: ThemeSizes.marginSmall),
                 Text(
                   'قد يكون هناك خطأ في تحميل البيانات',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: AppTheme.getBodyStyle(context, isSecondary: true),
                 ),
               ],
             ),
@@ -731,12 +720,10 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
     final bool isHiding = isCompleted; // هذا المتغير يستخدم لحالات الإخفاء التدريجي
     final categoryColor = IconHelper.getCategoryColor(_loadedCategory.id);
     
-    return AdvancedGlassmorphicCard(
-      elevation: ThemeSizes.cardElevationHigh,
+    return SoftCard(
+      elevation: 2,
       borderRadius: ThemeSizes.borderRadiusLarge,
-      blur: 5.0,
-      opacity: 0.18,
-      borderColor: categoryColor,
+      hasBorder: true,
       onTap: () => _incrementCounter(index),
       child: AnimatedBuilder(
         animation: _pulseAnimation,
@@ -758,11 +745,11 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
               right: -15,
               top: 20,
               child: Opacity(
-                opacity: 0.08,
+                opacity: 0.05,
                 child: Icon(
                   Icons.format_quote,
                   size: 100,
-                  color: Colors.white.withOpacity(0.1),
+                  color: categoryColor,
                 ),
               ),
             ),
@@ -779,7 +766,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                       // عدد التكرار
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.2),
+                          color: categoryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
                         ),
                         padding: const EdgeInsets.symmetric(
@@ -791,14 +778,14 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                           children: [
                             Icon(
                               IconHelper.getIconFromString(_loadedCategory.icon),
-                              color: Colors.white,
+                              color: categoryColor,
                               size: 16,
                             ),
                             const SizedBox(width: ThemeSizes.marginSmall),
                             Text(
                               'عدد التكرار ${counter}/${thikr.count}',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: categoryColor,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                               ),
@@ -818,7 +805,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                               child: IconButton(
                                 icon: Icon(
                                   isFavorite ? Icons.favorite : Icons.favorite_border,
-                                  color: Colors.white,
+                                  color: isFavorite ? ThemeColors.error : AppTheme.getTextColor(context, isSecondary: true),
                                   size: 20,
                                 ),
                                 onPressed: () => _toggleFavorite(index),
@@ -841,11 +828,13 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                       horizontal: ThemeSizes.marginLarge,
                       vertical: ThemeSizes.marginLarge,
                     ),
-                    decoration: ThemeEffects.getGlassMorphismDecoration(
-                      opacity: 0.1,
-                      borderRadius: ThemeSizes.borderRadiusMedium,
-                      borderColor: Colors.white,
-                      blurRadius: 8.0,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getSurfaceColor(context),
+                      borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
+                      border: Border.all(
+                        color: AppTheme.getDividerColor(context),
+                        width: ThemeSizes.borderWidthThin,
+                      ),
                     ),
                     child: Stack(
                       children: [
@@ -856,7 +845,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                           child: Icon(
                             Icons.format_quote,
                             size: 18,
-                            color: Colors.white.withOpacity(0.5),
+                            color: categoryColor.withOpacity(0.3),
                           ),
                         ),
                         
@@ -865,7 +854,9 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                             Text(
                               thikr.content,
                               textAlign: TextAlign.center,
-                              style: AthkarThemeManager.getThikrTextStyle(),
+                              style: AthkarThemeManager.getThikrTextStyle().copyWith(
+                                color: AppTheme.getTextColor(context),
+                              ),
                             ),
                           ],
                         ),
@@ -879,7 +870,7 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                             child: Icon(
                               Icons.format_quote,
                               size: 18,
-                              color: Colors.white.withOpacity(0.5),
+                              color: categoryColor.withOpacity(0.3),
                             ),
                           ),
                         ),
@@ -898,14 +889,13 @@ class _AthkarDetailsScreenState extends State<AthkarDetailsScreen>
                           vertical: ThemeSizes.marginSmall,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.2),
+                          color: categoryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusLarge),
-                          boxShadow: ThemeEffects.lightCardShadow,
                         ),
                         child: Text(
                           thikr.source!,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: categoryColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                           ),

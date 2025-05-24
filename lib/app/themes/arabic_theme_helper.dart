@@ -41,7 +41,7 @@ class ArabicThemeHelper {
       height: 1.5, // ارتفاع مناسب للنصوص العربية
       fontSize: fontSize ?? (isLarge ? 18 : 16),
       fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-      color: textColor ?? (isSecondary ? const Color(0xCCFFFFFF) : Colors.white),
+      color: textColor ?? (isSecondary ? ThemeColors.lightTextSecondary : ThemeColors.lightTextPrimary), // استخدام الألوان من ThemeColors
       // خصائص إضافية للغة العربية
       letterSpacing: -0.3, // تقليل التباعد بين الحروف العربية
       wordSpacing: 0.5, // زيادة التباعد بين الكلمات
@@ -51,24 +51,24 @@ class ArabicThemeHelper {
   
   /// زخرفة لبطاقات مخصصة مع تحسين لمعايير الوصول
   static BoxDecoration getAccessibleCardDecoration(BuildContext context, {
-    double opacity = 0.15,
-    double borderRadius = ThemeSizes.borderRadiusMedium,
+    double opacity = ThemeColors.opacityMedium, // استخدام شفافية متوسطة
+    double borderRadius = ThemeSizes.borderRadiusLarge, // زيادة نصف القطر للبطاقات
   }) {
     final isDark = isDarkMode(context);
-    final baseColor = isDark ? Colors.white : ThemeColors.primary;
+    final baseColor = isDark ? ThemeColors.darkCardBackground : ThemeColors.lightCardBackground; // استخدام ألوان البطاقات المخصصة
     
     return BoxDecoration(
       color: baseColor.withOpacity(opacity),
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
-        color: baseColor.withOpacity(isDark ? 0.3 : 0.2),
-        width: 1,
+        color: baseColor.withOpacity(isDark ? 0.4 : 0.3), // زيادة شفافية الحدود للوضوح
+        width: ThemeSizes.borderWidthNormal, // استخدام سمك الحدود الطبيعي
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
+          color: Colors.black.withOpacity(isDark ? 0.4 : 0.2), // تعديل الظل ليتناسب مع الزجاجية
+          blurRadius: ThemeSizes.marginMedium, // زيادة التضبيب
+          offset: const Offset(0, ThemeSizes.marginSmall), // تعديل الإزاحة
         ),
       ],
     );
@@ -80,12 +80,15 @@ class ArabicThemeHelper {
     double borderRadius = ThemeSizes.borderRadiusMedium,
   }) {
     final isDark = isDarkMode(context);
+    final buttonColor = ThemeColors.primaryLight; // اللون الأخضر المفضل
+    final textColor = isDark ? Colors.white : Colors.white; // نص أبيض على الأزرار
     
     if (isOutlined) {
       return OutlinedButton.styleFrom(
-        foregroundColor: isDark ? Colors.white : ThemeColors.primary,
+        foregroundColor: textColor, // لون النص للأزرار المحددة
         side: BorderSide(
-          color: isDark ? Colors.white.withOpacity(0.5) : ThemeColors.primary,
+          color: buttonColor.withOpacity(isDark ? 0.7 : 0.5), // حدود شفافة للأزرار المحددة
+          width: ThemeSizes.borderWidthNormal, // سمك الحدود
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
@@ -95,14 +98,14 @@ class ArabicThemeHelper {
           fontWeight: FontWeight.bold,
         ),
         padding: const EdgeInsets.symmetric(
-          horizontal: ThemeSizes.marginMedium,
-          vertical: ThemeSizes.marginSmall,
+          horizontal: ThemeSizes.marginLarge, // زيادة التباعد الأفقي
+          vertical: ThemeSizes.marginMedium, // زيادة التباعد العمودي
         ),
       );
     } else {
       return ElevatedButton.styleFrom(
-        backgroundColor: isDark ? ThemeColors.primaryLight : ThemeColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: buttonColor.withOpacity(ThemeColors.opacityMedium), // خلفية شبه شفافة
+        foregroundColor: textColor, // لون النص
         textStyle: const TextStyle(
           fontFamily: 'Cairo',
           fontWeight: FontWeight.bold,
@@ -111,9 +114,10 @@ class ArabicThemeHelper {
           borderRadius: BorderRadius.circular(borderRadius),
         ),
         padding: const EdgeInsets.symmetric(
-          horizontal: ThemeSizes.marginMedium,
-          vertical: ThemeSizes.marginSmall,
+          horizontal: ThemeSizes.marginLarge,
+          vertical: ThemeSizes.marginMedium,
         ),
+        shadowColor: Colors.transparent, // إزالة الظل التقليدي
       );
     }
   }
@@ -126,7 +130,7 @@ class ArabicThemeHelper {
     Widget? suffixIcon,
   }) {
     final isDark = isDarkMode(context);
-    final fillColor = isDark ? Colors.grey[800] : Colors.white.withOpacity(0.1);
+    final fillColor = isDark ? ThemeColors.darkCardBackground.withOpacity(ThemeColors.opacityLight) : ThemeColors.lightCardBackground.withOpacity(ThemeColors.opacityLight); // استخدام ألوان البطاقات كخلفية
     
     return InputDecoration(
       labelText: labelText,
@@ -142,29 +146,31 @@ class ArabicThemeHelper {
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
         borderSide: BorderSide(
-          color: isDark ? Colors.grey[600]! : Colors.white.withOpacity(0.3),
+          color: isDark ? ThemeColors.primaryLight.withOpacity(0.5) : Colors.white.withOpacity(0.3),
+          width: ThemeSizes.borderWidthNormal,
         ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
         borderSide: BorderSide(
-          color: isDark ? Colors.grey[600]! : Colors.white.withOpacity(0.3),
+          color: isDark ? ThemeColors.primaryLight.withOpacity(0.5) : Colors.white.withOpacity(0.3),
+          width: ThemeSizes.borderWidthNormal,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(ThemeSizes.borderRadiusMedium),
         borderSide: BorderSide(
-          color: isDark ? ThemeColors.primaryLight : Colors.white,
+          color: ThemeColors.accentLight, // لون مميز عند التركيز
           width: ThemeSizes.borderWidthThick,
         ),
       ),
       hintStyle: TextStyle(
         fontFamily: 'Cairo',
-        color: isDark ? Colors.grey[500] : Colors.white.withOpacity(0.5),
+        color: isDark ? ThemeColors.darkTextSecondary.withOpacity(0.7) : ThemeColors.lightTextSecondary.withOpacity(0.7),
       ),
       labelStyle: TextStyle(
         fontFamily: 'Cairo',
-        color: isDark ? Colors.grey[400] : Colors.white.withOpacity(0.7),
+        color: isDark ? ThemeColors.darkTextPrimary.withOpacity(0.8) : ThemeColors.lightTextPrimary.withOpacity(0.8),
       ),
       // التوجيه المناسب للعربية
       alignLabelWithHint: true,
